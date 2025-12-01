@@ -4,14 +4,20 @@ module CSHRL-Core
   (State Action Reward : Set)
   (step                : State → Action → State × Reward)
   (_≤ᵣ_                : Reward → Reward → Set)
+  -- Requirements for calculating optimal value
+  (max                 : Reward → Reward → Reward)
+  (bottom              : Reward)
+  (all-actions         : List Action)
   where
 
 open import Codata.Musical.Stream
 open import Codata.Musical.Notation
 open import Relation.Binary.PropositionalEquality
-open import Data.Product using (proj₁; proj₂; _,_)
-open import Data.Bool using (true; false)
+open import Data.Product using (proj₁; proj₂; _×_; _,_)
+open import Data.Bool using (Bool; true; false)
 open import Relation.Nullary using (¬_)
+open import Data.List using (List; map; foldr)
+open import Function using (_∘_)
 
 infix 4 _≤ᵣ_
 infix 4 _≤ₛ_
@@ -20,18 +26,35 @@ StreamR : Set
 StreamR = Stream Reward
 
 ------------------------------------------------------------------------
--- 1. Coinductive Value
--- The value of a policy is the stream of rewards it generates.
--- We define this for a constant action 'a' to simplify the core lemma.
+-- 1. Supremum of Streams
+-- Since we are constructive, we define "max" as a stream whose head
+-- is the max of heads, and whose tail is the supremum of tails.
 ------------------------------------------------------------------------
 
-value : Action → State → StreamR
-value a s with step s a
-... | s' , r = r ∷ ♯ value a s'
+max-list : List Reward → Reward
+max-list = foldr max bottom
+
+supremum : List StreamR → StreamR
+head (supremum xs) = max-list (map head xs)
+tail (supremum xs) = ♯ supremum (map (tail ∘ force) xs)
 
 ------------------------------------------------------------------------
--- 2. Coinductive Order
--- A stream x is "better" than y if its head is better, and its tail is better.
+-- 2. Optimal Value and Action Value (Mutually Coinductive)
+------------------------------------------------------------------------
+
+-- value s: The stream obtained by acting optimally from s forever.
+value : State → StreamR
+
+-- action-value s a: The stream obtained by doing 'a', then acting optimally.
+action-value : State → Action → StreamR
+
+value s = supremum (map (action-value s) all-actions)
+
+action-value s a with step s a
+... | s' , r = r ∷ ♯ value s'
+
+------------------------------------------------------------------------
+-- 3. Coinductive Order
 ------------------------------------------------------------------------
 
 data _≤ₛ_ : StreamR → StreamR → Set where
@@ -41,44 +64,35 @@ data _≤ₛ_ : StreamR → StreamR → Set where
              x ≤ₛ y
 
 ------------------------------------------------------------------------
--- 3. The Symmetric Homomorphism
--- This is the heart of the theory. It defines what it means for a 
--- "Ranking of Actions" (_≤ₐ_) to be a valid symmetry of the world.
+-- 4. The Symmetric Homomorphism
+-- Updated to refer to the optimal action-value instead of inertial value.
 ------------------------------------------------------------------------
 
 record CoindHomo : Set₁ where
   field
-    -- The Ranking: "Is action 'a' worse than or equal to 'b' in state 's'?"
     _≤ₐ_      : State → Action → Action → Bool
     
-    -- Strictness: No two actions produce identical futures (Distinguishability)
-    strict    : ∀ a b s → a ≢ b → ¬ (value a s ≡ value b s)
+    -- Strictness: No two actions produce identical optimal futures
+    strict    : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
     
-    -- Preservation (The Homomorphism Condition):
-    -- If the ranking says 'a ≤ b', then the world MUST reflect this:
-    -- 1. Immediate reward of a ≤ Immediate reward of b
-    -- 2. Future stream of a ≤ Future stream of b
+    -- Preservation: The ranking mirrors the relation between action-values
     preserves : ∀ a b s →
                 _≤ₐ_ s a b ≡ true →
-                let (s₁ , r₁) = step s a
-                    (s₂ , r₂) = step s b
-                in  r₁ ≤ᵣ r₂ × ∞ (value a s₁ ≤ₛ value b s₂)
+                let v₁ = action-value s a
+                    v₂ = action-value s b
+                in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
 
 open CoindHomo {{...}} public
 
 ------------------------------------------------------------------------
--- 4. The Optimality Theorem
--- We do not "search" for the optimum here. We prove a property about it.
--- Theorem: IF 'opt' is an action ranked higher than 'other',
--- THEN 'opt' yields a better reward stream than 'other'.
+-- 5. The Optimality Theorem
 ------------------------------------------------------------------------
 
 optimality : ⦃ h : CoindHomo ⦄ (s : State) (other opt : Action) →
-             (_ : _≤ₐ_ s other opt ≡ true) → -- Premise: Ranking holds
-             value other s ≤ₛ value opt s
+             (_ : _≤ₐ_ s other opt ≡ true) →
+             action-value s other ≤ₛ action-value s opt
 optimality ⦃ h ⦄ s other opt ranking-holds = ≤ₛ-intro r≤ tail≤
   where
-    -- We use the 'preserves' field to extract the stream inequality
     result = preserves other opt s ranking-holds
     r≤     = proj₁ result
     tail≤  = proj₂ result

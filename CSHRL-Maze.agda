@@ -3,12 +3,13 @@
 module CSHRL-Maze where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.Nat using (ℕ; zero; suc; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
 open import Relation.Nullary using (¬_)
 open import Codata.Musical.Stream
 open import Codata.Musical.Notation
+open import Data.List using (List; _∷_; [])
 
 -- 1. Domain Definitions
 data State : Set where
@@ -41,8 +42,11 @@ reward-fn _  = 0
 step : State → Action → State × Reward
 step s a = (move s a , reward-fn (move s a))
 
--- 2. Import Core (No argmax needed)
-open import CSHRL-Core State Action Reward step _≤ᵣ_
+all-actions : List Action
+all-actions = Fwd ∷ Bwd ∷ []
+
+-- 2. Import Core with new parameters
+open import CSHRL-Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Homo
 
@@ -66,14 +70,14 @@ my-rank P2 Fwd Bwd = false
 my-rank P2 Bwd Fwd = true
 my-rank P2 Bwd Bwd = true
 
--- Postulates for now to show structure
+-- Postulates updated to match new Core definitions
 postulate
-  strict-impl : ∀ a b s → a ≢ b → ¬ (value a s ≡ value b s)
+  strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   my-rank s a b ≡ true →
-                  let (s₁ , r₁) = step s a
-                      (s₂ , r₂) = step s b
-                  in  r₁ ≤ᵣ r₂ × ∞ (value a s₁ ≤ₛ value b s₂)
+                  let v₁ = action-value s a
+                      v₂ = action-value s b
+                  in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
 
 instance
   MyHomo : CoindHomo

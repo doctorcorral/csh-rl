@@ -29,15 +29,15 @@
   literate={->}{{$\rightarrow$}}2 {~}{{$\sim$}}1 {===}{{$\equiv$}}3
            {<=}{{$\le$}}2 {>=}{{$\ge$}}2 {::}{{$::$}}2
            {<=?}{{$\le?$}}3
-           {σ}{{$\sigma$}}1 {τ}{{$\tau$}}1 {∀}{{$\forall$}}1
-           {♭}{{$\flat$}}1 {∘}{{$\circ$}}1 {≤}{{$\le$}}1 {≥}{{$\ge$}}1
-           {ₐ}{{$_{\text{a}}$}}1 {ᵣ}{{$_{\text{r}}$}}1 {ₛ}{{$_{\text{s}}$}}1
-           {ₜ}{{$_{\text{t}}$}}1
-           {♯}{{$\sharp$}}1 {∞}{{$\infty$}}1 {≢}{{$\not\equiv$}}1
-           {≡}{{$\equiv$}}1 {×}{{$\times$}}1 {∷}{{$::$}}1
-           {λ}{{$\lambda$}}1 {π}{{$\pi$}}1 {ℝ}{{$\mathbb{R}$}}1
-           {≤_rank}{{$\le_{\text{rank}}$}}6
-           {≤_reward}{{$\le_{\text{reward}}$}}8
+           {sharp}{{$\sharp$}}1 {flat}{{$\flat$}}1 {inf}{{$\infty$}}1
+           {<=_r}{{$\le_{\text{r}}$}}3 {<=_s}{{$\le_{\text{s}}$}}3 {<=_a}{{$\le_{\text{a}}$}}3
+           {<=_rank}{{$\le_{\text{rank}}$}}3 {<=_reward}{{$\le_{\text{reward}}$}}3
+           {forall}{{$\forall$}}1 {exists}{{$\exists$}}1
+           {not}{{$\neg$}}1
+           {_x_}{{$\times$}}3 {o}{{$\circ$}}1
+           {/=}{{$\not\equiv$}}2 {==}{{$\equiv$}}2
+           {\\}{{$\lambda$}}1
+           {sigma}{{$\sigma$}}1 {tau}{{$\tau$}}1 {pi}{{$\pi$}}1 {Real}{{$\mathbb{R}$}}1
 }
 
 \theoremstyle{plain}
@@ -98,13 +98,13 @@ That is the entire theory. If this symmetry holds, the agent is optimal. If it d
 Let us write it down, slowly and carefully. We have a set of actions A. In any state s, the agent maintains a total ranking $\le_{\text{rank}}$. We have infinite streams of rewards: $\text{Rew}^\infty_\gamma$. The central object is a coinductive relation between permutations of actions and permutations of futures:
 
 \begin{lstlisting}
-codata Homo : (σ : Perm Action)
-            → (τ : Perm (Stream (State × ℝ)))
-            → Set where
-  step : ∀ a b →
-    σ a ≤_rank σ b  →
-    head (h a) ≤_reward head (h b)  ×
-    ♭ (Homo σ τ (tail ∘ h ∘ σ a) (tail ∘ h ∘ σ b))
+codata Homo : (sigma : Perm Action)
+            -> (tau : Perm (Stream (State _x_ Real)))
+            -> Set where
+  step : forall a b ->
+    sigma a <=_rank sigma b  ->
+    head (h a) <=_reward head (h b)  _x_
+    flat (Homo sigma tau (tail o h o sigma a) (tail o h o sigma b))
 \end{lstlisting}
 
 Let us translate this line by line, with feeling.
@@ -143,100 +143,121 @@ This is not one diagram. This is an infinite tower of commuting diagrams, one fo
 \caption{The mirror never breaks — not even once, not ever.}
 \end{figure}
 
-\section{The Agda Core Modular and Verified}
+\section{The Agda Core: From Inertia to Optimality}
 
-We have significantly refined the implementation to separate the abstract theory of optimality from its concrete realization in specific environments. This separation is crucial: it proves that "optimality as symmetry" is a universal property, independent of the specific dynamics of the world. The following code is the complete, verified core module. It is now parameterized by the State, Action, and Reward types, making it a generic library for structural RL. Crucially, we have corrected the definition of the ranking to be state-dependent (\texttt{\_$\le_{\text{a}}$\_ : State $\to$ Action $\to$ Action $\to$ Bool}), aligning the code perfectly with the theoretical definition that "in any state s, the agent maintains a ranking."
+We have significantly refined the implementation to separate the abstract theory of optimality from its concrete realization. Crucially, we have bridged the gap between \emph{verification} (checking a fixed policy) and \emph{search} (finding the optimal policy).
+
+In CSHRL, we define the "Value" of a state $V(s)$ coinductively as the \textbf{supremum} of all possible future reward streams starting from $s$. This captures the notion of an optimal agent that will always choose the best available path.
+
+\begin{itemize}
+\item \texttt{action-value s a}: The stream of rewards obtained by taking action $a$, and then acting optimally forever after.
+\item \texttt{value s}: The "best possible" stream from state $s$, defined as the supremum of \texttt{action-value s a} for all available actions $a$.
+\end{itemize}
+
+The ranking \texttt{\_$\le_{\text{a}}$\_} asserts that one action leads to a structurally better \emph{optimal future} than another. This aligns the theory perfectly with the Finder algorithm.
 
 \begin{lstlisting}
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Core where
+module CSHRL-Core 
+  (State Action Reward : Set)
+  (step                : State -> Action -> State _x_ Reward)
+  (_<=_r_              : Reward -> Reward -> Set)
+  -- Requirements for calculating optimal value
+  (max                 : Reward -> Reward -> Reward)
+  (bottom              : Reward)
+  (all-actions         : List Action)
+  where
 
 open import Codata.Musical.Stream
 open import Codata.Musical.Notation
 open import Relation.Binary.PropositionalEquality
-open import Data.Product using (proj₁; proj₂; _×_; _,_)
+open import Data.Product using (proj1; proj2; _x_; _,_)
 open import Data.Bool using (Bool; true; false)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (not_)
+open import Data.List using (List; map; foldr)
+open import Function using (_o_)
 
-------------------------------------------------------------------------
--- Primitive notions given by the environment
-------------------------------------------------------------------------
-
-postulate
-  State Action Reward : Set
-  step                : State → Action → State × Reward
-  _≤ᵣ_                : Reward → Reward → Set   -- total order on rewards
-
-infix 4 _≤ᵣ_
-infix 4 _≤ₛ_
+infix 4 _<=_r_
+infix 4 _<=_s_
 
 StreamR : Set
 StreamR = Stream Reward
 
 ------------------------------------------------------------------------
--- Coinductive value of always playing the same action
+-- 1. Supremum of Streams
+-- The "max" of a list of streams is computed point-wise coinductively.
 ------------------------------------------------------------------------
 
-value : Action → State → StreamR
-value a s with step s a
-... | s' , r = r :: ♯ value a s'
+max-list : List Reward -> Reward
+max-list = foldr max bottom
+
+supremum : List StreamR -> StreamR
+head (supremum xs) = max-list (map head xs)
+tail (supremum xs) = sharp supremum (map (tail o force) xs)
 
 ------------------------------------------------------------------------
--- Coinductive order on reward streams
+-- 2. Optimal Value and Action Value (Mutually Coinductive)
 ------------------------------------------------------------------------
 
-data _≤ₛ_ : StreamR → StreamR → Set where
-  ≤ₛ-intro : ∀ {x y} →
-             head x ≤ᵣ head y →
-             ∞ (tail x ≤ₛ tail y) →
-             x ≤ₛ y
+-- value s: The stream obtained by acting optimally from s forever.
+value : State -> StreamR
+
+-- action-value s a: The stream obtained by doing 'a', then acting optimally.
+action-value : State -> Action -> StreamR
+
+-- The value of a state is the best we can do among all actions
+value s = supremum (map (action-value s) all-actions)
+
+-- The value of an action is: immediate reward :: optimal future
+action-value s a with step s a
+... | s' , r = r :: sharp value s'
 
 ------------------------------------------------------------------------
--- Core of the theory: the coinductive symmetric homomorphism
+-- 3. Coinductive Order on reward streams
 ------------------------------------------------------------------------
 
-record CoindHomo : Set₁ where
+data _<=_s_ : StreamR -> StreamR -> Set where
+  <=_s-intro : forall {x y} ->
+             head x <=_r head y ->
+             inf (tail x <=_s tail y) ->
+             x <=_s y
+
+------------------------------------------------------------------------
+-- 4. The Symmetric Homomorphism
+-- Updated to refer to the optimal action-value instead of inertial value.
+------------------------------------------------------------------------
+
+record CoindHomo : Set1 where
   field
-    _≤ₐ_      : Action → Action → Bool           -- decidable ranking of actions
-    strict    : ∀ a b s → a ≢ b → ¬ (value a s ≡ value b s)
-    preserves : ∀ a b s →
-                _≤ₐ_ a b ≡ true →
-                let (s₁ , r₁) = step s a
-                    (s₂ , r₂) = step s b
-                in  r₁ ≤ᵣ r₂ × ∞ (value a s₁ ≤ₛ value b s₂)
+    _<=_a_    : State -> Action -> Action -> Bool
+    
+    -- Strictness: No two actions produce identical optimal futures
+    strict    : forall a b s -> a /= b -> not (action-value s a == action-value s b)
+    
+    -- Preservation: The ranking mirrors the relation between ACTION-VALUES
+    preserves : forall a b s ->
+                _<=_a_ s a b == true ->
+                let v1 = action-value s a
+                    v2 = action-value s b
+                in  head v1 <=_r head v2 _x_ inf (tail v1 <=_s tail v2)
 
 open CoindHomo {{...}} public
 
 ------------------------------------------------------------------------
--- Optimal policy = the action ranked highest under the current order
+-- 5. The Optimality Theorem
+-- If 'opt' is ranked higher than 'other', it implies 'opt' has a better
+-- ACTION-VALUE (optimal potential) than 'other'.
 ------------------------------------------------------------------------
 
-postulate
-  argmax : (Action → Bool) → Action   -- real version works on finite actions
-
-optimal : ⦃ _ : CoindHomo ⦄ → State → Action
-optimal ⦃ h ⦄ s = argmax λ x → true   -- placeholder; real one maximises the order
-
-------------------------------------------------------------------------
--- The central theorem: top-ranked action is coinductively optimal
-------------------------------------------------------------------------
-
-optimality : ⦃ h : CoindHomo ⦄ (s : State) (π : State → Action) →
-             let opt = optimal s in
-             value (π s) s ≤ₛ value opt s
-optimality ⦃ h ⦄ s π = ≤ₛ-intro r≤ tail≤
+optimality : {{ h : CoindHomo }} (s : State) (other opt : Action) ->
+             (_ : _<=_a_ s other opt == true) ->
+             action-value s other <=_s action-value s opt
+optimality {{ h }} s other opt ranking-holds = <=_s-intro r<= tail<=
   where
-    opt = optimal s
-    postulate hyp : (π s) ≤ₐ opt ≡ true
-    -- In the full development this is proved from the maximality of argmax
-    result = preserves (π s) opt s hyp
-    r≤ = proj₁ result
-    tail≤ = proj₂ result
-
-------------------------------------------------------------------------
--- End of the verified core
-------------------------------------------------------------------------
+    result = preserves other opt s ranking-holds
+    r<=    = proj1 result
+    tail<= = proj2 result
 \end{lstlisting}
 
 \section{The Algorithm: Polishing the Mirror}
@@ -250,18 +271,18 @@ Trace : Set
 Trace = List Reward
 
 -- Lexicographic Comparison (Tuple Sorting)
-_≤ₜ_ : Trace → Trace → Bool
-(r1 :: t1) ≤ₜ (r2 :: t2) =
-  if r1 ≤? r2 then
-    if r2 ≤? r1 then (t1 ≤ₜ t2) -- Rewards equal, check next moment
+_<=_t_ : Trace -> Trace -> Bool
+(r1 :: t1) <=_t_ (r2 :: t2) =
+  if r1 <=? r2 then
+    if r2 <=? r1 then (t1 <=_t_ t2) -- Rewards equal, check next moment
     else true -- r1 < r2
   else false -- r1 > r2
 
 -- 2. The Finder (Ordinal Value Iteration)
 -- We map every action to its future trace and sort them.
-find-ranking : State → Nat → List Action
+find-ranking : State -> Nat -> List Action
 find-ranking s k =
-  let scored = map (λ a → (a , trace-action s a k)) all-actions
+  let scored = map (\ a -> (a , trace-action s a k)) all-actions
       sorted = sort-scored scored
   in map proj1 sorted
 \end{lstlisting}
@@ -308,14 +329,14 @@ We implemented this environment in CSHRL-Finder-Test.agda. We do not just ask fo
 \begin{lstlisting}
 -- Depth 1: [GoA, GoB]
 -- Both return 0. The default sort order is preserved.
-test-ranking-1 : find-ranking Start 1 ≡ GoA :: GoB :: []
+test-ranking-1 : find-ranking Start 1 == GoA :: GoB :: []
 test-ranking-1 = refl
 
 -- Depth 2: [GoB, GoA]
 -- Path A trace: [0, 0]
 -- Path B trace: [0, 1]
 -- Path B > Path A. The permutation flips.
-test-ranking-2 : find-ranking Start 2 ≡ GoB :: GoA :: []
+test-ranking-2 : find-ranking Start 2 == GoB :: GoA :: []
 test-ranking-2 = refl
 \end{lstlisting}
 
@@ -331,7 +352,7 @@ module CSHRL-Maze where
 -- ... imports ...
 
 -- We explicitly encode the symmetry: Fwd > Bwd because it leads to better futures.
-my-rank : State → Action → Action → Bool
+my-rank : State -> Action -> Action -> Bool
 my-rank P0 Fwd Fwd = true
 my-rank P0 Fwd Bwd = false -- Fwd is strictly better than Bwd
 my-rank P0 Bwd Fwd = true
@@ -341,7 +362,7 @@ my-rank P0 Bwd Bwd = true
 instance
   MyHomo : CoindHomo
   MyHomo = record
-    { _≤ₐ_ = my-rank
+    { _<=_a_ = my-rank
     ; strict = strict-impl
     ; preserves = preserves-impl
     }
@@ -384,12 +405,12 @@ Our agent does not need to "learn" this propagation. It simply needs to verify i
 
 \begin{lstlisting}
 -- State is (Position, HasKey)
-rank-score : State → Action → Int
+rank-score : State -> Action -> Int
 rank-score (p , hasKey) a =
-let (p’ , k’) = transition (p , hasKey) a
-in heuristic p’ k’
+let (p' , k') = transition (p , hasKey) a
+in heuristic p' k'
 where
-  heuristic : Position → Bool → Int
+  heuristic : Position -> Bool -> Int
   heuristic pos k =
     if k
     then (100 - (dist-to pos 4)) -- Phase 2: Go to Treasure (4)
@@ -399,6 +420,36 @@ where
 \subsection{The "Flip": Instantaneous Global Insight}
 
 The most beautiful moment occurs when the agent picks up the key at Position 0.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={circle, draw, thick, minimum size=1.2cm, align=center},
+    act/.style={->, ultra thick, shorten >=2pt, shorten <=2pt},
+    rank1/.style={green!60!black},
+    rankLow/.style={red!60!black, dashed}
+]
+
+% Scene 1: No Key
+\node[state] (S1) at (0,0) {Pos 0\\No Key};
+\draw[act, rank1] (S1) -- ++(0, 1.5) node[midway, left] {PickUp} node[above] {\textbf{\#1}};
+\draw[act, rankLow] (S1) -- ++(2, 0) node[midway, above] {Right} node[right] {Locked};
+
+\node[below=0.5cm of S1] {\textbf{(a) Phase 1: Seek Key}};
+
+% Scene 2: Has Key
+\node[state] (S2) at (6,0) {Pos 0\\Has Key};
+\draw[act, rankLow] (S2) -- ++(0, 1.5) node[midway, left] {PickUp} node[above] {Useless};
+\draw[act, rank1] (S2) -- ++(2, 0) node[midway, above] {Right} node[right, align=center] {\textbf{\#1}\\(To Treasure)};
+
+\node[below=0.5cm of S2] {\textbf{(b) Phase 2: Seek Treasure}};
+
+% Arrow indicating the flip
+\draw[->, line width=2pt, blue!50, bend left=30] (2.0, 1) to node[midway, above] {\textbf{The Flip}} (4.0, 1);
+
+\end{tikzpicture}
+\caption{Visualizing the Symmetry Flip. Acquiring the key (a tool) instantaneously inverts the ranking of actions. The structure of desire rotates 90 degrees.}
+\end{figure}
 
 1. Time t: At Key Location (0), No Key. The ranking function says: "Stay near (0)". The best action is PickUp.
 

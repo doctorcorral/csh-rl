@@ -3,12 +3,13 @@
 module CSHRL-KeyDoor where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
 open import Relation.Nullary using (¬_)
 open import Codata.Musical.Stream
 open import Codata.Musical.Notation
+open import Data.List using (List; _∷_; [])
 
 -- 1. Domain Definitions
 
@@ -72,8 +73,11 @@ step s a =
   let s' = transition s a 
   in (s' , reward-fn s')
 
--- 2. Import Core (No argmax)
-open import CSHRL-Core State Action Reward step _≤ᵣ_
+all-actions : List Action
+all-actions = GoLeft ∷ GoRight ∷ PickUp ∷ Unlock ∷ []
+
+-- 2. Import Core with new parameters
+open import CSHRL-Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Structural Symmetry (The "Strategy")
 
@@ -105,12 +109,12 @@ s ≤ a rank b = (rank-score s a) <=? (rank-score s b)
 
 -- Postulate the proofs
 postulate
-  strict-impl : ∀ a b s → a ≢ b → ¬ (value a s ≡ value b s)
+  strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   _≤_rank_ s a b ≡ true →
-                  let (s₁ , r₁) = step s a
-                      (s₂ , r₂) = step s b
-                  in  r₁ ≤ᵣ r₂ × ∞ (value a s₁ ≤ₛ value b s₂)
+                  let v₁ = action-value s a
+                      v₂ = action-value s b
+                  in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
 
 instance
   KeyDoorHomo : CoindHomo
