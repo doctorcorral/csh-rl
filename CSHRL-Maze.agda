@@ -46,7 +46,8 @@ all-actions : List Action
 all-actions = Fwd ∷ Bwd ∷ []
 
 -- 2. Import Core with new parameters
-open import CSHRL-Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
+open import CSHRL-Core
+open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Homo
 
