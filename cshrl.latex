@@ -195,7 +195,7 @@ In CSHRL, we define the "Value" of a state $V(s)$ coinductively as the \textbf{s
 The ranking \texttt{\_$\le_{\text{a}}$\_} asserts that one action leads to a structurally better \emph{optimal future} than another. This aligns the theory perfectly with the Finder algorithm.
 
 \begin{lstlisting}
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --safe --guardedness #-}
 
 module CSHRL-Core 
   (State Action Reward : Set)
@@ -207,14 +207,14 @@ module CSHRL-Core
   (all-actions         : List Action)
   where
 
-open import Codata.Musical.Stream
-open import Codata.Musical.Notation
+open import Codata.Guarded.Stream
 open import Relation.Binary.PropositionalEquality
 open import Data.Product using (proj1; proj2; _x_; _,_)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Nullary using (not_)
 open import Data.List using (List; map; foldr)
 open import Function using (_(*@$\circ$@*)_)
+open import Data.Nat using (Nat; zero; suc)
 
 infix 4 _<=_r_
 infix 4 _<=_s_
@@ -230,36 +230,37 @@ StreamR = Stream Reward
 max-list : List Reward -> Reward
 max-list = foldr max bottom
 
-supremum : List StreamR -> StreamR
-head (supremum xs) = max-list (map head xs)
-tail (supremum xs) = sharp supremum (map (tail (*@$\circ$@*) force) xs)
-
 ------------------------------------------------------------------------
 -- 2. Optimal Value and Action Value (Mutually Coinductive)
 ------------------------------------------------------------------------
 
+-- Helper function: Value at depth n (Finite Horizon)
+-- We compute optimal value via structural recursion on depth (Safe)
+solve : State -> Nat -> Reward
+solve s zero    = max-list (map (\ a -> proj2 (step s a)) all-actions)
+solve s (suc n) = max-list (map (\ a -> solve (proj1 (step s a)) n) all-actions)
+
 -- value s: The stream obtained by acting optimally from s forever.
+-- Constructed safely using tabulate
 value : State -> StreamR
+value s = tabulate (solve s)
 
 -- action-value s a: The stream obtained by doing 'a', then acting optimally.
 action-value : State -> Action -> StreamR
-
--- The value of a state is the best we can do among all actions
-value s = supremum (map (action-value s) all-actions)
-
--- The value of an action is: immediate reward :: optimal future
-action-value s a with step s a
-... | s' , r = r :: sharp value s'
+head (action-value s a) = proj2 (step s a)
+tail (action-value s a) = value (proj1 (step s a))
 
 ------------------------------------------------------------------------
--- 3. Coinductive Order on reward streams
+-- 3. Coinductive Order on reward streams (Record based)
 ------------------------------------------------------------------------
 
-data _<=_s_ : StreamR -> StreamR -> Set where
-  <=_s-intro : forall {x y} ->
-             head x <=_r head y ->
-             inf (tail x <=_s tail y) ->
-             x <=_s y
+record _<=_s_ (x y : StreamR) : Set where
+  coinductive
+  field
+    head<= : head x <=_r head y
+    tail<= : tail x <=_s tail y
+
+open _<=_s_ public
 
 ------------------------------------------------------------------------
 -- 4. The Symmetric Homomorphism
@@ -278,7 +279,7 @@ record CoindHomo : Set1 where
                 _<=_a_ s a b == true ->
                 let v1 = action-value s a
                     v2 = action-value s b
-                in  head v1 <=_r head v2 _x_ inf (tail v1 <=_s tail v2)
+                in  head v1 <=_r head v2 _x_ (tail v1 <=_s tail v2)
 
 open CoindHomo {{...}} public
 
@@ -291,11 +292,8 @@ open CoindHomo {{...}} public
 optimality : {{ h : CoindHomo }} (s : State) (other opt : Action) ->
              (_ : _<=_a_ s other opt == true) ->
              action-value s other <=_s action-value s opt
-optimality {{ h }} s other opt ranking-holds = <=_s-intro r<= tail<=
-  where
-    result = preserves other opt s ranking-holds
-    r<=    = proj1 result
-    tail<= = proj2 result
+head<= (optimality {{ h }} s other opt ranking-holds) = proj1 (preserves other opt s ranking-holds)
+tail<= (optimality {{ h }} s other opt ranking-holds) = proj2 (preserves other opt s ranking-holds)
 \end{lstlisting}
 
 \section{The Algorithm: Polishing the Mirror}
