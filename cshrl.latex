@@ -216,7 +216,6 @@ open import Data.List using (List; map; foldr)
 open import Function using (_(*@$\circ$@*)_)
 open import Data.Nat using (Nat; zero; suc)
 
-infix 4 _<=_r_
 infix 4 _<=_s_
 
 StreamR : Set
