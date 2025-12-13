@@ -106,7 +106,7 @@ open Finder State Action Reward step _≤?_ default-action all-actions
 
 -- 4. Tests
 
--- We expect it to find a solution for N=4.
+-- We expect it to find a solution.
 -- A known solution for 4-Queens is (1, 3, 0, 2) (columns).
 -- Let's see if find-policy (Ongoing []) 4 finds the first step of a valid solution.
 -- Solution 1: [1, 3, 0, 2] -> First step 1.
@@ -147,7 +147,6 @@ test-queens = find-policy (Ongoing []) N
 -- head is 2.
 -- So we expect 2.
 
--- To use N=8, change N at the top.
 -- N=8 is solved efficiently by the Agda evaluator due to the lazy exploration and pruning of invalid states.
 
 -- Verify that the found policy picks a valid starting column.

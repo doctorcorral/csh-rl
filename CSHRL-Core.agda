@@ -1,15 +1,15 @@
-{-# OPTIONS --guardedness -WnoUnknownNamesInFixityDecl #-}
+{-# OPTIONS --safe --guardedness #-}
 
 module CSHRL-Core where
 
-open import Data.List using (List; foldr) renaming (map to list-map)
-open import Codata.Musical.Stream
-open import Codata.Musical.Notation
-open import Relation.Binary.PropositionalEquality
+open import Data.List using (List; map; foldr)
+open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Nullary using (¬_)
 open import Function using (_∘_)
+open import Data.Nat using (ℕ; zero; suc)
 
 -- Inner module with parameters
 module Core
@@ -22,7 +22,6 @@ module Core
   (all-actions         : List Action)
   where
 
-  infix 4 _≤ᵣ_
   infix 4 _≤ₛ_
 
   StreamR : Set
@@ -37,33 +36,38 @@ module Core
   max-list : List Reward → Reward
   max-list = foldr max bottom
 
-  supremum : List StreamR → StreamR
-  supremum xs = max-list (list-map head xs) ∷ ♯ supremum (list-map tail xs)
-
   ------------------------------------------------------------------------
   -- 2. Optimal Value and Action Value (Mutually Coinductive)
   ------------------------------------------------------------------------
+  -- We use a safe, structural definition for value construction
+  -- by tabulating the finite horizon optimal value at every depth.
+
+  -- Helper function: Value at depth n (Finite Horizon)
+  solve : State → ℕ → Reward
+  solve s zero    = max-list (map (λ a → proj₂ (step s a)) all-actions)
+  solve s (suc n) = max-list (map (λ a → solve (proj₁ (step s a)) n) all-actions)
 
   -- value s: The stream obtained by acting optimally from s forever.
+  -- Defined via tabulation of the solve function.
   value : State → StreamR
+  value s = tabulate (solve s)
 
   -- action-value s a: The stream obtained by doing 'a', then acting optimally.
   action-value : State → Action → StreamR
-
-  {-# TERMINATING #-}
-  value s = supremum (list-map (action-value s) all-actions)
-
-  action-value s a = let (s' , r) = step s a in r ∷ ♯ value s'
+  head (action-value s a) = proj₂ (step s a)
+  tail (action-value s a) = value (proj₁ (step s a))
 
   ------------------------------------------------------------------------
   -- 3. Coinductive Order
   ------------------------------------------------------------------------
 
-  data _≤ₛ_ : StreamR → StreamR → Set where
-    ≤ₛ-intro : ∀ {x y} →
-               head x ≤ᵣ head y →
-               ∞ (tail x ≤ₛ tail y) →
-               x ≤ₛ y
+  record _≤ₛ_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : tail x ≤ₛ tail y
+
+  open _≤ₛ_ public
 
   ------------------------------------------------------------------------
   -- 4. The Symmetric Homomorphism
@@ -73,16 +77,16 @@ module Core
   record CoindHomo : Set₁ where
     field
       _≤ₐ_      : State → Action → Action → Bool
-      
+
       -- Strictness: No two actions produce identical optimal futures
       strict    : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
-      
+
       -- Preservation: The ranking mirrors the relation between action-values
       preserves : ∀ a b s →
                   _≤ₐ_ s a b ≡ true →
                   let v₁ = action-value s a
                       v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
+                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
 
   open CoindHomo {{...}} public
 
@@ -93,8 +97,5 @@ module Core
   optimality : ⦃ h : CoindHomo ⦄ (s : State) (other opt : Action) →
                (_ : _≤ₐ_ s other opt ≡ true) →
                action-value s other ≤ₛ action-value s opt
-  optimality ⦃ h ⦄ s other opt ranking-holds = ≤ₛ-intro r≤ tail≤
-    where
-      result = preserves other opt s ranking-holds
-      r≤     = proj₁ result
-      tail≤  = proj₂ result
+  head≤ (optimality ⦃ h ⦄ s other opt ranking) = proj₁ (preserves other opt s ranking)
+  tail≤ (optimality ⦃ h ⦄ s other opt ranking) = proj₂ (preserves other opt s ranking)

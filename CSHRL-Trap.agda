@@ -118,4 +118,3 @@ module SparseFinder where
   test-insight : sparse-rank Start 1 ≡ TakeSafe ∷ TakeTrap ∷ Wait ∷ []
   test-insight = refl
 
-
