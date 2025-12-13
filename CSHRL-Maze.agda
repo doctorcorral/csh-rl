@@ -7,8 +7,7 @@ open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
 open import Relation.Nullary using (¬_)
-open import Codata.Musical.Stream
-open import Codata.Musical.Notation
+open import Codata.Guarded.Stream using (Stream; head; tail)
 open import Data.List using (List; _∷_; [])
 
 -- 1. Domain Definitions
@@ -45,7 +44,7 @@ step s a = (move s a , reward-fn (move s a))
 all-actions : List Action
 all-actions = Fwd ∷ Bwd ∷ []
 
--- 2. Import Core with new parameters
+-- 2. Import Core
 open import CSHRL-Core
 open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
@@ -71,14 +70,13 @@ my-rank P2 Fwd Bwd = false
 my-rank P2 Bwd Fwd = true
 my-rank P2 Bwd Bwd = true
 
--- Postulates updated to match new Core definitions
 postulate
   strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   my-rank s a b ≡ true →
                   let v₁ = action-value s a
                       v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
+                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
 
 instance
   MyHomo : CoindHomo

@@ -1,4 +1,3 @@
-
 {-# OPTIONS --guardedness #-}
 
 module CSHRL-Energy where
@@ -8,8 +7,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊔_; _≤_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
 open import Relation.Nullary using (¬_)
-open import Codata.Musical.Stream
-open import Codata.Musical.Notation
+open import Codata.Guarded.Stream using (Stream; head; tail)
 open import Data.List using (List; _∷_; [])
 
 ------------------------------------------------------------------------
@@ -127,9 +125,9 @@ score (pos , en) act =
          -- If we act Fwd, we die (score 0).
          -- If we act Bwd, we get closer to 0 (which is good for recharging).
          -- If we are at 0, Recharge is best.
-    if eq? pos 0
-    then (if eq-action? act Recharge then 50 else 0)
-    else (if eq-action? act Bwd then (50 ∸ n-pos) else 0)
+         if eq? pos 0
+         then (if eq-action? act Recharge then 50 else 0)
+         else (if eq-action? act Bwd then (50 ∸ n-pos) else 0)
 
 -- The Ranking Relation
 _≤_rank_ : State → Action → Action → Bool
@@ -142,7 +140,7 @@ postulate
                   _≤_rank_ s a b ≡ true →
                   let v₁ = action-value s a
                       v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × ∞ (tail v₁ ≤ₛ tail v₂)
+                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
 
 instance
   EnergyHomo : CoindHomo
@@ -151,5 +149,3 @@ instance
     ; strict = strict-impl
     ; preserves = preserves-impl
     }
-
-
