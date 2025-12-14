@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Maze where
+module CSHRL.Maze where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
@@ -45,7 +45,7 @@ all-actions : List Action
 all-actions = Fwd ∷ Bwd ∷ []
 
 -- 2. Import Core
-open import CSHRL-Core
+open import CSHRL.Core
 open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Homo

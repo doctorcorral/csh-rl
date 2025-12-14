@@ -31,24 +31,24 @@ git clone https://github.com/doctorcorral/csh-rl.git
 cd csh-rl/main
 ```
 Open in your editor (e.g., Emacs with agda-mode: `M-x` `agda-mode`).
-Load the core: `C-c C-l` in `CSHRL-Core.agda` (it should type-check instantly).
+Load the core: `C-c C-l` in `CSHRL.Core.agda` (it should type-check instantly).
 
 ### Usage
 
 Verifying the Core Theory
 
-Load `CSHRL-Core.agda` in Agda.
+Load `CSHRL.Core.agda` in Agda.
 The optimality theorem is `machine-checked—try` normalizing it with `C-c C-n` to see it unfold.
 Extend with your own environments: define step and `_≤ᵣ_` for your MDP, instantiate CoindHomo, and the proof holds for free.
 
 #### Running the Finder Algorithm
 
-Load `CSHRL-Finder-Test.agda`.
+Load `CSHRL.Finder-Test.agda`.
 Evaluate `test-ranking-2` with `C-c C-n` to see the symmetry flip in action.
 
 ### Code Explanation
 
-#### The core is in CSHRL-Core.agda (58 lines):
+#### The core is in CSHRL.Core.agda (58 lines):
 
 - `value`: Coinductive rollout of constant policies.
 - `_≤ₛ_`: Coinductive stream dominance.
@@ -57,9 +57,9 @@ Evaluate `test-ranking-2` with `C-c C-n` to see the symmetry flip in action.
 
 #### Extensions:
 
-- `CSHRL-Maze.agda`: Instantiates for a 1D grid world.
-- `CSHRL-KeyDoor.agda`: Handles hierarchical planning via symmetry flips.
-- `CSHRL-Finder-Test.agda`: Tests the ordinal symmetry finder.
+- `CSHRL.Maze.agda`: Instantiates for a 1D grid world.
+- `CSHRL.KeyDoor.agda`: Handles hierarchical planning via symmetry flips.
+- `CSHRL.Finder-Test.agda`: Tests the ordinal symmetry finder.
 
 
 ### Citation

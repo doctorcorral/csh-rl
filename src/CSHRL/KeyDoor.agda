@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-KeyDoor where
+module CSHRL.KeyDoor where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_; _⊔_)
@@ -76,7 +76,7 @@ all-actions : List Action
 all-actions = GoLeft ∷ GoRight ∷ PickUp ∷ Unlock ∷ []
 
 -- 2. Import Core with new parameters
-open import CSHRL-Core
+open import CSHRL.Core
 open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Structural Symmetry (The "Strategy")

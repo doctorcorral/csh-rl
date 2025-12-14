@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Trap where
+module CSHRL.Trap where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -48,7 +48,7 @@ all-actions = TakeTrap ∷ TakeSafe ∷ Wait ∷ []
 -- 2. Auto-Discovery using Finder
 -- We do NOT define a ranking manually. We ask the algorithm to find it.
 
-open import CSHRL-Finder
+open import CSHRL.Finder
 open Finder State Action Reward step _≤?_ TakeSafe all-actions
 
 -- 3. The Test
@@ -103,7 +103,7 @@ step-sparse Goal _ = (Goal , 100)
 
 -- Re-import finder with sparse step
 module SparseFinder where
-  open import CSHRL-Finder
+  open import CSHRL.Finder
   open Finder State Action Reward step-sparse _≤?_ TakeSafe all-actions hiding (trace-action) renaming (find-ranking to sparse-rank)
   
   -- Depth 0: All 0 (Immediate only). Order is stable (defaults).

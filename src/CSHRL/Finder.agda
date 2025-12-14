@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Finder where
+module CSHRL.Finder where
 
 open import Data.List using (List; []; _∷_; map; foldr)
 open import Data.Nat using (ℕ; zero; suc)
