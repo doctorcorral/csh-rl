@@ -1,6 +1,6 @@
 {-# OPTIONS --safe --guardedness #-}
 
-module CSHRL-Core where
+module CSHRL.Core where
 
 open import Data.List using (List; map; foldr)
 open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
