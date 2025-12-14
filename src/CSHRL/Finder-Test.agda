@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Finder-Test where
+module CSHRL.Finder-Test where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_)
@@ -43,7 +43,7 @@ all-actions : List Action
 all-actions = GoA ∷ GoB ∷ [] 
 
 -- 3. Import the Finder
-open import CSHRL-Finder State Action Reward step _≤?_ GoA all-actions
+open import CSHRL.Finder State Action Reward step _≤?_ GoA all-actions
 
 -- 4. The Test Cases
 
@@ -71,7 +71,7 @@ step-deep S2 _   = (S3 , 0)
 step-deep S3 _   = (S4 , 1)
 step-deep S4 _   = (S4 , 1)
 
-open CSHRL-Finder DeepState Action Reward step-deep _≤?_ GoA all-actions renaming (find-ranking to find-deep-rank)
+open CSHRL.Finder DeepState Action Reward step-deep _≤?_ GoA all-actions renaming (find-ranking to find-deep-rank)
 
 -- Depth 3: GoB wins.
 test-deep-rank : find-deep-rank S0 3 ≡ GoB ∷ GoA ∷ []

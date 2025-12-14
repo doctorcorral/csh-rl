@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Queens where
+module CSHRL.Queens where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -101,7 +101,7 @@ all-actions = gen-actions N
 default-action : Action
 default-action = 0
 
-open import CSHRL-Finder
+open import CSHRL.Finder
 open Finder State Action Reward step _≤?_ default-action all-actions
 
 -- 4. Tests

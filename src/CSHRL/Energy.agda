@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL-Energy where
+module CSHRL.Energy where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊔_; _≤_)
@@ -89,14 +89,14 @@ step s Wait = (s , 0)
 all-actions : List Action
 all-actions = Fwd ∷ Bwd ∷ Recharge ∷ Wait ∷ []
 
-open import CSHRL-Core
+open import CSHRL.Core
 open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. The Structural Ranking (The "Truth" of the domain)
 -- NOTE: Here we are HARDCODING the optimal policy structure (the ranking).
 -- In this module, we are VERIFYING that our insight about Energy/Distance trade-offs
 -- is mathematically consistent with infinite optimality. We are NOT discovering it.
--- For discovery, see CSHRL-Finder modules.
+-- For discovery, see CSHRL.Finder modules.
 
 -- We calculate a heuristic score for every action to define the order.
 
