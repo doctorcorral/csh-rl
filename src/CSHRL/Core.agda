@@ -94,4 +94,4 @@ module Core
   optimality : ⦃ h : CoindHomo ⦄ (other opt : Action) (s : State)
                (_ : _≤ₐ_ s other opt ≡ true) →
                action-value s other ≤ₛ action-value s opt
-  optimality ⦃ h ⦄ = preserves
+  optimality = preserves
