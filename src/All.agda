@@ -11,5 +11,4 @@ import CSHRL.Queens
 import CSHRL.Trap
 
 -- Not compiling
--- import CSHRL.Finder-Test
-
+-- import CSHRL-Finder-Test
