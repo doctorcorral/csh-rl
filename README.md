@@ -52,7 +52,7 @@ Evaluate `test-ranking-2` with `C-c C-n` to see the symmetry flip in action.
 
 - `value`: Coinductive rollout of constant policies.
 - `_≤ₛ_`: Coinductive stream dominance.
-- `CoindHomo`: The homomorphism record, with state-dependent ranking, strict distinction, and preservation.
+- `CoindHomo`: The homomorphism record, with state-dependent ranking and preservation.
 - `optimality`: The theorem proving top-ranked actions dominate coinductively.
 
 #### Extensions:

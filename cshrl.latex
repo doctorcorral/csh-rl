@@ -269,10 +269,7 @@ open _<=_s_ public
 record CoindHomo : Set1 where
   field
     _<=_a_    : State -> Action -> Action -> Bool
-    
-    -- Strictness: No two actions produce identical optimal futures
-    strict    : forall a b s -> a /= b -> not (action-value s a == action-value s b)
-    
+
     -- Preservation: The ranking mirrors the relation between ACTION-VALUES
     preserves : forall a b s ->
                 _<=_a_ s a b == true ->
@@ -389,7 +386,7 @@ module CSHRL.Maze where
 -- We explicitly encode the symmetry: Fwd > Bwd because it leads to better futures.
 my-rank : State -> Action -> Action -> Bool
 my-rank P0 Fwd Fwd = true
-my-rank P0 Fwd Bwd = false -- Fwd is strictly better than Bwd
+my-rank P0 Fwd Bwd = false -- Fwd is better than Bwd
 my-rank P0 Bwd Fwd = true
 my-rank P0 Bwd Bwd = true
 -- ... similar for P1 and P2 ...
@@ -398,7 +395,6 @@ instance
   MyHomo : CoindHomo
   MyHomo = record
     { _<=_a_ = my-rank
-    ; strict = strict-impl
     ; preserves = preserves-impl
     }
 \end{lstlisting}

@@ -71,7 +71,6 @@ my-rank P2 Bwd Fwd = true
 my-rank P2 Bwd Bwd = true
 
 postulate
-  strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   my-rank s a b ≡ true →
                   let v₁ = action-value s a
@@ -82,6 +81,5 @@ instance
   MyHomo : CoindHomo
   MyHomo = record
     { _≤ₐ_ = my-rank
-    ; strict = strict-impl
     ; preserves = preserves-impl
     }
