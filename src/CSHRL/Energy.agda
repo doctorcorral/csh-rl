@@ -135,7 +135,6 @@ _≤_rank_ s a b = lte? (score s a) (score s b)
 
 -- 4. Instance Proof (Postulated for this complex domain)
 postulate
-  strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   _≤_rank_ s a b ≡ true →
                   let v₁ = action-value s a
@@ -146,6 +145,5 @@ instance
   EnergyHomo : CoindHomo
   EnergyHomo = record
     { _≤ₐ_ = _≤_rank_
-    ; strict = strict-impl
     ; preserves = preserves-impl
     }

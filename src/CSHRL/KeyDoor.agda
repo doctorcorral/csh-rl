@@ -109,7 +109,6 @@ s ≤ a rank b = (rank-score s a) <=? (rank-score s b)
 
 -- Postulate the proofs
 postulate
-  strict-impl : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
   preserves-impl : ∀ a b s →
                   _≤_rank_ s a b ≡ true →
                   let v₁ = action-value s a
@@ -120,6 +119,5 @@ instance
   KeyDoorHomo : CoindHomo
   KeyDoorHomo = record
     { _≤ₐ_ = _≤_rank_
-    ; strict = strict-impl
     ; preserves = preserves-impl
     }
