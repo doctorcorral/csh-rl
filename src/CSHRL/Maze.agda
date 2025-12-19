@@ -73,9 +73,7 @@ my-rank P2 Bwd Bwd = true
 postulate
   preserves-impl : ∀ a b s →
                   my-rank s a b ≡ true →
-                  let v₁ = action-value s a
-                      v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
+                  action-value s a ≤ₛ action-value s b
 
 instance
   MyHomo : CoindHomo
