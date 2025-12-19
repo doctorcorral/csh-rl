@@ -137,9 +137,7 @@ _≤_rank_ s a b = lte? (score s a) (score s b)
 postulate
   preserves-impl : ∀ a b s →
                   _≤_rank_ s a b ≡ true →
-                  let v₁ = action-value s a
-                      v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
+                  action-value s a ≤ₛ action-value s b
 
 instance
   EnergyHomo : CoindHomo

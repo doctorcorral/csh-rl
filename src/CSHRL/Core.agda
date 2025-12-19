@@ -79,11 +79,8 @@ module Core
       _≤ₐ_      : State → Action → Action → Bool
 
       -- Preservation: The ranking mirrors the relation between action-values
-      preserves : ∀ a b s →
-                  _≤ₐ_ s a b ≡ true →
-                  let v₁ = action-value s a
-                      v₂ = action-value s b
-                  in  head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
+      preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
+                  action-value s a ≤ₛ action-value s b
 
   open CoindHomo {{...}} public
 
@@ -91,8 +88,7 @@ module Core
   -- 5. The Optimality Theorem
   ------------------------------------------------------------------------
 
-  optimality : ⦃ h : CoindHomo ⦄ (s : State) (other opt : Action) →
+  optimality : ⦃ h : CoindHomo ⦄ (other opt : Action) (s : State)
                (_ : _≤ₐ_ s other opt ≡ true) →
                action-value s other ≤ₛ action-value s opt
-  head≤ (optimality ⦃ h ⦄ s other opt ranking) = proj₁ (preserves other opt s ranking)
-  tail≤ (optimality ⦃ h ⦄ s other opt ranking) = proj₂ (preserves other opt s ranking)
+  optimality = preserves
