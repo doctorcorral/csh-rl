@@ -78,9 +78,6 @@ module Core
     field
       _≤ₐ_      : State → Action → Action → Bool
 
-      -- Strictness: No two actions produce identical optimal futures
-      strict    : ∀ a b s → a ≢ b → ¬ (action-value s a ≡ action-value s b)
-
       -- Preservation: The ranking mirrors the relation between action-values
       preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
                   action-value s a ≤ₛ action-value s b
