@@ -693,6 +693,90 @@ It is proof that we have finally touched the absolute.
 
 For seventy years we have tried to approximate optimality. Today we declare: Optimality is not a number. It is a symmetry. When an agent sees that every permutation of its actions produces exactly the corresponding permutation of infinite futures now and forever it is optimal. When it does not yet see this, learning is nothing more than polishing the mirror. This is Coinductive Symmetric Homomorphism Reinforcement Learning. The future is structural.
 
+\appendix
+
+\section*{Appendix: A Pedagogical Note on Products and Coinductive Records}
+\addcontentsline{toc}{section}{Appendix: A Pedagogical Note}
+
+This appendix illustrates an equivalent formulation of the preservation property that may help readers unfamiliar with Agda's coinductive records. The reformulation is a \textbf{tautology}---the two presentations are linked by $\eta$-reduction---but spelling out the correspondence explicitly can build intuition.
+
+\subsection{The Core Definition: Products}
+
+In the main text, the \texttt{CoindHomo} record requires that the ranking function \texttt{\_$\le_a$\_} preserves structure. The \texttt{preserves} field returns a \emph{product} of two obligations:
+
+\begin{lstlisting}
+preserves : forall a b s ->
+            _<=_a_ s a b == true ->
+            let v1 = action-value s a
+                v2 = action-value s b
+            in  head v1 <=_r head v2  _x_  (tail v1 <=_s tail v2)
+\end{lstlisting}
+
+This says: if action $a$ is ranked below action $b$ in state $s$, then:
+\begin{enumerate}
+\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (the left component of the product).
+\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (the right component).
+\end{enumerate}
+
+\subsection{An Equivalent View: Coinductive Records}
+
+Agda's coinductive order \texttt{\_$\le_s$\_} is defined as a \emph{record} with two fields:
+
+\begin{lstlisting}
+record _<=_s_ (x y : StreamR) : Set where
+  coinductive
+  field
+    head<= : head x <=_r head y
+    tail<= : tail x <=_s tail y
+\end{lstlisting}
+
+One can restate the preservation property directly in terms of this record. We define an \texttt{optimality-$\eta$} lemma that unpacks the product into the record fields:
+
+\begin{lstlisting}
+optimality-(*@$\eta$@*) : {{ h : CoindHomo }} (s : State) (other opt : Action)
+               -> (_<=_a_ s other opt == true)
+               -> action-value s other <=_s action-value s opt
+head<= (optimality-(*@$\eta$@*) {{ h }} s other opt ranking) =
+    proj1 (preserves other opt s ranking)
+tail<= (optimality-(*@$\eta$@*) {{ h }} s other opt ranking) =
+    proj2 (preserves other opt s ranking)
+\end{lstlisting}
+
+\subsection{Why This Is a Tautology}
+
+The two formulations are \textbf{equivalent by construction}. The \texttt{optimality-$\eta$} lemma projects the components of the product returned by \texttt{preserves} into the corresponding fields of the coinductive record. In type-theoretic terms, this is $\eta$-expansion for records: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$.
+
+Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how \texttt{preserves} is formulated. The lemma itself carries no computational content beyond projection---it is a rephrasing, not a proof of a non-trivial property.
+
+\subsection{Pedagogical Value}
+
+Despite being a tautology, this reformulation serves two purposes:
+
+\begin{enumerate}
+\item \textbf{Bridging notations:} Readers may encounter coinductive properties stated either as products (common in mathematical presentations) or as records (idiomatic in Agda). Seeing the explicit correspondence demystifies both.
+
+\item \textbf{Highlighting the recursive structure:} The record formulation makes the coinductive nature visually apparent: the \texttt{tail$\le$} field has the same type as the record itself, emphasizing that the property must hold at every future time step.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 2.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=6em,align=center,font=\footnotesize},
+    arr/.style={->,thick,>=Stealth}
+]
+\node[box] (prod) {$(\text{head} \le_r) \times (\text{tail} \le_s)$};
+\node[box,right=of prod] (rec) {\texttt{\_$\le_s$\_} record};
+\node[below=0.6cm of prod,font=\footnotesize] {Product};
+\node[below=0.6cm of rec,font=\footnotesize] {Coinductive Record};
+
+\draw[arr,<->] (prod) -- node[above] {\footnotesize $\eta$} (rec);
+\end{tikzpicture}
+\caption{The product and record formulations are related by $\eta$-equivalence.}
+\end{figure}
+
+In the main development, we use the product formulation directly in \texttt{preserves} because it is more concise. This appendix shows that one can equivalently view the same content through the lens of coinductive records, which may be more intuitive for readers familiar with object-oriented or coalgebraic thinking.
+
 \begin{thebibliography}{9}
 
 \bibitem[1]{ref1}
