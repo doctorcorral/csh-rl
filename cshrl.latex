@@ -698,29 +698,11 @@ For seventy years we have tried to approximate optimality. Today we declare: Opt
 \section*{Appendix: A Pedagogical Note on Products and Coinductive Records}
 \addcontentsline{toc}{section}{Appendix: A Pedagogical Note}
 
-This appendix illustrates an equivalent formulation of the preservation property that may help readers unfamiliar with Agda's coinductive records. The reformulation is a \textbf{tautology}---the two presentations are linked by $\eta$-reduction---but spelling out the correspondence explicitly can build intuition.
+This appendix shows that three formulations of the preservation property are equivalent. The correspondence is a \textbf{tautology}---linked by $\eta$-reduction---but spelling it out explicitly can build intuition.
 
-\subsection{The Core Definition: Products}
+\subsection{The Core Definition: Coinductive Records}
 
-In the main text, the \texttt{CoindHomo} record requires that the ranking function \texttt{\_$\le_a$\_} preserves structure. The \texttt{preserves} field returns a \emph{product} of two obligations:
-
-\begin{lstlisting}
-preserves : forall a b s ->
-            _<=_a_ s a b == true ->
-            let v1 = action-value s a
-                v2 = action-value s b
-            in  head v1 <=_r head v2  _x_  (tail v1 <=_s tail v2)
-\end{lstlisting}
-
-This says: if action $a$ is ranked below action $b$ in state $s$, then:
-\begin{enumerate}
-\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (the left component of the product).
-\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (the right component).
-\end{enumerate}
-
-\subsection{An Equivalent View: Coinductive Records}
-
-Agda's coinductive order \texttt{\_$\le_s$\_} is defined as a \emph{record} with two fields:
+In the main development, \texttt{CoindHomo.preserves} returns the coinductive record \texttt{\_$\le_s$\_} directly:
 
 \begin{lstlisting}
 record _<=_s_ (x y : StreamR) : Set where
@@ -728,25 +710,66 @@ record _<=_s_ (x y : StreamR) : Set where
   field
     head<= : head x <=_r head y
     tail<= : tail x <=_s tail y
+
+-- In CoindHomo:
+preserves : forall a b s -> _<=_a_ s a b == true ->
+            action-value s a <=_s action-value s b
 \end{lstlisting}
 
-One can restate the preservation property directly in terms of this record. We define an \texttt{optimality-$\eta$} lemma that unpacks the product into the record fields:
+\subsection{An Alternative View: Products}
+
+One could equivalently define preservation to return a \emph{product} of two obligations:
 
 \begin{lstlisting}
-optimality-(*@$\eta$@*) : {{ h : CoindHomo }} (s : State) (other opt : Action)
-               -> (_<=_a_ s other opt == true)
-               -> action-value s other <=_s action-value s opt
-head<= (optimality-(*@$\eta$@*) {{ h }} s other opt ranking) =
-    proj1 (preserves other opt s ranking)
-tail<= (optimality-(*@$\eta$@*) {{ h }} s other opt ranking) =
-    proj2 (preserves other opt s ranking)
+preserves-(*@$\times$@*) : forall a b s -> _<=_a_ s a b == true ->
+              let v1 = action-value s a
+                  v2 = action-value s b
+              in  head v1 <=_r head v2  _x_  (tail v1 <=_s tail v2)
 \end{lstlisting}
+
+This says: if action $a$ is ranked below action $b$ in state $s$, then:
+\begin{enumerate}
+\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (left component).
+\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (right component).
+\end{enumerate}
+
+\subsection{The Bridge: optimality-$\eta$}
+
+The \texttt{optimality-$\eta$} lemma converts the product formulation into the record formulation by projecting the components into record fields:
+
+\begin{lstlisting}
+optimality-(*@$\eta$@*) : preserves-(*@$\times$@*) _<=_a_ ->
+               forall s other opt -> _<=_a_ s other opt == true ->
+               action-value s other <=_s action-value s opt
+head<= (optimality-(*@$\eta$@*) pres s other opt r) = proj1 (pres other opt s r)
+tail<= (optimality-(*@$\eta$@*) pres s other opt r) = proj2 (pres other opt s r)
+\end{lstlisting}
+
+\subsection{The Equivalence: All Three Are the Same}
+
+The following identity proves that starting with \texttt{Core.preserves}, converting to product form, and applying \texttt{optimality-$\eta$} yields back \texttt{Core.preserves}:
+
+\begin{lstlisting}
+all-three-equal : (h : CoindHomo) -> forall s a b r ->
+    let -- Build preserves-(*@$\times$@*) from Core.preserves
+        pres-(*@$\times$@*) a' b' s' r' = let p = CoindHomo.preserves h a' b' s' r'
+                           in (head<= p , tail<= p)
+        -- Apply optimality-(*@$\eta$@*) to get back a record
+        via-(*@$\eta$@*) = optimality-(*@$\eta$@*) pres-(*@$\times$@*) s a b r
+        -- Original
+        original = CoindHomo.preserves h a b s r
+    in (head<= via-(*@$\eta$@*) == head<= original)
+     _x_ (tail<= via-(*@$\eta$@*) == tail<= original)
+all-three-equal _ _ _ _ _ = refl , refl
+\end{lstlisting}
+
+The \texttt{refl , refl} compiles, witnessing that the three formulations---\texttt{Core.preserves}, \texttt{preserves-$\times$}, and \texttt{optimality-$\eta$}---are the same function.
 
 \subsection{Why This Is a Tautology}
 
-The two formulations are \textbf{equivalent by construction}. The \texttt{optimality-$\eta$} lemma projects the components of the product returned by \texttt{preserves} into the corresponding fields of the coinductive record. In type-theoretic terms, this is $\eta$-expansion for records: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$.
+The formulations are \textbf{equivalent by construction}. Converting between products and records is $\eta$-expansion: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$, and vice versa.
 
-Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how \texttt{preserves} is formulated. The lemma itself carries no computational content beyond projection---it is a rephrasing, not a proof of a non-trivial property.
+Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how definitions are formulated. The lemmas carry no computational content beyond projection---they are rephrasings, not proofs of non-trivial properties.
 
 \subsection{Pedagogical Value}
 
@@ -761,21 +784,22 @@ Despite being a tautology, this reformulation serves two purposes:
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    node distance=1.2cm and 2.5cm,
-    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=6em,align=center,font=\footnotesize},
+    node distance=1.2cm and 3.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=7em,align=center,font=\footnotesize},
     arr/.style={->,thick,>=Stealth}
 ]
-\node[box] (prod) {$(\text{head} \le_r) \times (\text{tail} \le_s)$};
-\node[box,right=of prod] (rec) {\texttt{\_$\le_s$\_} record};
-\node[below=0.6cm of prod,font=\footnotesize] {Product};
-\node[below=0.6cm of rec,font=\footnotesize] {Coinductive Record};
+\node[box] (core) {\texttt{Core.preserves}\\(record)};
+\node[box,right=of core] (prod) {\texttt{preserves-$\times$}\\(product)};
+\node[box,below=1.5cm of prod] (eta) {\texttt{optimality-$\eta$}\\(record)};
 
-\draw[arr,<->] (prod) -- node[above] {\footnotesize $\eta$} (rec);
+\draw[arr] (core) -- node[above] {\footnotesize unpack} (prod);
+\draw[arr] (prod) -- node[right] {\footnotesize $\eta$-expand} (eta);
+\draw[arr,dashed] (eta) -- node[below left] {\footnotesize $\equiv$} (core);
 \end{tikzpicture}
-\caption{The product and record formulations are related by $\eta$-equivalence.}
+\caption{The three formulations form a triangle of equivalences.}
 \end{figure}
 
-In the main development, we use the product formulation directly in \texttt{preserves} because it is more concise. This appendix shows that one can equivalently view the same content through the lens of coinductive records, which may be more intuitive for readers familiar with object-oriented or coalgebraic thinking.
+The full proof is in \texttt{appendix.PreservationEquivalence}.
 
 \begin{thebibliography}{9}
 
