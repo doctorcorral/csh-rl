@@ -1,5 +1,7 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
+[![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-blue.svg)](VERSION)
+
 This repository contains the source code and paper for "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure" by Ricardo Corral-Corral.
 
 ## Description
@@ -48,12 +50,12 @@ Evaluate `test-ranking-2` with `C-c C-n` to see the symmetry flip in action.
 
 ### Code Explanation
 
-#### The core is in CSHRL.Core.agda (58 lines):
+#### The core is in CSHRL.Core.agda:
 
-- `value`: Coinductive rollout of constant policies.
+- `value`: Coinductive optimal value via tabulation.
+- `action-value`: The stream obtained by taking an action, then acting optimally.
 - `_≤ₛ_`: Coinductive stream dominance.
 - `CoindHomo`: The homomorphism record, with state-dependent ranking and preservation.
-- `optimality`: The theorem proving top-ranked actions dominate coinductively.
 
 #### Extensions:
 
