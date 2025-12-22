@@ -693,6 +693,114 @@ It is proof that we have finally touched the absolute.
 
 For seventy years we have tried to approximate optimality. Today we declare: Optimality is not a number. It is a symmetry. When an agent sees that every permutation of its actions produces exactly the corresponding permutation of infinite futures now and forever it is optimal. When it does not yet see this, learning is nothing more than polishing the mirror. This is Coinductive Symmetric Homomorphism Reinforcement Learning. The future is structural.
 
+\appendix
+
+\section*{Appendix: A Pedagogical Note on Products and Coinductive Records}
+\addcontentsline{toc}{section}{Appendix: A Pedagogical Note}
+
+This appendix shows that three formulations of the preservation property are equivalent. The correspondence is a \textbf{tautology}---linked by $\eta$-reduction---but spelling it out explicitly can build intuition.
+
+\subsection{The Core Definition: Coinductive Records}
+
+In the main development, \texttt{CoindHomo.preserves} returns the coinductive record \texttt{\_$\le_s$\_} directly:
+
+\begin{lstlisting}
+record _<=_s_ (x y : StreamR) : Set where
+  coinductive
+  field
+    head<= : head x <=_r head y
+    tail<= : tail x <=_s tail y
+
+-- In CoindHomo:
+preserves : forall a b s -> _<=_a_ s a b == true ->
+            action-value s a <=_s action-value s b
+\end{lstlisting}
+
+\subsection{An Alternative View: Products}
+
+One could equivalently define preservation to return a \emph{product} of two obligations:
+
+\begin{lstlisting}
+preserves-(*@$\times$@*) : forall a b s -> _<=_a_ s a b == true ->
+              let v1 = action-value s a
+                  v2 = action-value s b
+              in  head v1 <=_r head v2  _x_  (tail v1 <=_s tail v2)
+\end{lstlisting}
+
+This says: if action $a$ is ranked below action $b$ in state $s$, then:
+\begin{enumerate}
+\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (left component).
+\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (right component).
+\end{enumerate}
+
+\subsection{The Bridge: optimality-$\eta$}
+
+The \texttt{optimality-$\eta$} lemma converts the product formulation into the record formulation by projecting the components into record fields:
+
+\begin{lstlisting}
+optimality-(*@$\eta$@*) : preserves-(*@$\times$@*) _<=_a_ ->
+               forall s other opt -> _<=_a_ s other opt == true ->
+               action-value s other <=_s action-value s opt
+head<= (optimality-(*@$\eta$@*) pres s other opt r) = proj1 (pres other opt s r)
+tail<= (optimality-(*@$\eta$@*) pres s other opt r) = proj2 (pres other opt s r)
+\end{lstlisting}
+
+\subsection{The Equivalence: All Three Are the Same}
+
+The following identity proves that starting with \texttt{Core.preserves}, converting to product form, and applying \texttt{optimality-$\eta$} yields back \texttt{Core.preserves}:
+
+\begin{lstlisting}
+all-three-equal : (h : CoindHomo) -> forall s a b r ->
+    let -- Build preserves-(*@$\times$@*) from Core.preserves
+        pres-(*@$\times$@*) a' b' s' r' = let p = CoindHomo.preserves h a' b' s' r'
+                           in (head<= p , tail<= p)
+        -- Apply optimality-(*@$\eta$@*) to get back a record
+        via-(*@$\eta$@*) = optimality-(*@$\eta$@*) pres-(*@$\times$@*) s a b r
+        -- Original
+        original = CoindHomo.preserves h a b s r
+    in (head<= via-(*@$\eta$@*) == head<= original)
+     _x_ (tail<= via-(*@$\eta$@*) == tail<= original)
+all-three-equal _ _ _ _ _ = refl , refl
+\end{lstlisting}
+
+The \texttt{refl , refl} compiles, witnessing that the three formulations---\texttt{Core.preserves}, \texttt{preserves-$\times$}, and \texttt{optimality-$\eta$}---are the same function.
+
+\subsection{Why This Is a Tautology}
+
+The formulations are \textbf{equivalent by construction}. Converting between products and records is $\eta$-expansion: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$, and vice versa.
+
+Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how definitions are formulated. The lemmas carry no computational content beyond projection---they are rephrasings, not proofs of non-trivial properties.
+
+\subsection{Pedagogical Value}
+
+Despite being a tautology, this reformulation serves two purposes:
+
+\begin{enumerate}
+\item \textbf{Bridging notations:} Readers may encounter coinductive properties stated either as products (common in mathematical presentations) or as records (idiomatic in Agda). Seeing the explicit correspondence demystifies both.
+
+\item \textbf{Highlighting the recursive structure:} The record formulation makes the coinductive nature visually apparent: the \texttt{tail$\le$} field has the same type as the record itself, emphasizing that the property must hold at every future time step.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 3.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=7em,align=center,font=\footnotesize},
+    arr/.style={->,thick,>=Stealth}
+]
+\node[box] (core) {\texttt{Core.preserves}\\(record)};
+\node[box,right=of core] (prod) {\texttt{preserves-$\times$}\\(product)};
+\node[box,below=1.5cm of prod] (eta) {\texttt{optimality-$\eta$}\\(record)};
+
+\draw[arr] (core) -- node[above] {\footnotesize unpack} (prod);
+\draw[arr] (prod) -- node[right] {\footnotesize $\eta$-expand} (eta);
+\draw[arr,dashed] (eta) -- node[below left] {\footnotesize $\equiv$} (core);
+\end{tikzpicture}
+\caption{The three formulations form a triangle of equivalences.}
+\end{figure}
+
+The full proof is in \texttt{appendix.PreservationEquivalence}.
+
 \begin{thebibliography}{9}
 
 \bibitem[1]{ref1}
