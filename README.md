@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-blue.svg)](VERSION)
+[![Version 0.1.1](https://img.shields.io/badge/version-0.1.1-blue.svg)](VERSION)
 
 This repository contains the source code and paper for "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure" by Ricardo Corral-Corral.
 
