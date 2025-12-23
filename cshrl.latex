@@ -356,7 +356,7 @@ This is the "Marshmallow Test" for algorithms. A purely greedy agent sees "0 vs 
 
 \subsection{Discovery of the Full Ranking}
 
-We implemented this environment in CSHRL.Finder-Test.agda. We do not just ask for the "best action" we demand the full permutation of actions sorted by quality.
+We implemented this environment in \texttt{CSHRL.Tasks.DelayedGratification.agda}. We do not just ask for the "best action" we demand the full permutation of actions sorted by quality.
 
 \begin{lstlisting}
 -- Depth 1: [GoA, GoB]
@@ -380,7 +380,7 @@ To prove that this theory is not vacuous, we have implemented a concrete instant
 In this module, we explicitly define the "symmetry of the world." We define a function my-rank that encodes the structural truth: at any point, moving Forward is better than moving Backward. We then instantiate the CoindHomo record, proving that this ranking perfectly mirrors the infinite future rewards.
 
 \begin{lstlisting}
-module CSHRL.Maze where
+module CSHRL.Tasks.Maze where
 -- ... imports ...
 
 -- We explicitly encode the symmetry: Fwd > Bwd because it leads to better futures.
@@ -432,7 +432,7 @@ In traditional RL, discovering this requires propagating value from the Treasure
 
 \subsection{The Solution: Structural Symmetry}
 
-Our agent does not need to "learn" this propagation. It simply needs to verify if a candidate ranking respects the symmetry of the world. In CSHRL.KeyDoor.agda, we define the ranking logic explicitly. This is not a "hard-coded policy" it is a definition of the structure of desire in this universe.
+Our agent does not need to "learn" this propagation. It simply needs to verify if a candidate ranking respects the symmetry of the world. In \texttt{CSHRL.Tasks.KeyDoor.agda}, we define the ranking logic explicitly. This is not a "hard-coded policy" it is a definition of the structure of desire in this universe.
 
 \begin{lstlisting}
 -- State is (Position, HasKey)
@@ -527,7 +527,7 @@ This demonstrates that "Goal-Directed Behavior" and "Homeostatic Drive" (hunger/
 The "Desert Crossing" example demonstrated \emph{verification}: we had an intuition about the policy and proved it correct.
 But what if we have no intuition? What if the environment is a "Trap" where rewards are sparse?
 
-In \texttt{CSHRL.Trap.agda}, we define a world with a "Trap" (infinite zeros) and a "Goal" (zeros followed by paradise).
+In \texttt{CSHRL.Tasks.Trap.agda}, we define a world with a "Trap" (infinite zeros) and a "Goal" (zeros followed by paradise).
 We do \emph{not} write a ranking function. We let the \texttt{CSHRL.Finder} algorithm discover it using Ordinal Value Iteration.
 
 \begin{lstlisting}
