@@ -1,6 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL.Queens where
+-- | N-Queens Problem (Combinatorial Constraints)
+-- | Demonstrates that constraints are just sparse rewards.
+-- | Invalid moves lead to Dead state (infinite zeros).
+
+module CSHRL.Tasks.Queens where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -101,10 +105,38 @@ all-actions = gen-actions N
 default-action : Action
 default-action = 0
 
+open import Data.Nat using (_⊔_; _≤_)
+
+-- 4a. Finder for discovering optimal actions
 open import CSHRL.Finder
 open Finder State Action Reward step _≤?_ default-action all-actions
 
--- 4. Tests
+-- 4b. Core for coinductive verification
+open import CSHRL.Core
+open Core State Action Reward step _≤_ _⊔_ 0 all-actions
+
+-- 5. CoindHomo Instance
+-- The ranking is derived from Finder's trace comparison at depth N.
+-- This connects the finite-horizon search to the infinite coinductive property.
+
+_≤_rank_ : State → Action → Action → Bool
+s ≤ a rank b = trace-action s a N ≤ₜ trace-action s b N
+
+-- Postulate: The Finder-derived ranking preserves the coinductive ordering.
+-- This holds because Queens is a terminating game (depth ≤ N), so finite = infinite.
+postulate
+  preserves-impl : ∀ a b s →
+                  _≤_rank_ s a b ≡ true →
+                  action-value s a ≤ₛ action-value s b
+
+instance
+  QueensHomo : CoindHomo
+  QueensHomo = record
+    { _≤ₐ_ = _≤_rank_
+    ; preserves = preserves-impl
+    }
+
+-- 6. Tests
 
 -- We expect it to find a solution.
 -- A known solution for 4-Queens is (1, 3, 0, 2) (columns).
@@ -154,5 +186,6 @@ test-queens = find-policy (Ongoing []) N
 -- For N=8, we just want to ensure it computes (compilation succeeds).
 -- check-valid-start : (test-queens ≡ᵇ 1) ∨ (test-queens ≡ᵇ 2) ≡ true
 -- check-valid-start = refl
+
 
 

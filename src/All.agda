@@ -1,14 +1,17 @@
 {-# OPTIONS --guardedness #-}
 
+-- | Master import for all CSHRL modules
+
 module All where
 
+-- Framework Core
 import CSHRL.Core
-import CSHRL.Energy
 import CSHRL.Finder
-import CSHRL.KeyDoor
-import CSHRL.Maze
-import CSHRL.Queens
-import CSHRL.Trap
 
--- Not compiling
--- import CSHRL-Finder-Test
+-- Task Implementations
+import CSHRL.Tasks.DelayedGratification
+import CSHRL.Tasks.Energy
+import CSHRL.Tasks.KeyDoor
+import CSHRL.Tasks.Maze
+import CSHRL.Tasks.Queens
+import CSHRL.Tasks.Trap

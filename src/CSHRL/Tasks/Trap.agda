@@ -1,6 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL.Trap where
+-- | Trap Avoidance (Greedy vs Patient)
+-- | Tests the Finder's ability to see through greedy bait.
+
+module CSHRL.Tasks.Trap where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -117,4 +120,5 @@ module SparseFinder where
   -- Safe > Trap.
   test-insight : sparse-rank Start 1 ≡ TakeSafe ∷ TakeTrap ∷ Wait ∷ []
   test-insight = refl
+
 

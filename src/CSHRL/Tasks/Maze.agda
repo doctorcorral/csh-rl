@@ -1,6 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL.Maze where
+-- | Simple 1D Grid World Navigation
+-- | The agent must move forward to reach a goal (P0 → P1 → P2).
+
+module CSHRL.Tasks.Maze where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
@@ -81,3 +84,4 @@ instance
     { _≤ₐ_ = my-rank
     ; preserves = preserves-impl
     }
+

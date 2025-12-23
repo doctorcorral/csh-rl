@@ -1,6 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL.KeyDoor where
+-- | Key-Door-Treasure World
+-- | Demonstrates hierarchical planning via symmetry flips.
+-- | The agent must backtrack to get a key before proceeding to treasure.
+
+module CSHRL.Tasks.KeyDoor where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_; _⊔_)
@@ -119,3 +123,4 @@ instance
     { _≤ₐ_ = _≤_rank_
     ; preserves = preserves-impl
     }
+

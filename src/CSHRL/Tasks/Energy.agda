@@ -1,6 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
-module CSHRL.Energy where
+-- | Desert Crossing (Resource Management)
+-- | The agent must cross a desert with limited energy.
+-- | Demonstrates dynamic horizon and phase transitions.
+
+module CSHRL.Tasks.Energy where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊔_; _≤_)
@@ -145,3 +149,4 @@ instance
     { _≤ₐ_ = _≤_rank_
     ; preserves = preserves-impl
     }
+
