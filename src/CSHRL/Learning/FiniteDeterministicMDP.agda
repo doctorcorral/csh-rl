@@ -1,0 +1,264 @@
+{-# OPTIONS --safe --guardedness #-}
+
+------------------------------------------------------------------------
+-- CSHRL.Learning.FiniteDeterministicMDP
+--
+-- Learning implementation for Finite Deterministic MDPs.
+--
+-- Key properties:
+--   - Deterministic transitions: step s a = (s', r) uniquely
+--   - Finite horizon: traces stabilize at depth ≥ horizon
+--   - Trace-based comparison: lexicographic ordering
+--
+-- This is the primary learning implementation for grid worlds,
+-- mazes, and similar environments.
+------------------------------------------------------------------------
+
+module CSHRL.Learning.FiniteDeterministicMDP where
+
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Nat using (ℕ; zero; suc)
+open import Data.List using (List; []; _∷_; map)
+open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃; ∃-syntax)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Nullary using (Dec; yes; no)
+
+open import CSHRL.Learning.Base
+
+------------------------------------------------------------------------
+-- FiniteDeterministicMDP Learning Module
+------------------------------------------------------------------------
+
+module FDMDPLearning
+  (State Action Reward : Set)
+  (step        : State → Action → State × Reward)
+  (_≤ᵣ_        : Reward → Reward → Set)
+  (max         : Reward → Reward → Reward)
+  (bottom      : Reward)
+  (all-actions : List Action)
+  -- Decidable comparison for rewards
+  (_≤?_        : Reward → Reward → Bool)
+  (≤?-sound    : ∀ r₁ r₂ → r₁ ≤? r₂ ≡ true → r₁ ≤ᵣ r₂)
+  (≤?-refl     : ∀ r → r ≤? r ≡ true)
+  -- Decidable equality for actions
+  (_≟ₐ_        : (a b : Action) → Dec (a ≡ b))
+  where
+
+  ------------------------------------------------------------------------
+  -- Import Base and Core
+  ------------------------------------------------------------------------
+
+  open UniversalLearning State Action _≟ₐ_ public
+
+  open import CSHRL.Core
+  open Core State Action Reward step _≤ᵣ_ max bottom all-actions public
+
+  ------------------------------------------------------------------------
+  -- Trace Type and Comparison
+  ------------------------------------------------------------------------
+
+  Trace : Set
+  Trace = List Reward
+
+  -- Lexicographic trace comparison
+  _≤ₜ_ : Trace → Trace → Bool
+  []       ≤ₜ []       = true
+  []       ≤ₜ (_ ∷ _)  = true
+  (_ ∷ _)  ≤ₜ []       = false
+  (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) =
+    if r₁ ≤? r₂ then
+      if r₂ ≤? r₁ then (t₁ ≤ₜ t₂)  -- Equal, compare tails
+      else true                      -- r₁ < r₂
+    else false                       -- r₁ > r₂
+
+  -- Equal traces imply ≤ₜ
+  eq-implies-≤ₜ : ∀ t₁ t₂ → t₁ ≡ t₂ → t₁ ≤ₜ t₂ ≡ true
+  eq-implies-≤ₜ [] [] refl = refl
+  eq-implies-≤ₜ (r ∷ t) .(r ∷ t) refl = 
+    subst (λ b → (if b then (if b then t ≤ₜ t else true) else false) ≡ true)
+          (sym (≤?-refl r))
+          (eq-implies-≤ₜ t t refl)
+
+  ------------------------------------------------------------------------
+  -- Trace Computation (Deterministic)
+  ------------------------------------------------------------------------
+
+  mutual
+    best-trace : State → ℕ → Trace
+    best-trace s zero    = []
+    best-trace s (suc k) = max-trace (map (λ a → trace-action s a k) all-actions)
+
+    trace-action : State → Action → ℕ → Trace
+    trace-action s a k =
+      let (s' , r) = step s a
+      in r ∷ best-trace s' k
+
+    max-trace : List Trace → Trace
+    max-trace []       = []
+    max-trace (t ∷ ts) = max-helper t ts
+
+    max-helper : Trace → List Trace → Trace
+    max-helper current []       = current
+    max-helper current (t ∷ ts) =
+      if current ≤ₜ t
+      then max-helper t ts
+      else max-helper current ts
+
+  ------------------------------------------------------------------------
+  -- Restricted Trace Computation (for unavailable actions)
+  ------------------------------------------------------------------------
+
+  mutual
+    best-trace-restricted : Available → State → ℕ → Trace
+    best-trace-restricted avail s zero = []
+    best-trace-restricted avail s (suc k) =
+      let available = filter-available avail all-actions
+          traces = map (λ a → trace-action-restricted avail s a k) available
+      in max-trace traces
+
+    trace-action-restricted : Available → State → Action → ℕ → Trace
+    trace-action-restricted avail s a k =
+      let (s' , r) = step s a
+      in r ∷ best-trace-restricted avail s' k
+
+  ------------------------------------------------------------------------
+  -- Sorting and Ranking
+  ------------------------------------------------------------------------
+
+  -- Sort actions by trace quality (insertion sort)
+  insert-scored : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
+  insert-scored x [] = x ∷ []
+  insert-scored (a₁ , t₁) ((a₂ , t₂) ∷ xs) =
+    if t₂ ≤ₜ t₁
+    then (a₁ , t₁) ∷ (a₂ , t₂) ∷ xs
+    else (a₂ , t₂) ∷ insert-scored (a₁ , t₁) xs
+
+  sort-scored : List (Action × Trace) → List (Action × Trace)
+  sort-scored []       = []
+  sort-scored (x ∷ xs) = insert-scored x (sort-scored xs)
+
+  ------------------------------------------------------------------------
+  -- Find Ranking
+  ------------------------------------------------------------------------
+
+  -- Find ranking over all actions at depth k
+  find-ranking : State → ℕ → List Action
+  find-ranking s k =
+    let scored = map (λ a → (a , trace-action s a k)) all-actions
+        sorted = sort-scored scored
+    in map proj₁ sorted
+
+  -- Find ranking restricted to available actions
+  find-ranking-restricted : Available → State → ℕ → List Action
+  find-ranking-restricted avail s k =
+    let available = filter-available avail all-actions
+        scored = map (λ a → (a , trace-action-restricted avail s a k)) available
+        sorted = sort-scored scored
+    in map proj₁ sorted
+
+  -- Ranking from finder at depth k
+  finder-ranking : ℕ → Ranking
+  finder-ranking k s = list-to-ranking (find-ranking s k)
+
+  -- Restricted ranking from finder
+  finder-ranking-restricted : Available → ℕ → Ranking
+  finder-ranking-restricted avail k s = 
+    list-to-ranking (find-ranking-restricted avail s k)
+
+  ------------------------------------------------------------------------
+  -- Totality of Finder Rankings
+  ------------------------------------------------------------------------
+
+  finder-ranking-total : ∀ k s → IsTotal (finder-ranking k) s
+  finder-ranking-total k s = list-ranking-total (find-ranking s k) s
+
+  finder-ranking-restricted-total : ∀ avail k s → 
+    IsTotal (finder-ranking-restricted avail k) s
+  finder-ranking-restricted-total avail k s = 
+    list-ranking-total (find-ranking-restricted avail s k) s
+
+  ------------------------------------------------------------------------
+  -- Violation Detection
+  ------------------------------------------------------------------------
+
+  -- Test a pair for violation at given depth
+  test-pair : ℕ → Sample → Maybe Violation
+  test-pair k (sample s a b) with finder-ranking k s a b | trace-action s a k ≤ₜ trace-action s b k
+  ... | true  | false = just (violation s b a k)
+  ... | _     | _     = nothing
+
+  ------------------------------------------------------------------------
+  -- Learning Loop (Instantiated)
+  ------------------------------------------------------------------------
+
+  learn-step : ℕ → Sample → ℕ
+  learn-step = default-learn-step test-pair
+
+  learn-loop : ℕ → List Sample → ℕ
+  learn-loop = default-learn-loop test-pair
+
+  learned-ranking : ℕ → List Sample → Ranking
+  learned-ranking initial-depth samples = finder-ranking (learn-loop initial-depth samples)
+
+  ------------------------------------------------------------------------
+  -- Adaptation to Unavailability
+  ------------------------------------------------------------------------
+
+  adapt-to-unavailability : Available → ℕ → Ranking
+  adapt-to-unavailability avail depth = finder-ranking-restricted avail depth
+
+  ------------------------------------------------------------------------
+  -- Convergence
+  ------------------------------------------------------------------------
+
+  Converges : Set
+  Converges = ConvergesAt finder-ranking
+
+  ------------------------------------------------------------------------
+  -- Monotonic Improvement
+  --
+  -- Violations can only decrease with depth.
+  ------------------------------------------------------------------------
+
+  ViolationsDecrease : Set
+  ViolationsDecrease = ∀ s a b k →
+    trace-action s a k ≤ₜ trace-action s b k ≡ false →
+    trace-action s a (suc k) ≤ₜ trace-action s b (suc k) ≡ false
+
+  ------------------------------------------------------------------------
+  -- Soundness Properties
+  ------------------------------------------------------------------------
+
+  -- Type of finder soundness
+  FinderSound : ℕ → Set
+  FinderSound k = ∀ s a b → 
+    finder-ranking k s a b ≡ true → 
+    trace-action s a k ≤ₜ trace-action s b k ≡ true ⊎
+    trace-action s a k ≡ trace-action s b k
+
+  -- Type of restricted preservation
+  RestrictedPreserves : Available → ℕ → Set
+  RestrictedPreserves avail k = ∀ a b s →
+    avail a ≡ true →
+    avail b ≡ true →
+    finder-ranking-restricted avail k s a b ≡ true →
+    trace-action-restricted avail s a k ≤ₜ trace-action-restricted avail s b k ≡ true
+
+  -- Restricted finder soundness type
+  RestrictedFinderSound : Available → ℕ → Set
+  RestrictedFinderSound avail k = ∀ s a b →
+    finder-ranking-restricted avail k s a b ≡ true →
+    trace-action-restricted avail s a k ≤ₜ trace-action-restricted avail s b k ≡ true ⊎
+    trace-action-restricted avail s a k ≡ trace-action-restricted avail s b k
+
+  -- Adaptation soundness: given restricted finder soundness, we get restricted preserves
+  adaptation-sound : ∀ avail k →
+    RestrictedFinderSound avail k →
+    RestrictedPreserves avail k
+  adaptation-sound avail k sound a b s avail-a avail-b rank-ab with sound s a b rank-ab
+  ... | inj₁ p = p
+  ... | inj₂ q = eq-implies-≤ₜ (trace-action-restricted avail s a k) (trace-action-restricted avail s b k) q
+
+
