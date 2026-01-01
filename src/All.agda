@@ -16,6 +16,10 @@ import CSHRL.Finder
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
 
+-- Learning Framework
+import CSHRL.Learning.Base
+import CSHRL.Learning.FiniteDeterministicMDP
+
 -- Verified Task Implementations (--safe, no postulates)
 import CSHRL.Tasks.Verified.TwoState
 import CSHRL.Tasks.Verified.OnePlacement

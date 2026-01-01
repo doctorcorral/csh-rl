@@ -261,4 +261,93 @@ module FDMDPLearning
   ... | inj₁ p = p
   ... | inj₂ q = eq-implies-≤ₜ (trace-action-restricted avail s a k) (trace-action-restricted avail s b k) q
 
+  ------------------------------------------------------------------------
+  -- Curried Learner Interface for FDMDP
+  --
+  -- Provides a stateful, checkpoint-friendly learning interface.
+  -- Uses the universal LearnerState from Base with FDMDP-specific test.
+  ------------------------------------------------------------------------
+
+  -- Create an FDMDP learner with the FDMDP-specific test function
+  fdmdp-learner : Learner
+  fdmdp-learner = make-learner test-pair
+
+  -- Initialize a fresh learner state
+  new-fdmdp-learner : LearnerState
+  new-fdmdp-learner = init-learner
+
+  -- Train on a single sample
+  train-step : LearnerState → Sample → LearnerState
+  train-step = fdmdp-learner
+
+  -- Train on multiple samples
+  train-batch : LearnerState → List Sample → LearnerState
+  train-batch = learn-many fdmdp-learner
+
+  -- Get current ranking at learner's depth
+  current-ranking : LearnerState → State → List Action
+  current-ranking ls s = find-ranking s (get-depth ls)
+
+  -- Get current ranking with unavailability
+  current-ranking-restricted : LearnerState → Available → State → List Action
+  current-ranking-restricted ls avail s = find-ranking-restricted avail s (get-depth ls)
+
+  -- Train until no violations for N samples (or max iterations)
+  train-until-stable : LearnerState → ℕ → ℕ → List Sample → LearnerState
+  train-until-stable ls window max-iter samples = 
+    learn-until fdmdp-learner (λ ls' → has-stabilized ls' window) max-iter ls samples
+
+  -- Get full training trace (for analysis/plotting)
+  training-trace : LearnerState → List Sample → List LearnerState
+  training-trace = learn-with-trace fdmdp-learner
+
+  -- Extract depth history from trace (for plotting)
+  depth-history : List LearnerState → List ℕ
+  depth-history [] = []
+  depth-history (ls ∷ rest) = get-depth ls ∷ depth-history rest
+
+  -- Extract violation count history from trace
+  violation-history : List LearnerState → List ℕ
+  violation-history [] = []
+  violation-history (ls ∷ rest) = get-violations ls ∷ violation-history rest
+
+  ------------------------------------------------------------------------
+  -- Active Learner for FDMDP
+  --
+  -- Uses active refinement: on violation, BOTH increase depth AND swap
+  -- the violated pair in the explicit ranking.
+  ------------------------------------------------------------------------
+
+  -- Create an active FDMDP learner with the global swap updater
+  fdmdp-active-learner : ActiveLearner
+  fdmdp-active-learner = make-active-learner test-pair global-swap-updater
+
+  -- Initialize active learner with Finder's ranking at depth 0
+  new-fdmdp-active-learner : ActiveLearnerState
+  new-fdmdp-active-learner = init-active-learner (λ s → find-ranking s 0)
+
+  -- Initialize with a specific initial depth
+  new-fdmdp-active-learner-at : ℕ → ActiveLearnerState
+  new-fdmdp-active-learner-at k = init-active-learner (λ s → find-ranking s k)
+
+  -- Active training step
+  active-train-step : ActiveLearnerState → Sample → ActiveLearnerState
+  active-train-step = fdmdp-active-learner
+
+  -- Active batch training
+  active-batch : ActiveLearnerState → List Sample → ActiveLearnerState
+  active-batch = active-train-batch fdmdp-active-learner
+
+  -- Get the current refined ranking for a state
+  current-active-ranking : ActiveLearnerState → State → List Action
+  current-active-ranking ls s = get-explicit-ranking ls s
+
+  -- Get active learner depth
+  active-depth : ActiveLearnerState → ℕ
+  active-depth = get-active-depth
+
+  -- Get active learner violation count
+  active-violation-count : ActiveLearnerState → ℕ
+  active-violation-count = get-active-violations
+
 
