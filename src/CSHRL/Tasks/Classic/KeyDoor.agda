@@ -4,7 +4,7 @@
 -- | Demonstrates hierarchical planning via symmetry flips.
 -- | The agent must backtrack to get a key before proceeding to treasure.
 
-module CSHRL.Tasks.KeyDoor where
+module CSHRL.Tasks.Classic.KeyDoor where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_; _⊔_)

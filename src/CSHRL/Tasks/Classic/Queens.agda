@@ -4,7 +4,7 @@
 -- | Demonstrates that constraints are just sparse rewards.
 -- | Invalid moves lead to Dead state (infinite zeros).
 
-module CSHRL.Tasks.Queens where
+module CSHRL.Tasks.Classic.Queens where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
