@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.1.1](https://img.shields.io/badge/version-0.1.1-blue.svg)](VERSION)
+[![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-blue.svg)](VERSION)
 
 This repository contains the source code and paper for "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure" by Ricardo Corral-Corral.
 
@@ -18,6 +18,7 @@ Key contributions:
 - Machine-verified core in Agda.
 - Environment Classes (ECs): reusable, verified *families* of environments with solvers and preservation proofs.
 - Instantaneous "flips" for hierarchical planning without value propagation.
+- **Curried Learner**: Stateful, checkpoint-friendly learning with training traces for analysis.
 
 ### Installation
 
@@ -57,13 +58,15 @@ agda -i src src/All.agda
 ```
 src/
 ├── All.agda                          # Master import (verified + classic)
-├── AllSafe.agda                      # Optional: fully verified subset entrypoint
 ├── CSHRL/
 │   ├── Core.agda                     # The coinductive homomorphism theory
 │   ├── Finder.agda                   # Historical/standalone finder (not EC-specific)
 │   ├── EnvironmentClass/             # Environment Classes (ECs): solver + preserves
 │   │   ├── FiniteDeterministicMDP.agda
 │   │   └── CombinatorialPlacementMDP.agda
+│   ├── Learning/                     # Learning infrastructure
+│   │   ├── Base.agda                 # Universal: LearnerState, curried interface
+│   │   └── FiniteDeterministicMDP.agda  # FDMDP-specific: traces, violations
 │   └── Tasks/
 │       ├── Classic/                  # Pedagogical tasks (may use postulates)
 │       │   ├── DelayedGratification.agda
@@ -74,6 +77,11 @@ src/
 │       │   └── Trap.agda
 │       └── Verified/                 # Fully verified tasks (instantiate an EC)
 │           ├── TwoState.agda
+│           ├── TwoStateLearning.agda
+│           ├── DelayedGratificationLearning.agda
+│           ├── GridWorld5x5.agda
+│           ├── KeyTreasure10x10.agda
+│           ├── CurriedLearnerDemo.agda
 │           ├── OnePlacement.agda
 │           └── Queens1.agda
 └── appendix/
@@ -86,6 +94,47 @@ src/
 - `EnvironmentClass/*`: **Environment Classes (ECs)**. An EC packages:
   - an environment family (state/action/reward + structure like finiteness/horizon), and
   - a **verified solver** (policy/ranking finder) plus the **`preserves` proof interface** so instances become fully verified.
+
+#### Learning Infrastructure (`CSHRL/Learning/`):
+
+The learning module provides a **curried, stateful** interface for incremental learning with checkpointing:
+
+- `Base.agda`: Universal (EC-independent) components:
+  - `LearnerState`: Record with `current-depth`, `samples-seen`, `violations-seen`, `last-violation`
+  - `Learner`: Type alias for `LearnerState → Sample → LearnerState`
+  - `make-learner`, `learn-many`, `checkpoint`, `has-stabilized`, `training-trace`
+  
+- `FiniteDeterministicMDP.agda`: FDMDP-specific learning:
+  - `fdmdp-learner`, `new-fdmdp-learner`, `train-step`, `train-batch`
+  - `current-ranking`, `current-ranking-restricted`
+  - `training-trace`, `depth-history`, `violation-history`
+
+**Benefits of the curried design:**
+1. **Checkpointing**: Just save the `LearnerState` record (4 numbers)
+2. **Incremental learning**: Process samples one at a time
+3. **Training traces**: Get full history for analysis/plotting
+4. **Composability**: Chain `train-batch`, `checkpoint`, `current-ranking` freely
+5. **No performance penalty**: Same computations, better organization
+
+Example usage:
+```agda
+-- Initialize
+learner₀ = new-fdmdp-learner
+
+-- Train incrementally
+learner₁ = train-step learner₀ sample₁
+learner₂ = train-step learner₁ sample₂
+
+-- Checkpoint
+ckpt = checkpoint learner₂
+
+-- Resume later
+learner₃ = train-step ckpt sample₃
+
+-- Get training trace for plotting
+trace = training-trace learner₀ samples
+depths = depth-history trace
+```
 
 #### Task Implementations (`CSHRL/Tasks/`):
 
