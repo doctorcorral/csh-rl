@@ -983,6 +983,78 @@ Why is this approach superior to traditional RL?
 
 The structural nature of CSHRL makes it robust to dynamic action spaces—a critical advantage for real-world deployment.
 
+\subsection{The Curried Learner: Stateful Learning with Checkpointing}
+
+Real-world learning systems need more than a one-shot algorithm—they need \textbf{stateful, interruptible, resumable} learning. We provide a curried learner interface that makes the learning state explicit:
+
+\begin{lstlisting}
+-- Learner state captures training progress
+record LearnerState : Set where
+  constructor learner-state
+  field
+    current-depth   : ℕ       -- Current lookahead depth
+    samples-seen    : ℕ       -- Total samples processed
+    violations-seen : ℕ       -- Total violations detected
+    last-violation  : Maybe ℕ -- Depth of last violation
+
+-- The curried learner type
+Learner : Set
+Learner = LearnerState → Sample → LearnerState
+
+-- Create a learner by fixing the test function
+make-learner : (ℕ → Sample → Maybe Violation) → Learner
+\end{lstlisting}
+
+This design provides several key benefits:
+
+\begin{enumerate}
+\item \textbf{Natural Checkpointing}: Save the \texttt{LearnerState} record to disk; resume by passing it to \texttt{train-step}. No serialization of complex closures—just four numbers.
+
+\item \textbf{Incremental Learning}: Process samples one at a time with \texttt{train-step}, or in batches with \texttt{train-batch}. Inspect state between samples.
+
+\item \textbf{Training Traces}: The \texttt{training-trace} function returns the full history of learner states, enabling analysis and plotting of learning curves.
+
+\item \textbf{Composability}: Chain operations freely—\texttt{train-batch}, \texttt{checkpoint}, \texttt{current-ranking}—to build complex training pipelines.
+
+\item \textbf{Convergence Detection}: The \texttt{has-stabilized} function checks if the learner has converged (no recent violations).
+\end{enumerate}
+
+\begin{lstlisting}
+-- FDMDP-specific curried interface
+fdmdp-learner       : Learner
+new-fdmdp-learner   : LearnerState
+train-step          : LearnerState → Sample → LearnerState
+train-batch         : LearnerState → List Sample → LearnerState
+current-ranking     : LearnerState → State → List Action
+training-trace      : LearnerState → List Sample → List LearnerState
+depth-history       : List LearnerState → List ℕ
+violation-history   : List LearnerState → List ℕ
+\end{lstlisting}
+
+The curried structure has \textbf{no performance penalty}—it performs exactly the same computations as the uncurried version, just with better organization. The \texttt{LearnerState} record is small (4 fields), and the currying is just partial application.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 2.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=6em,align=center,font=\footnotesize},
+    arr/.style={->,thick,>=Stealth}
+]
+\node[box] (init) {init-learner};
+\node[box,right=of init] (train) {train-step\\(sample)};
+\node[box,right=of train] (ckpt) {checkpoint};
+\node[box,below=of ckpt] (disk) {disk/memory};
+\node[box,right=of ckpt] (resume) {resume\\train-step};
+
+\draw[arr] (init) -- (train);
+\draw[arr] (train) -- node[above] {repeat} (ckpt);
+\draw[arr] (ckpt) -- (disk);
+\draw[arr,dashed] (disk) -- (resume);
+\draw[arr] (resume) edge[bend right=30] (train);
+\end{tikzpicture}
+\caption{Curried learner workflow: initialize, train, checkpoint, resume.}
+\end{figure}
+
 \section{Undecidability Is the Point}
 
 A natural question arises:
