@@ -3,9 +3,9 @@
 -- | Simple 1D Grid World Navigation
 -- | The agent must move forward to reach a goal (P0 → P1 → P2).
 
-module CSHRL.Tasks.Maze where
+module CSHRL.Tasks.Classic.Maze where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
@@ -53,29 +53,33 @@ open Core State Action Reward step _≤ᵣ_ _⊔_ 0 all-actions
 
 -- 3. Define the Homo
 
--- Manual ranking for pattern matching ease
-my-rank : State → Action → Action → Bool
+-- Manual ranking for pattern matching ease (Boolean version)
+my-rankᵇ : State → Action → Action → Bool
 -- At P0: Fwd(P1) vs Bwd(P0). P1>P0. Fwd > Bwd.
-my-rank P0 Fwd Fwd = true
-my-rank P0 Fwd Bwd = false 
-my-rank P0 Bwd Fwd = true 
-my-rank P0 Bwd Bwd = true
+my-rankᵇ P0 Fwd Fwd = true
+my-rankᵇ P0 Fwd Bwd = false 
+my-rankᵇ P0 Bwd Fwd = true 
+my-rankᵇ P0 Bwd Bwd = true
 
 -- At P1: Fwd(P2) vs Bwd(P0). P2>P0. Fwd > Bwd.
-my-rank P1 Fwd Fwd = true
-my-rank P1 Fwd Bwd = false
-my-rank P1 Bwd Fwd = true
-my-rank P1 Bwd Bwd = true
+my-rankᵇ P1 Fwd Fwd = true
+my-rankᵇ P1 Fwd Bwd = false
+my-rankᵇ P1 Bwd Fwd = true
+my-rankᵇ P1 Bwd Bwd = true
 
 -- At P2: Fwd(P2) vs Bwd(P1). P2>P1. Fwd > Bwd.
-my-rank P2 Fwd Fwd = true
-my-rank P2 Fwd Bwd = false
-my-rank P2 Bwd Fwd = true
-my-rank P2 Bwd Bwd = true
+my-rankᵇ P2 Fwd Fwd = true
+my-rankᵇ P2 Fwd Bwd = false
+my-rankᵇ P2 Bwd Fwd = true
+my-rankᵇ P2 Bwd Bwd = true
+
+-- Lift to a proposition
+my-rank : State → Action → Action → Set
+my-rank s a b = T (my-rankᵇ s a b)
 
 postulate
   preserves-impl : ∀ a b s →
-                  my-rank s a b ≡ true →
+                  my-rank s a b →
                   action-value s a ≤ₛ action-value s b
 
 instance

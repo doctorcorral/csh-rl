@@ -4,9 +4,9 @@
 -- | The agent must cross a desert with limited energy.
 -- | Demonstrates dynamic horizon and phase transitions.
 
-module CSHRL.Tasks.Energy where
+module CSHRL.Tasks.Classic.Energy where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊔_; _≤_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
@@ -133,14 +133,18 @@ score (pos , en) act =
          then (if eq-action? act Recharge then 50 else 0)
          else (if eq-action? act Bwd then (50 ∸ n-pos) else 0)
 
--- The Ranking Relation
-_≤_rank_ : State → Action → Action → Bool
-_≤_rank_ s a b = lte? (score s a) (score s b)
+-- The Ranking Relation (Boolean version)
+_≤_rankᵇ_ : State → Action → Action → Bool
+_≤_rankᵇ_ s a b = lte? (score s a) (score s b)
+
+-- Lift to a proposition
+_≤_rank_ : State → Action → Action → Set
+_≤_rank_ s a b = T (s ≤ a rankᵇ b)
 
 -- 4. Instance Proof (Postulated for this complex domain)
 postulate
   preserves-impl : ∀ a b s →
-                  _≤_rank_ s a b ≡ true →
+                  s ≤ a rank b →
                   action-value s a ≤ₛ action-value s b
 
 instance
