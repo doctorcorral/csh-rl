@@ -60,6 +60,9 @@ src/
 │   ├── EnvironmentClass/
 │   │   ├── FiniteDeterministicMDP.agda
 │   │   └── CombinatorialPlacementMDP.agda
+│   ├── Learning/
+│   │   ├── Base.agda                    # Universal learning infrastructure
+│   │   └── FiniteDeterministicMDP.agda  # FDMDP-specific learner
 │   └── Tasks/
 │       ├── Classic/
 │       │   ├── DelayedGratification.agda # Sparse reward / Marshmallow test
@@ -80,6 +83,16 @@ src/
 
 - `Core.agda`: Coinductive optimal value, action-value, stream dominance `_≤ₛ_`, and `CoindHomo` record.
 - `Finder.agda`: The symmetry restoration algorithm using ordinal value iteration.
+
+#### Learning Infrastructure (`CSHRL/Learning/`):
+
+- `Base.agda`: Universal learning primitives—LearnerState, violation detection, ranking updates, convergence bounds, monotonicity proofs.
+- `FiniteDeterministicMDP.agda`: FDMDP-specific learner with trace-based violation detection and active refinement.
+
+The Learning module provides stateful, checkpoint-friendly learning with proven monotonicity guarantees:
+- Passive learning: increase depth on violation detection
+- Active refinement: swap rankings based on violations for faster convergence
+- Unavailability handling: adapt rankings when actions become unavailable
 
 #### Environment Classes (`CSHRL/EnvironmentClass/`):
 
