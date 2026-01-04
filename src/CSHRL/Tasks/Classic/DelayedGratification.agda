@@ -4,7 +4,7 @@
 -- | Tests the Finder algorithm on sparse rewards where the optimal
 -- | action is only distinguishable by looking deeper into the future.
 
-module CSHRL.Tasks.DelayedGratification where
+module CSHRL.Tasks.Classic.DelayedGratification where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)

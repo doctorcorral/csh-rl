@@ -4,10 +4,10 @@
 -- | Demonstrates that constraints are just sparse rewards.
 -- | Invalid moves lead to Dead state (infinite zeros).
 
-module CSHRL.Tasks.Queens where
+module CSHRL.Tasks.Classic.Queens where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
 open import Data.List using (List; _∷_; []; length; map; _++_; foldr)
 open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -119,14 +119,19 @@ open Core State Action Reward step _≤_ _⊔_ 0 all-actions
 -- The ranking is derived from Finder's trace comparison at depth N.
 -- This connects the finite-horizon search to the infinite coinductive property.
 
-_≤_rank_ : State → Action → Action → Bool
-s ≤ a rank b = trace-action s a N ≤ₜ trace-action s b N
+-- Boolean version of the ranking
+_≤_rankᵇ_ : State → Action → Action → Bool
+s ≤ a rankᵇ b = trace-action s a N ≤ₜ trace-action s b N
+
+-- Lift to a proposition
+_≤_rank_ : State → Action → Action → Set
+s ≤ a rank b = T (s ≤ a rankᵇ b)
 
 -- Postulate: The Finder-derived ranking preserves the coinductive ordering.
 -- This holds because Queens is a terminating game (depth ≤ N), so finite = infinite.
 postulate
   preserves-impl : ∀ a b s →
-                  _≤_rank_ s a b ≡ true →
+                  s ≤ a rank b →
                   action-value s a ≤ₛ action-value s b
 
 instance

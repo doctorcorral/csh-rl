@@ -4,9 +4,9 @@
 -- | Demonstrates hierarchical planning via symmetry flips.
 -- | The agent must backtrack to get a key before proceeding to treasure.
 
-module CSHRL.Tasks.KeyDoor where
+module CSHRL.Tasks.Classic.KeyDoor where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; T)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; _≢_)
@@ -108,13 +108,18 @@ zero  <=? _     = true
 suc _ <=? zero  = false
 suc n <=? suc m = n <=? m
 
-_≤_rank_ : State → Action → Action → Bool
-s ≤ a rank b = (rank-score s a) <=? (rank-score s b)
+-- Boolean version of ranking
+_≤_rankᵇ_ : State → Action → Action → Bool
+s ≤ a rankᵇ b = (rank-score s a) <=? (rank-score s b)
+
+-- Lift to a proposition
+_≤_rank_ : State → Action → Action → Set
+s ≤ a rank b = T (s ≤ a rankᵇ b)
 
 -- Postulate the proofs
 postulate
   preserves-impl : ∀ a b s →
-                  _≤_rank_ s a b ≡ true →
+                  s ≤ a rank b →
                   action-value s a ≤ₛ action-value s b
 
 instance

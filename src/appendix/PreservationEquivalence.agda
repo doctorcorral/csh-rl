@@ -16,7 +16,6 @@ open import Data.List using (List)
 open import Codata.Guarded.Stream using (Stream; head; tail)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
-open import Data.Bool using (Bool; true)
 
 module _
   {State Action Reward : Set}
@@ -32,10 +31,11 @@ module _
 
   ------------------------------------------------------------------------
   -- 1. Alternative preserves (product-based)
+  --    Now uses propositions instead of Bool
   ------------------------------------------------------------------------
 
-  preserves-× : (State → Action → Action → Bool) → Set
-  preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b ≡ true →
+  preserves-× : (State → Action → Action → Set) → Set
+  preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b →
                      let v₁ = action-value s a
                          v₂ = action-value s b
                      in head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
@@ -44,9 +44,9 @@ module _
   -- 2. optimality-η: unpacks product into record
   ------------------------------------------------------------------------
 
-  optimality-η : {_≤ₐ_ : State → Action → Action → Bool} →
+  optimality-η : {_≤ₐ_ : State → Action → Action → Set} →
                  preserves-× _≤ₐ_ →
-                 ∀ s other opt → _≤ₐ_ s other opt ≡ true →
+                 ∀ s other opt → _≤ₐ_ s other opt →
                  action-value s other ≤ₛ action-value s opt
   head≤ (optimality-η pres s other opt r) = proj₁ (pres other opt s r)
   tail≤ (optimality-η pres s other opt r) = proj₂ (pres other opt s r)
@@ -56,7 +56,7 @@ module _
   ------------------------------------------------------------------------
 
   -- optimality-η unpacked = preserves-× (round-trip)
-  optimality-η≡preserves-× : {_≤ₐ_ : State → Action → Action → Bool}
+  optimality-η≡preserves-× : {_≤ₐ_ : State → Action → Action → Set}
                              (pres : preserves-× _≤ₐ_) →
                              ∀ s a b r →
                              let result = optimality-η pres s a b r

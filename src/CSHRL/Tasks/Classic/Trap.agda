@@ -3,7 +3,7 @@
 -- | Trap Avoidance (Greedy vs Patient)
 -- | Tests the Finder's ability to see through greedy bait.
 
-module CSHRL.Tasks.Trap where
+module CSHRL.Tasks.Classic.Trap where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
