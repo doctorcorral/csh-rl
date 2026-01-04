@@ -624,6 +624,108 @@ While the theory is clean, full verification in Agda faces computational limits.
 
 This is not a limitation of the theory, but of current proof assistants. The preservation proof \emph{exists} mathematically; we simply cannot ask Agda to enumerate it exhaustively. Future work will explore proof-carrying code and certified extraction to bridge this gap.
 
+\section{The Learner: Stateful Symmetry Restoration}
+
+While the Finder computes optimal rankings at a fixed depth, real-world learning requires \emph{adaptive} depth discovery. The Learner module provides a stateful, checkpoint-friendly interface for incremental symmetry restoration.
+
+\subsection{Universal Learning Infrastructure}
+
+The \texttt{CSHRL.Learning.Base} module defines EC-independent learning primitives:
+
+\begin{lstlisting}
+module CSHRL.Learning.Base where
+
+module UniversalLearning (State Action : Set)
+                         (_≟ₐ_ : (a b : Action) → Dec (a ≡ b)) where
+
+  -- Learner state captures training progress
+  record LearnerState : Set where
+    field
+      current-depth   : ℕ           -- Lookahead depth
+      samples-seen    : ℕ           -- Total samples processed
+      violations-seen : ℕ           -- Violations detected
+      last-violation  : Maybe ℕ     -- For convergence analysis
+  
+  -- A violation records where ranking disagrees with traces
+  record Violation : Set where
+    field
+      viol-state  : State
+      viol-better : Action   -- Should be ranked higher
+      viol-worse  : Action   -- Should be ranked lower
+      viol-depth  : ℕ        -- Depth where detected
+  
+  -- Create a learner from a test function
+  make-learner : (ℕ → Sample → Maybe Violation) → Learner
+  
+  -- Active refinement: swap ranking on violation
+  make-active-learner : (ℕ → Sample → Maybe Violation) →
+                        RankingUpdater → ActiveLearner
+\end{lstlisting}
+
+\subsection{Passive vs Active Learning}
+
+The module supports two learning modes:
+
+\begin{enumerate}
+\item \textbf{Passive Learning}: On violation detection, increase the lookahead depth. The ranking is recomputed from traces at the new depth. Simple but may require many violations to converge.
+
+\item \textbf{Active Refinement}: On violation, \emph{both} increase depth \emph{and} swap the violated pair in the ranking. This directly fixes the mistake, leading to faster convergence.
+\end{enumerate}
+
+\begin{lstlisting}
+-- Active step: swap ranking AND increase depth
+active-curried-step test updater ls s with test (current-depth ls) s
+... | nothing = record ls { samples-seen = suc samples-seen }
+... | just v  = record ls
+    { current-depth    = suc current-depth
+    ; violations-seen  = suc violations-seen
+    ; explicit-ranking = updater v explicit-ranking  -- Direct fix!
+    }
+\end{lstlisting}
+
+\subsection{Monotonicity Guarantees}
+
+The key theoretical contribution is that learning \emph{monotonically decreases violations}. We prove:
+
+\begin{itemize}
+\item \textbf{Depth monotonicity}: $\text{depth}(t) \leq \text{depth}(t+1)$
+\item \textbf{Violations-seen monotonicity}: Counter never decreases
+\item \textbf{Violation-count decrease}: After each swap, total violations $\downarrow$
+\end{itemize}
+
+\begin{lstlisting}
+-- Proved in CSHRL.Learning.Base
+depth-mono : ∀ test updater ls s →
+  get-active-depth ls ≤ get-active-depth (active-step test updater ls s)
+\end{lstlisting}
+
+\subsection{Action Unavailability}
+
+Real environments may have actions that become temporarily unavailable. The Learning module handles this gracefully:
+
+\begin{lstlisting}
+-- Restrict ranking to available actions
+find-ranking-restricted : Available → State → ℕ → List Action
+find-ranking-restricted avail s k =
+  let available = filter-available avail all-actions
+      scored = map (λ a → (a , trace-action-restricted avail s a k)) available
+  in map proj₁ (sort-scored scored)
+
+-- Demote unavailable actions to bottom of ranking
+demote-unavailable : Available → ExplicitRanking → ExplicitRanking
+\end{lstlisting}
+
+This allows the learner to adapt when actions are blocked, broken, or forbidden---without restarting training.
+
+\subsection{Convergence Bounds}
+
+We prove an upper bound on violations, guaranteeing termination:
+\[
+\text{max-violations} \leq |S| \times \binom{|A|}{2} = |S| \times \frac{|A|(|A|-1)}{2}
+\]
+
+Since each violation-fixing swap reduces violations by at least one, convergence is guaranteed in at most this many steps.
+
 \section{Testing the Finder: The Silence of the Zeros}
 
 To rigorously test our "Symmetry Finding" algorithm, we subjected it to the classic problem of delayed gratification (or sparse rewards). In this task, the agent faces two paths:
