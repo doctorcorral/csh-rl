@@ -8,10 +8,19 @@ module All where
 import CSHRL.Core
 import CSHRL.Finder
 
--- Task Implementations
-import CSHRL.Tasks.DelayedGratification
-import CSHRL.Tasks.Energy
-import CSHRL.Tasks.KeyDoor
-import CSHRL.Tasks.Maze
-import CSHRL.Tasks.Queens
-import CSHRL.Tasks.Trap
+-- Environment Classes
+import CSHRL.EnvironmentClass.FiniteDeterministicMDP
+import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
+
+-- Classic Task Implementations (pedagogical, may use postulates)
+import CSHRL.Tasks.Classic.DelayedGratification
+import CSHRL.Tasks.Classic.Energy
+import CSHRL.Tasks.Classic.KeyDoor
+import CSHRL.Tasks.Classic.Maze
+import CSHRL.Tasks.Classic.Queens
+import CSHRL.Tasks.Classic.Trap
+
+-- Verified Task Implementations
+import CSHRL.Tasks.Verified.TwoState
+import CSHRL.Tasks.Verified.OnePlacement
+import CSHRL.Tasks.Verified.Queens1
