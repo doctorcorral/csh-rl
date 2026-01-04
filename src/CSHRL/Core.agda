@@ -6,8 +6,7 @@ open import Data.List using (List; map; foldr)
 open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
-open import Data.Bool using (Bool; true; false)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Function using (_∘_)
 open import Data.Nat using (ℕ; zero; suc)
 
@@ -76,10 +75,11 @@ module Core
 
   record CoindHomo : Set₁ where
     field
-      _≤ₐ_      : State → Action → Action → Bool
+      -- The ranking as a proposition (a relation, not a Boolean function)
+      _≤ₐ_      : State → Action → Action → Set
 
       -- Preservation: The ranking mirrors the relation between action-values
-      preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
+      preserves : ∀ a b s → _≤ₐ_ s a b →
                   action-value s a ≤ₛ action-value s b
 
   open CoindHomo {{...}} public
