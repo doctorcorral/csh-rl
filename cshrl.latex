@@ -34,7 +34,8 @@
     with, in, let, codata, forall, Set, Set1, Set2, Prop,
     OPTIONS, BUILTIN, REWRITE,
     CoindHomo, Stream, StreamR, List, Bool, Nat, Action, State, Reward,
-    ℕ, _≤ᵣ_, _≤ₛ_, _≤ₐ_, _≤ₜ_, _≡_, _×_
+    ℕ, _≤ᵣ_, _≤ₛ_, _≤ₐ_, _≤ₜ_, _≡_, _×_,
+    Dec, yes, no, T, ⊤, ⊥
   },
   morekeywords=[2]{
     refl, zero, suc, true, false,
@@ -206,8 +207,7 @@ open import Data.List using (List; map; foldr)
 open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
-open import Data.Bool using (Bool; true; false)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Function using (_∘_)
 open import Data.Nat using (ℕ; zero; suc)
 
@@ -263,18 +263,40 @@ module Core
 
   ------------------------------------------------------------------------
   -- 4. The Symmetric Homomorphism
+  -- NOTE: _≤ₐ_ is now a proposition (Set), not a Bool.
+  -- This allows preservation to directly receive a proof, not Bool equality.
   ------------------------------------------------------------------------
 
   record CoindHomo : Set₁ where
     field
-      _≤ₐ_      : State → Action → Action → Bool
+      -- The ranking as a proposition (a relation, not a Boolean function)
+      _≤ₐ_      : State → Action → Action → Set
 
       -- Preservation: The ranking mirrors the relation between action-values
-      preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
+      preserves : ∀ a b s → _≤ₐ_ s a b →
                   action-value s a ≤ₛ action-value s b
 
   open CoindHomo {{...}} public
 \end{lstlisting}
+
+\subsection{Why Propositions Instead of Booleans?}
+
+A natural question arises: why define \texttt{\_$\le_a$\_} as a \emph{proposition} (\texttt{Set}) rather than a Boolean? The answer lies in the nature of verification:
+
+\begin{itemize}
+\item \textbf{Booleans are blind:} A Boolean \texttt{true} carries no information about \emph{why} something is true. To use it in a proof, we need a separate ``soundness'' lemma: \texttt{$\le?$-sound : r$_1$ $\le$? r$_2$ $\equiv$ true $\to$ r$_1$ $\le_r$ r$_2$}.
+
+\item \textbf{Propositions carry evidence:} A value of type \texttt{r$_1$ $\le_r$ r$_2$} \emph{is} the proof. No extraction needed---the proof is directly available for use.
+
+\item \textbf{Decidability bridges both:} The type \texttt{Dec (r$_1$ $\le_r$ r$_2$)} gives us the best of both worlds: it is either \texttt{yes p} (with proof \texttt{p}) or \texttt{no $\neg$p} (with refutation \texttt{$\neg$p}). This enables pattern matching for computation while providing evidence for verification.
+\end{itemize}
+
+This design separates concerns cleanly:
+\begin{enumerate}
+\item The \texttt{Finder} module uses Boolean comparisons for efficient computation.
+\item The \texttt{Core} module uses propositional rankings for clean proof structure.
+\item Environment Classes bridge the two via decidability proofs.
+\end{enumerate}
 
 \section{The Algorithm: Polishing the Mirror}
 
@@ -294,15 +316,16 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 module Finder
   (State Action Reward : Set)
   (step                : State → Action → State × Reward)
-  (_≤?_                : Reward → Reward → Bool) -- Decidable comparison
+  (_≤?_                : Reward → Reward → Bool) -- Boolean comparison for computation
   (actions             : Action)                 -- Default action (fallback)
   (all-actions         : List Action)            -- List of all available actions
   where
 
-  -- 1. Ordinal Value
+  -- 1. Ordinal Value (Traces)
   Trace : Set
   Trace = List Reward
 
+  -- Boolean trace comparison for algorithmic use
   _≤ₜ_ : Trace → Trace → Bool
   []       ≤ₜ []       = true
   []       ≤ₜ (_ ∷ _)  = true
@@ -367,6 +390,8 @@ module Finder
       head-default (x ∷ _) = x
 \end{lstlisting}
 
+\textbf{Note on Booleans vs Propositions:} The Finder module uses Boolean comparisons (\texttt{Bool}) for computational efficiency during search. However, the verification infrastructure (Environment Classes) lifts these to \emph{propositions} (\texttt{Set}) with decidability proofs (\texttt{Dec}). This separation allows fast execution while enabling rigorous machine-checked proofs.
+
 This algorithm is profound because it requires no discount factor ($\gamma$). Standard RL needs $\gamma < 1$ to make infinite sums converge. We do not sum. We compare structure. The lexicographic comparison is well-defined for any finite depth, and coinductively well-defined for infinite streams. This removes a major hyperparameter and source of instability in RL.
 
 \section{Environment Classes: The Bridge to Full Verification}
@@ -418,38 +443,53 @@ Our first EC captures the structure shared by grid worlds, mazes, and simple nav
 \begin{lstlisting}
 module CSHRL.EnvironmentClass.FiniteDeterministicMDP where
 
+open import Relation.Nullary using (Dec; yes; no)
+
 module FiniteDeterministicMDP
   (State Action Reward : Set)
   (step        : State → Action → State × Reward)  -- Deterministic
   (horizon     : ℕ)                                 -- Finite episodes
   (all-actions : List Action)                       -- Finite actions
-  -- Reward algebra
-  (_≤ᵣ_        : Reward → Reward → Set)
+  -- Reward algebra (propositional with decidability)
+  (_≤ᵣ_        : Reward → Reward → Set)            -- Propositional ordering
+  (_≤?_        : (r s : Reward) → Dec (r ≤ᵣ s))    -- Decidable!
+  (≤ᵣ-refl     : ∀ {r} → r ≤ᵣ r)
   (max         : Reward → Reward → Reward)
   (bottom      : Reward)
-  (_≤?_        : Reward → Reward → Bool)            -- Decidable
-  (≤?-sound    : ∀ r₁ r₂ → r₁ ≤? r₂ ≡ true → r₁ ≤ᵣ r₂)
   where
   
-  -- The EC provides a finder based on trace comparison
-  module Finder where
-    find-ranking : State → ℕ → List Action
-    find-policy  : State → ℕ → Action
-    -- ... (implementation as shown earlier)
+  -- Derive Boolean version from Dec for computation
+  _≤?ᵇ_ : Reward → Reward → Bool
+  r ≤?ᵇ s with r ≤? s
+  ... | yes _ = true
+  ... | no  _ = false
+  
+  -- Propositional trace ordering (for proofs)
+  _≤ₜ_ : Trace → Trace → Set
+  []       ≤ₜ []       = ⊤
+  []       ≤ₜ (_ ∷ _)  = ⊤
+  (_ ∷ _)  ≤ₜ []       = ⊥
+  (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) = (r₁ ≤ᵣ r₂) × ((r₂ ≤ᵣ r₁) → t₁ ≤ₜ t₂)
+  
+  -- The ranking as a proposition (not Bool!)
+  _ranks_≤_ : State → Action → Action → Set
+  s ranks a ≤ b = trace-action s a horizon ≤ₜ trace-action s b horizon
   
   -- The preservation proof requires a "bridge lemma"
   module WithBridgeLemma
-    (tail-value-≤ₛ : ∀ s₁ s₂ → value s₁ ≤ₛ value s₂ →
-                     tail (value s₁) ≤ₛ tail (value s₂))
+    (tail-value-≤ₛ : ∀ s a b → s ranks a ≤ b →
+                     value (proj₁ (step s a)) ≤ₛ value (proj₁ (step s b)))
     where
     
     instance
       FiniteMDPHomo : CoindHomo
       FiniteMDPHomo = record
-        { _≤ₐ_     = Finder.find-ranking-cmp
+        { _≤ₐ_     = _ranks_≤_   -- Proposition, not Bool!
         ; preserves = preserves-impl
         }
 \end{lstlisting}
+
+The key innovation here is the use of \texttt{Dec (r $\le_r$ s)} instead of a Boolean comparison with a separate soundness lemma. The \texttt{Dec} type carries \emph{evidence}: either \texttt{yes p} with a proof \texttt{p : r $\le_r$ s}, or \texttt{no $\neg$p} with a refutation. This eliminates the need for \texttt{$\le$?-sound} entirely---the proof is built into the decision procedure.
 
 The \texttt{WithBridgeLemma} module requires the task to provide one key lemma: that the tail of the value stream preserves the ordering. For absorbing terminal states (where rewards become constant forever), this is straightforward to prove.
 
@@ -460,30 +500,48 @@ For constraint satisfaction problems like N-Queens, we define a specialized EC:
 \begin{lstlisting}
 module CSHRL.EnvironmentClass.CombinatorialPlacementMDP where
 
+open import Relation.Nullary using (Dec; yes; no; ¬_)
+open import Data.Unit using (⊤)
+open import Data.Empty using (⊥)
+
 module CombinatorialPlacementMDP
-  (N            : ℕ)                  -- Board size / problem size
-  (Config       : Set)                -- Configuration type
-  (Action       : Set)                -- Placement actions
-  (step         : Config → Action → State × Reward)
-  (is-valid     : Config → Action → Bool)  -- Constraint check
-  (is-complete  : Config → Bool)           -- Goal test
-  (solved-reward : ℕ)                      -- Reward for solution
+  (Config        : Set)                -- Configuration type
+  (Action        : Set)                -- Placement actions
+  (is-dead       : Config → Bool)      -- Constraint violated?
+  (is-solved     : Config → Bool)      -- Complete valid solution?
+  (place         : Config → Action → Config)
+  (solved-reward : ℕ)                  -- Reward for solution
+  (all-actions   : List Action)
+  (horizon       : ℕ)
   where
   
   -- States have explicit terminal structure
   data State : Set where
     Ongoing : Config → State
     Dead    : State           -- Constraint violated
-    Solved  : State           -- Goal reached
+    Solved  : Config → State  -- Goal reached
   
-  -- Terminal states produce constant reward streams
-  step-Dead   : step Dead   _ = (Dead  , 0)
-  step-Solved : step Solved _ = (Solved, solved-reward)
+  -- Decidable ordering with evidence
+  _≤?_ : (m n : ℕ) → Dec (m ≤ n)
+  zero  ≤? _     = yes z≤n
+  suc _ ≤? zero  = no λ()
+  suc m ≤? suc n with m ≤? n
+  ... | yes p = yes (s≤s p)
+  ... | no ¬p = no λ{ (s≤s p) → ¬p p }
+  
+  -- Propositional trace ordering (structure-preserving)
+  _≤ₜ_ : Trace → Trace → Set
+  []       ≤ₜ []       = ⊤
+  []       ≤ₜ (_ ∷ _)  = ⊤
+  (_ ∷ _)  ≤ₜ []       = ⊥
+  (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) = (r₁ ≤ r₂) × ((r₂ ≤ r₁) → t₁ ≤ₜ t₂)
   
   -- The EC provides proofs about terminal states
   Dead-≤ₛ-any : ∀ s → value Dead ≤ₛ value s
   -- (Proof: Dead produces 0s forever, which is ≤ anything)
 \end{lstlisting}
+
+The propositional trace ordering \texttt{\_$\le_t$\_} directly encodes the proof structure: for non-empty traces, we require (1) the head comparison \texttt{r$_1$ $\le$ r$_2$}, and (2) if the heads are equal (witnessed by \texttt{r$_2$ $\le$ r$_1$}), then the tails must also be ordered. This makes proofs \emph{compositional}---head comparisons are just projections, and impossible cases (like non-empty $\le$ empty) are inhabited by $\bot$.
 
 The key innovation is that \texttt{Dead} and \texttt{Solved} states are \emph{absorbing}---once entered, the agent stays there forever with constant reward. This makes the coinductive proofs tractable because:
 \begin{itemize}
@@ -505,25 +563,42 @@ The EC provides the rest. Here is the complete, \texttt{--safe} verified TwoStat
 \begin{lstlisting}
 module CSHRL.Tasks.Verified.TwoState where
 
+open import Relation.Nullary using (Dec; yes; no; ¬_)
+
 -- Domain-specific definitions
 data State : Set where Start : State; Goal : State
-data Action : Set where Go : Action
+data Action : Set where Go : Action; Stay : Action
+
+-- Decidable ordering (returns proof, not Bool!)
+_≤?_ : (m n : ℕ) → Dec (m ≤ n)
+zero  ≤? _     = yes z≤n
+suc _ ≤? zero  = no λ()
+suc m ≤? suc n with m ≤? n
+... | yes p = yes (s≤s p)
+... | no ¬p = no λ{ (s≤s p) → ¬p p }
 
 step : State → Action → State × ℕ
-step Start Go = (Goal , 1)
-step Goal  Go = (Goal , 1)  -- Absorbing
+step Start Go   = (Goal , 1)
+step Start Stay = (Start , 0)
+step Goal  _    = (Goal , 1)  -- Absorbing
 
--- Instantiate the EC
-open FiniteDeterministicMDP State Action ℕ step 1 ...
+-- Instantiate the EC with Dec-based ordering
+open FiniteDeterministicMDP State Action ℕ step
+  _≤_ _≤?_ ≤-refl _⊔_ 0   -- Note: no ≤?-sound needed!
+  all-actions Go 1
 
--- Provide the bridge lemma (domain-specific proof)
-two-state-bridge : ∀ s₁ s₂ → value s₁ ≤ₛ value s₂ →
-                   tail (value s₁) ≤ₛ tail (value s₂)
-two-state-bridge = ... -- Inductive proof using absorbing state property
+-- Provide direct preservation (domain-specific proof)
+direct-preserves : ∀ a b s → s ranks a ≤ b →
+                   action-value s a ≤ₛ action-value s b
+direct-preserves Go Stay Start ()  -- Absurd: (1∷[]) ≤ₜ (0∷[]) = ⊥
+direct-preserves Stay Go Start p = ...  -- 0 ≤ 1, so valid
+-- ... other cases
 
 -- Obtain the verified CoindHomo!
-open WithBridgeLemma two-state-bridge public
+open WithDirectPreservation direct-preserves public
 \end{lstlisting}
+
+Notice how the absurd case \texttt{direct-preserves Go Stay Start ()} works: the propositional trace ordering for \texttt{(1 :: []) $\le_t$ (0 :: [])} requires \texttt{1 $\le$ 0}, which is $\bot$. Agda recognizes this as uninhabited, allowing the absurd pattern \texttt{()}.
 
 The \texttt{open WithBridgeLemma two-state-bridge} line completes the verification. Agda's type checker confirms that all obligations are met, and the resulting \texttt{CoindHomo} instance is \emph{postulate-free}.
 
@@ -606,35 +681,42 @@ In this module, we explicitly define the "symmetry of the world." We define a fu
 \begin{lstlisting}
 module CSHRL.Tasks.Classic.Maze where
 -- ... imports ...
+open import Data.Bool using (Bool; true; false; T)  -- T lifts Bool to Set
 
--- We explicitly encode the symmetry: Fwd > Bwd because it leads to better futures.
-my-rank : State → Action → Action → Bool
-my-rank P0 Fwd Fwd = true
-my-rank P0 Fwd Bwd = false
-my-rank P0 Bwd Fwd = true 
-my-rank P0 Bwd Bwd = true
-my-rank P1 Fwd Fwd = true
-my-rank P1 Fwd Bwd = false
-my-rank P1 Bwd Fwd = true
-my-rank P1 Bwd Bwd = true
+-- Boolean ranking for pattern matching ease
+my-rankᵇ : State → Action → Action → Bool
+my-rankᵇ P0 Fwd Fwd = true
+my-rankᵇ P0 Fwd Bwd = false   -- Fwd > Bwd at P0
+my-rankᵇ P0 Bwd Fwd = true 
+my-rankᵇ P0 Bwd Bwd = true
+my-rankᵇ P1 Fwd Fwd = true
+my-rankᵇ P1 Fwd Bwd = false   -- Fwd > Bwd at P1
+my-rankᵇ P1 Bwd Fwd = true
+my-rankᵇ P1 Bwd Bwd = true
+my-rankᵇ P2 Fwd Fwd = true
+my-rankᵇ P2 Fwd Bwd = false   -- Fwd > Bwd at P2
+my-rankᵇ P2 Bwd Fwd = true
+my-rankᵇ P2 Bwd Bwd = true
 
-my-rank P2 Fwd Fwd = true
-my-rank P2 Fwd Bwd = false
-my-rank P2 Bwd Fwd = true
-my-rank P2 Bwd Bwd = true
+-- Lift to a proposition using T : Bool → Set
+-- T true = ⊤, T false = ⊥
+my-rank : State → Action → Action → Set
+my-rank s a b = T (my-rankᵇ s a b)
 
 postulate
   preserves-impl : ∀ a b s →
-                  my-rank s a b ≡ true →
+                  my-rank s a b →        -- Now a proof, not Bool equality!
                   action-value s a ≤ₛ action-value s b
 
 instance
   MyHomo : CoindHomo
   MyHomo = record
-    { _≤ₐ_ = my-rank
+    { _≤ₐ_ = my-rank            -- Proposition (Set), not Bool
     ; preserves = preserves-impl
     }
 \end{lstlisting}
+
+The \texttt{T} function from Agda's standard library lifts Booleans to propositions: \texttt{T true = $\top$} (trivially inhabited) and \texttt{T false = $\bot$} (empty). This provides a bridge between computational Boolean rankings and propositional preservation proofs.
 
 \section{Scaling Up: The Key-Door-Treasure Problem}
 
@@ -826,14 +908,18 @@ module CSHRL.Tasks.Verified.Queens1 where
 
 open CombinatorialPlacementMDP ... -- EC provides structure
 
--- Domain-specific preservation proof
-direct-preserves : ∀ a b s → ranking s a b ≡ true →
+-- Domain-specific preservation proof (propositional!)
+direct-preserves : ∀ a b s → s ranks a ≤ b →    -- Proof, not Bool equality
                    action-value s a ≤ₛ action-value s b
-direct-preserves Go Go Ongoing refl = ... -- Coinductive proof
+direct-preserves Col0 Col0 (Ongoing []) p = ... -- Coinductive proof
+direct-preserves Col0 Col0 Dead p = ...          -- Dead case (trivial)
+direct-preserves Col0 Col0 (Solved _) p = ...    -- Solved case (trivial)
 
 -- The verified CoindHomo instance
 open WithDirectPreservation direct-preserves public
 \end{lstlisting}
+
+The propositional approach shines in the preservation proof: impossible cases are now \emph{directly uninhabited}. For example, if \texttt{Col0} leads to a worse trace than another action, the proof obligation \texttt{s ranks Col0 $\le$ other} reduces to $\bot$, and Agda accepts the absurd pattern \texttt{()}.
 
 The gap between $N=1$ (verified) and $N=8$ (unverified but executable) illustrates a fundamental tension: coinductive proofs over exponential state spaces exceed current proof assistant capabilities. Future work on proof-carrying code and certified extraction may bridge this gap.
 
@@ -972,7 +1058,7 @@ This appendix shows that three formulations of the preservation property are equ
 
 \subsection{The Core Definition: Coinductive Records}
 
-In the main development, \texttt{CoindHomo.preserves} returns the coinductive record \texttt{\_$\le_s$\_} directly:
+In the main development, \texttt{CoindHomo.preserves} returns the coinductive record \texttt{\_$\le_s$\_} directly. Note that \texttt{\_$\le_a$\_} is now a \emph{proposition} (\texttt{Set}), not a Boolean:
 
 \begin{lstlisting}
 record _≤ₛ_ (x y : StreamR) : Set where
@@ -981,8 +1067,8 @@ record _≤ₛ_ (x y : StreamR) : Set where
     head≤ : head x ≤ᵣ head y
     tail≤ : tail x ≤ₛ tail y
 
--- In CoindHomo:
-preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
+-- In CoindHomo (propositional version):
+preserves : ∀ a b s → _≤ₐ_ s a b →      -- Direct proof, not Bool equality!
             action-value s a ≤ₛ action-value s b
 \end{lstlisting}
 
@@ -991,14 +1077,14 @@ preserves : ∀ a b s → _≤ₐ_ s a b ≡ true →
 One could equivalently define preservation to return a \emph{product} of two obligations:
 
 \begin{lstlisting}
-preserves-× : (State → Action → Action → Bool) → Set
-preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b ≡ true →
+preserves-× : (State → Action → Action → Set) → Set
+preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b →    -- Takes a proof directly
                    let v₁ = action-value s a
                        v₂ = action-value s b
                    in head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
 \end{lstlisting}
 
-This says: if action $a$ is ranked below action $b$ in state $s$, then:
+This says: if action $a$ is ranked below action $b$ in state $s$ (witnessed by a proof), then:
 \begin{enumerate}
 \item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (left component).
 \item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (right component).
@@ -1009,9 +1095,9 @@ This says: if action $a$ is ranked below action $b$ in state $s$, then:
 The \texttt{optimality-$\eta$} lemma converts the product formulation into the record formulation by projecting the components into record fields:
 
 \begin{lstlisting}
-optimality-η : {_≤ₐ_ : State → Action → Action → Bool} →
+optimality-η : {_≤ₐ_ : State → Action → Action → Set} →
                preserves-× _≤ₐ_ →
-               ∀ s other opt → _≤ₐ_ s other opt ≡ true →
+               ∀ s other opt → _≤ₐ_ s other opt →
                action-value s other ≤ₛ action-value s opt
 head≤ (optimality-η pres s other opt r) = proj₁ (pres other opt s r)
 tail≤ (optimality-η pres s other opt r) = proj₂ (pres other opt s r)
@@ -1022,15 +1108,15 @@ tail≤ (optimality-η pres s other opt r) = proj₂ (pres other opt s r)
 The following identity proves that starting with \texttt{Core.preserves}, converting to product form, and applying \texttt{optimality-$\eta$} yields back \texttt{Core.preserves}:
 
 \begin{lstlisting}
-all-three-equal : (h : CoindHomo) → ∀ s a b r →
+all-three-equal : (h : CoindHomo) → ∀ s a b (p : CoindHomo._≤ₐ_ h s a b) →
                   let -- Build preserves-× from Core.preserves
                       pres-× : preserves-× (CoindHomo._≤ₐ_ h)
-                      pres-× a' b' s' r' = let p = CoindHomo.preserves h a' b' s' r'
-                                           in head≤ p , tail≤ p
+                      pres-× a' b' s' r' = let q = CoindHomo.preserves h a' b' s' r'
+                                           in head≤ q , tail≤ q
                       -- Apply optimality-η to get back a record
-                      via-η = optimality-η pres-× s a b r
+                      via-η = optimality-η pres-× s a b p
                       -- Original Core.preserves
-                      original = CoindHomo.preserves h a b s r
+                      original = CoindHomo.preserves h a b s p
                   in (head≤ via-η ≡ head≤ original)
                    × (tail≤ via-η ≡ tail≤ original)
 all-three-equal _ _ _ _ _ = refl , refl
