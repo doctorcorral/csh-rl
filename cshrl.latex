@@ -1,10 +1,12 @@
-\UseRawInputEncoding
 \documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes,graphs}
 \usepackage{listings}
+\usepackage{listingsutf8}
 \usepackage{inconsolata}
 \usepackage{xcolor}
 \usepackage{hyperref}
@@ -31,34 +33,51 @@
     abstract, data, record, module, open, import, using, renaming,
     where, field, constructor, infix, infixl, infixr,
     mutual, postulate, primitive, private, public,
-    with, in, let, codata, forall, Set, Set1, Set2, Prop,
+    with, in, let, codata, forall, Set, Prop,
     OPTIONS, BUILTIN, REWRITE,
-    CoindHomo, Stream, StreamR, List, Bool, Nat, Action, State, Reward,
-    ℕ, _≤ᵣ_, _≤ₛ_, _≤ₐ_, _≤ₜ_, _≡_, _×_,
-    Dec, yes, no, T, ⊤, ⊥
+    CoindHomo, Stream, StreamR, List, Bool, Action, State, Reward,
+    Dec, yes, no
   },
   morekeywords=[2]{
-    refl, zero, suc, true, false,
-    _::_, _<=?_, _<=_s_, _<=_r_, _<=_a_, _==_,
-    _o_, _x_, not_
+    refl, zero, suc, true, false
   },
   sensitive=true,
   morecomment=[l]{--},
   morecomment=[n]{\{-}{-\}},
   morestring=[b]",
-  literate={->}{{$\rightarrow$}}2 {~}{{$\sim$}}1 {===}{{$\equiv$}}3
-           {<=}{{$\le$}}2 {>=}{{$\ge$}}2 {::}{{$::$}}2
+  literate=
+           % Arrows
+           {->}{{$\rightarrow$}}2
+           {~}{{$\sim$}}1 
+           % Equality and ordering
+           {===}{{$\equiv$}}3
+           {<=}{{$\le$}}2 {>=}{{$\ge$}}2 
            {<=?}{{$\le?$}}3
-           {sharp}{{$\sharp$}}1 {flat}{{$\flat$}}1
-           {<=_r}{{$\le_{\text{r}}$}}3 {<=_s}{{$\le_{\text{s}}$}}3 {<=_a}{{$\le_{\text{a}}$}}3
-           {<=_rank}{{$\le_{\text{rank}}$}}3 {<=_reward}{{$\le_{\text{reward}}$}}3
-           {forall}{{$\forall$}}1 {exists}{{$\exists$}}1
-           {not}{{$\neg$}}1
-           {_x_}{{$\times$}}3
-           {/=}{{$\not\equiv$}}2 {==}{{$\equiv$}}2
+           % Subscript ordering
+           {<=_r}{{$\le_r$}}4 {<=_s}{{$\le_s$}}4 {<=_a}{{$\le_a$}}4 {<=_t}{{$\le_t$}}4
+           {_<=_r_}{{$\_\!\le_r\_$}}6 {_<=_s_}{{$\_\!\le_s\_$}}6 
+           {_<=_a_}{{$\_\!\le_a\_$}}6 {_<=_t_}{{$\_\!\le_t\_$}}6
+           % Cons and list operations
+           {::}{{$::$}}2
+           % Quantifiers
+           {forall }{{$\forall$}}7
+           % Lambda
            {\\}{{$\lambda$}}1
-           {sigma}{{$\sigma$}}1 {tau}{{$\tau$}}1 {Real}{{$\mathbb{R}$}}1
-           {Nat}{{$\mathbb{N}$}}3 {_and_}{{$\land$}}5
+           % Number sets
+           {Nat}{{$\mathbb{N}$}}3
+           % Projections with subscripts
+           {proj_1}{{proj$_1$}}6 {proj_2}{{proj$_2$}}6
+           % Set levels
+           {Set_1}{{Set$_1$}}5 {Set_2}{{Set$_2$}}5
+           % head/tail with subscripts
+           {head<=}{{head$\le$}}6 {tail<=}{{tail$\le$}}6
+           % Ranks
+           {ranks_<=}{{ranks$\,\le$}}7
+           % Other subscripts
+           {r_1}{{r$_1$}}3 {r_2}{{r$_2$}}3
+           {t_1}{{t$_1$}}3 {t_2}{{t$_2$}}3
+           {v_1}{{v$_1$}}3 {v_2}{{v$_2$}}3
+           {s_1}{{s$_1$}}3 {s_2}{{s$_2$}}3
 }
 
 \lstset{
@@ -78,6 +97,8 @@
   rulecolor=\color{black},
   breaklines=true,
   escapeinside={(*@}{@*)},
+  inputencoding=utf8,
+  extendedchars=true,
 }
 
 \theoremstyle{plain}
@@ -182,7 +203,7 @@ This is not one diagram. This is an infinite tower of commuting diagrams, one fo
 \node[below=1.0cm of A2,font=\footnotesize,align=center,text width=8cm]
   {Coinductive Homo = infinite descending tower\\of perfectly aligned symmetries};
 \end{tikzpicture}
-\caption{The mirror never breaks — not even once, not ever.}
+\caption{The mirror never breaks --- not even once, not ever.}
 \end{figure}
 
 \section{The Agda Core: From Inertia to Optimality}
@@ -204,25 +225,25 @@ The ranking \texttt{\_$\le_{\text{a}}$\_} asserts that one action leads to a str
 module CSHRL.Core where
 
 open import Data.List using (List; map; foldr)
-open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
-open import Data.Product using (proj₁; proj₂; _×_; _,_)
-open import Relation.Nullary using (¬_; Dec; yes; no)
-open import Function using (_∘_)
-open import Data.Nat using (ℕ; zero; suc)
+open import Codata.Guarded.Stream using (Stream; head; tail; _::_; tabulate)
+open import Relation.Binary.PropositionalEquality using (_==_; _/=_)
+open import Data.Product using (proj_1; proj_2; _x_; _,_)
+open import Relation.Nullary using (not_; Dec; yes; no)
+open import Function using (_._)
+open import Data.Nat using (Nat; zero; suc)
 
 -- Inner module with parameters
 module Core
   (State Action Reward : Set)
-  (step                : State → Action → State × Reward)
-  (_≤ᵣ_                : Reward → Reward → Set)
+  (step                : State -> Action -> State x Reward)
+  (_<=_r_                : Reward -> Reward -> Set)
   -- Requirements for calculating optimal value
-  (max                 : Reward → Reward → Reward)
+  (max                 : Reward -> Reward -> Reward)
   (bottom              : Reward)
   (all-actions         : List Action)
   where
 
-  infix 4 _≤ₛ_
+  infix 4 _<=_s_
 
   StreamR : Set
   StreamR = Stream Reward
@@ -231,50 +252,50 @@ module Core
   -- 1. Supremum of Streams
   ------------------------------------------------------------------------
 
-  max-list : List Reward → Reward
+  max-list : List Reward -> Reward
   max-list = foldr max bottom
 
   ------------------------------------------------------------------------
   -- 2. Optimal Value and Action Value
   ------------------------------------------------------------------------
 
-  solve : State → ℕ → Reward
-  solve s zero    = max-list (map (λ a → proj₂ (step s a)) all-actions)
-  solve s (suc n) = max-list (map (λ a → solve (proj₁ (step s a)) n) all-actions)
+  solve : State -> Nat -> Reward
+  solve s zero    = max-list (map (\ a -> proj_2 (step s a)) all-actions)
+  solve s (suc n) = max-list (map (\ a -> solve (proj_1 (step s a)) n) all-actions)
 
-  value : State → StreamR
+  value : State -> StreamR
   value s = tabulate (solve s)
 
-  action-value : State → Action → StreamR
-  head (action-value s a) = proj₂ (step s a)
-  tail (action-value s a) = value (proj₁ (step s a))
+  action-value : State -> Action -> StreamR
+  head (action-value s a) = proj_2 (step s a)
+  tail (action-value s a) = value (proj_1 (step s a))
 
   ------------------------------------------------------------------------
   -- 3. Coinductive Order
   ------------------------------------------------------------------------
 
-  record _≤ₛ_ (x y : StreamR) : Set where
+  record _<=_s_ (x y : StreamR) : Set where
     coinductive
     field
-      head≤ : head x ≤ᵣ head y
-      tail≤ : tail x ≤ₛ tail y
+      head<= : head x <=_r head y
+      tail<= : tail x <=_s tail y
 
-  open _≤ₛ_ public
+  open _<=_s_ public
 
   ------------------------------------------------------------------------
   -- 4. The Symmetric Homomorphism
-  -- NOTE: _≤ₐ_ is now a proposition (Set), not a Bool.
+  -- NOTE: _<=_a_ is now a proposition (Set), not a Bool.
   -- This allows preservation to directly receive a proof, not Bool equality.
   ------------------------------------------------------------------------
 
-  record CoindHomo : Set₁ where
+  record CoindHomo : Set_1 where
     field
       -- The ranking as a proposition (a relation, not a Boolean function)
-      _≤ₐ_      : State → Action → Action → Set
+      _<=_a_      : State -> Action -> Action -> Set
 
       -- Preservation: The ranking mirrors the relation between action-values
-      preserves : ∀ a b s → _≤ₐ_ s a b →
-                  action-value s a ≤ₛ action-value s b
+      preserves : forall  a b s -> _<=_a_ s a b ->
+                  action-value s a <=_s action-value s b
 
   open CoindHomo {{...}} public
 \end{lstlisting}
@@ -308,15 +329,15 @@ The algorithm is based on a finite approximation of the coinductive ideal. We de
 
 module CSHRL.Finder where
 
-open import Data.List using (List; []; _∷_; map; foldr)
-open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.List using (List; []; _::_; map; foldr)
+open import Data.Nat using (Nat; zero; suc)
+open import Data.Product using (_x_; _,_; proj_1; proj_2)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 
 module Finder
   (State Action Reward : Set)
-  (step                : State → Action → State × Reward)
-  (_≤?_                : Reward → Reward → Bool) -- Boolean comparison for computation
+  (step                : State -> Action -> State x Reward)
+  (_<=?_                : Reward -> Reward -> Bool) -- Boolean comparison for computation
   (actions             : Action)                 -- Default action (fallback)
   (all-actions         : List Action)            -- List of all available actions
   where
@@ -326,68 +347,68 @@ module Finder
   Trace = List Reward
 
   -- Boolean trace comparison for algorithmic use
-  _≤ₜ_ : Trace → Trace → Bool
-  []       ≤ₜ []       = true
-  []       ≤ₜ (_ ∷ _)  = true
-  (_ ∷ _)  ≤ₜ []       = false
-  (r1 ∷ t1) ≤ₜ (r2 ∷ t2) =
-    if r1 ≤? r2 then
-      if r2 ≤? r1 then (t1 ≤ₜ t2) -- r1 == r2
+  _<=_t_ : Trace -> Trace -> Bool
+  []       <=_t []       = true
+  []       <=_t (_ :: _)  = true
+  (_ :: _)  <=_t []       = false
+  (r1 :: t1) <=_t (r2 :: t2) =
+    if r1 <=? r2 then
+      if r2 <=? r1 then (t1 <=_t t2) -- r1 == r2
       else true                   -- r1 < r2
     else false                    -- r1 > r2
 
   -- 2. Evaluation
   mutual
-    best-trace : State → ℕ → Trace
+    best-trace : State -> Nat -> Trace
     best-trace s zero    = []
     best-trace s (suc k) =
-      let outcomes = map (λ a → trace-action s a k) all-actions
+      let outcomes = map (\ a -> trace-action s a k) all-actions
       in max-trace outcomes
 
-    trace-action : State → Action → ℕ → Trace
+    trace-action : State -> Action -> Nat -> Trace
     trace-action s a k =
       let (s' , r) = step s a
           future   = best-trace s' k
-      in r ∷ future
+      in r :: future
 
-    max-trace : List Trace → Trace
+    max-trace : List Trace -> Trace
     max-trace []       = []
-    max-trace (t ∷ ts) = max-helper t ts
+    max-trace (t :: ts) = max-helper t ts
 
-    max-helper : Trace → List Trace → Trace
+    max-helper : Trace -> List Trace -> Trace
     max-helper current [] = current
-    max-helper current (t ∷ ts) =
-      if current ≤ₜ t
+    max-helper current (t :: ts) =
+      if current <=_t t
       then max-helper t ts
       else max-helper current ts
 
   -- 3. The Ranking Finder (Full Permutation)
-  insert : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
-  insert x [] = x ∷ []
-  insert (a1 , t1) ((a2 , t2) ∷ xs) =
-    if t2 ≤ₜ t1
-    then (a1 , t1) ∷ (a2 , t2) ∷ xs
-    else (a2 , t2) ∷ insert (a1 , t1) xs
+  insert : (Action x Trace) -> List (Action x Trace) -> List (Action x Trace)
+  insert x [] = x :: []
+  insert (a1 , t1) ((a2 , t2) :: xs) =
+    if t2 <=_t t1
+    then (a1 , t1) :: (a2 , t2) :: xs
+    else (a2 , t2) :: insert (a1 , t1) xs
 
-  sort-scored : List (Action × Trace) → List (Action × Trace)
+  sort-scored : List (Action x Trace) -> List (Action x Trace)
   sort-scored [] = []
-  sort-scored (x ∷ xs) = insert x (sort-scored xs)
+  sort-scored (x :: xs) = insert x (sort-scored xs)
 
-  find-ranking : State → ℕ → List Action
+  find-ranking : State -> Nat -> List Action
   find-ranking s k =
-    let scored = map (λ a → (a , trace-action s a k)) all-actions
+    let scored = map (\ a -> (a , trace-action s a k)) all-actions
         sorted = sort-scored scored
-    in map proj₁ sorted
+    in map proj_1 sorted
 
   -- 4. The Policy Finder (Single Best Action)
-  find-policy : State → ℕ → Action
+  find-policy : State -> Nat -> Action
   find-policy s k =
     let ranking = find-ranking s k
     in head-default ranking
     where
-      head-default : List Action → Action
+      head-default : List Action -> Action
       head-default []      = actions
-      head-default (x ∷ _) = x
+      head-default (x :: _) = x
 \end{lstlisting}
 
 \textbf{Note on Booleans vs Propositions:} The Finder module uses Boolean comparisons (\texttt{Bool}) for computational efficiency during search. However, the verification infrastructure (Environment Classes) lifts these to \emph{propositions} (\texttt{Set}) with decidability proofs (\texttt{Dec}). This separation allows fast execution while enabling rigorous machine-checked proofs.
@@ -447,44 +468,44 @@ open import Relation.Nullary using (Dec; yes; no)
 
 module FiniteDeterministicMDP
   (State Action Reward : Set)
-  (step        : State → Action → State × Reward)  -- Deterministic
-  (horizon     : ℕ)                                 -- Finite episodes
+  (step        : State -> Action -> State x Reward)  -- Deterministic
+  (horizon     : Nat)                                 -- Finite episodes
   (all-actions : List Action)                       -- Finite actions
   -- Reward algebra (propositional with decidability)
-  (_≤ᵣ_        : Reward → Reward → Set)            -- Propositional ordering
-  (_≤?_        : (r s : Reward) → Dec (r ≤ᵣ s))    -- Decidable!
-  (≤ᵣ-refl     : ∀ {r} → r ≤ᵣ r)
-  (max         : Reward → Reward → Reward)
+  (_<=_r_        : Reward -> Reward -> Set)            -- Propositional ordering
+  (_<=?_        : (r s : Reward) -> Dec (r <=_r s))    -- Decidable!
+  (<=_r-refl     : forall  {r} -> r <=_r r)
+  (max         : Reward -> Reward -> Reward)
   (bottom      : Reward)
   where
   
   -- Derive Boolean version from Dec for computation
-  _≤?ᵇ_ : Reward → Reward → Bool
-  r ≤?ᵇ s with r ≤? s
+  _<=?b_ : Reward -> Reward -> Bool
+  r <=?b s with r <=? s
   ... | yes _ = true
   ... | no  _ = false
   
   -- Propositional trace ordering (for proofs)
-  _≤ₜ_ : Trace → Trace → Set
-  []       ≤ₜ []       = ⊤
-  []       ≤ₜ (_ ∷ _)  = ⊤
-  (_ ∷ _)  ≤ₜ []       = ⊥
-  (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) = (r₁ ≤ᵣ r₂) × ((r₂ ≤ᵣ r₁) → t₁ ≤ₜ t₂)
+  _<=_t_ : Trace -> Trace -> Set
+  []       <=_t []       = T
+  []       <=_t (_ :: _)  = T
+  (_ :: _)  <=_t []       = Bot
+  (r_1 :: t_1) <=_t (r_2 :: t_2) = (r_1 <=_r r_2) x ((r_2 <=_r r_1) -> t_1 <=_t t_2)
   
   -- The ranking as a proposition (not Bool!)
-  _ranks_≤_ : State → Action → Action → Set
-  s ranks a ≤ b = trace-action s a horizon ≤ₜ trace-action s b horizon
+  _ranks_<=_ : State -> Action -> Action -> Set
+  s ranks a <= b = trace-action s a horizon <=_t trace-action s b horizon
   
   -- The preservation proof requires a "bridge lemma"
   module WithBridgeLemma
-    (tail-value-≤ₛ : ∀ s a b → s ranks a ≤ b →
-                     value (proj₁ (step s a)) ≤ₛ value (proj₁ (step s b)))
+    (tail-value-<=_s : forall  s a b -> s ranks a <= b ->
+                     value (proj_1 (step s a)) <=_s value (proj_1 (step s b)))
     where
     
     instance
       FiniteMDPHomo : CoindHomo
       FiniteMDPHomo = record
-        { _≤ₐ_     = _ranks_≤_   -- Proposition, not Bool!
+        { _<=_a_     = _ranks_<=_   -- Proposition, not Bool!
         ; preserves = preserves-impl
         }
 \end{lstlisting}
@@ -500,45 +521,45 @@ For constraint satisfaction problems like N-Queens, we define a specialized EC:
 \begin{lstlisting}
 module CSHRL.EnvironmentClass.CombinatorialPlacementMDP where
 
-open import Relation.Nullary using (Dec; yes; no; ¬_)
-open import Data.Unit using (⊤)
-open import Data.Empty using (⊥)
+open import Relation.Nullary using (Dec; yes; no; not_)
+open import Data.Unit using (T)
+open import Data.Empty using (Bot)
 
 module CombinatorialPlacementMDP
   (Config        : Set)                -- Configuration type
   (Action        : Set)                -- Placement actions
-  (is-dead       : Config → Bool)      -- Constraint violated?
-  (is-solved     : Config → Bool)      -- Complete valid solution?
-  (place         : Config → Action → Config)
-  (solved-reward : ℕ)                  -- Reward for solution
+  (is-dead       : Config -> Bool)      -- Constraint violated?
+  (is-solved     : Config -> Bool)      -- Complete valid solution?
+  (place         : Config -> Action -> Config)
+  (solved-reward : Nat)                  -- Reward for solution
   (all-actions   : List Action)
-  (horizon       : ℕ)
+  (horizon       : Nat)
   where
   
   -- States have explicit terminal structure
   data State : Set where
-    Ongoing : Config → State
+    Ongoing : Config -> State
     Dead    : State           -- Constraint violated
-    Solved  : Config → State  -- Goal reached
+    Solved  : Config -> State  -- Goal reached
   
   -- Decidable ordering with evidence
-  _≤?_ : (m n : ℕ) → Dec (m ≤ n)
-  zero  ≤? _     = yes z≤n
-  suc _ ≤? zero  = no λ()
-  suc m ≤? suc n with m ≤? n
-  ... | yes p = yes (s≤s p)
-  ... | no ¬p = no λ{ (s≤s p) → ¬p p }
+  _<=?_ : (m n : Nat) -> Dec (m <= n)
+  zero  <=? _     = yes z<=n
+  suc _ <=? zero  = no \()
+  suc m <=? suc n with m <=? n
+  ... | yes p = yes (s<=s p)
+  ... | no notp = no \{ (s<=s p) -> notp p }
   
   -- Propositional trace ordering (structure-preserving)
-  _≤ₜ_ : Trace → Trace → Set
-  []       ≤ₜ []       = ⊤
-  []       ≤ₜ (_ ∷ _)  = ⊤
-  (_ ∷ _)  ≤ₜ []       = ⊥
-  (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) = (r₁ ≤ r₂) × ((r₂ ≤ r₁) → t₁ ≤ₜ t₂)
+  _<=_t_ : Trace -> Trace -> Set
+  []       <=_t []       = T
+  []       <=_t (_ :: _)  = T
+  (_ :: _)  <=_t []       = Bot
+  (r_1 :: t_1) <=_t (r_2 :: t_2) = (r_1 <= r_2) x ((r_2 <= r_1) -> t_1 <=_t t_2)
   
   -- The EC provides proofs about terminal states
-  Dead-≤ₛ-any : ∀ s → value Dead ≤ₛ value s
-  -- (Proof: Dead produces 0s forever, which is ≤ anything)
+  Dead-<=_s-any : forall  s -> value Dead <=_s value s
+  -- (Proof: Dead produces 0s forever, which is <= anything)
 \end{lstlisting}
 
 The propositional trace ordering \texttt{\_$\le_t$\_} directly encodes the proof structure: for non-empty traces, we require (1) the head comparison \texttt{r$_1$ $\le$ r$_2$}, and (2) if the heads are equal (witnessed by \texttt{r$_2$ $\le$ r$_1$}), then the tails must also be ordered. This makes proofs \emph{compositional}---head comparisons are just projections, and impossible cases (like non-empty $\le$ empty) are inhabited by $\bot$.
@@ -563,35 +584,35 @@ The EC provides the rest. Here is the complete, \texttt{--safe} verified TwoStat
 \begin{lstlisting}
 module CSHRL.Tasks.Verified.TwoState where
 
-open import Relation.Nullary using (Dec; yes; no; ¬_)
+open import Relation.Nullary using (Dec; yes; no; not_)
 
 -- Domain-specific definitions
 data State : Set where Start : State; Goal : State
 data Action : Set where Go : Action; Stay : Action
 
 -- Decidable ordering (returns proof, not Bool!)
-_≤?_ : (m n : ℕ) → Dec (m ≤ n)
-zero  ≤? _     = yes z≤n
-suc _ ≤? zero  = no λ()
-suc m ≤? suc n with m ≤? n
-... | yes p = yes (s≤s p)
-... | no ¬p = no λ{ (s≤s p) → ¬p p }
+_<=?_ : (m n : Nat) -> Dec (m <= n)
+zero  <=? _     = yes z<=n
+suc _ <=? zero  = no \()
+suc m <=? suc n with m <=? n
+... | yes p = yes (s<=s p)
+... | no notp = no \{ (s<=s p) -> notp p }
 
-step : State → Action → State × ℕ
+step : State -> Action -> State x Nat
 step Start Go   = (Goal , 1)
 step Start Stay = (Start , 0)
 step Goal  _    = (Goal , 1)  -- Absorbing
 
 -- Instantiate the EC with Dec-based ordering
-open FiniteDeterministicMDP State Action ℕ step
-  _≤_ _≤?_ ≤-refl _⊔_ 0   -- Note: no ≤?-sound needed!
+open FiniteDeterministicMDP State Action Nat step
+  _<=_ _<=?_ <=-refl _max_ 0   -- Note: no <=?-sound needed!
   all-actions Go 1
 
 -- Provide direct preservation (domain-specific proof)
-direct-preserves : ∀ a b s → s ranks a ≤ b →
-                   action-value s a ≤ₛ action-value s b
-direct-preserves Go Stay Start ()  -- Absurd: (1∷[]) ≤ₜ (0∷[]) = ⊥
-direct-preserves Stay Go Start p = ...  -- 0 ≤ 1, so valid
+direct-preserves : forall  a b s -> s ranks a <= b ->
+                   action-value s a <=_s action-value s b
+direct-preserves Go Stay Start ()  -- Absurd: (1::[]) <=_t (0::[]) = Bot
+direct-preserves Stay Go Start p = ...  -- 0 <= 1, so valid
 -- ... other cases
 
 -- Obtain the verified CoindHomo!
@@ -636,15 +657,15 @@ The \texttt{CSHRL.Learning.Base} module defines EC-independent learning primitiv
 module CSHRL.Learning.Base where
 
 module UniversalLearning (State Action : Set)
-                         (_≟ₐ_ : (a b : Action) → Dec (a ≡ b)) where
+                         (_==a_ : (a b : Action) -> Dec (a == b)) where
 
   -- Learner state captures training progress
   record LearnerState : Set where
     field
-      current-depth   : ℕ           -- Lookahead depth
-      samples-seen    : ℕ           -- Total samples processed
-      violations-seen : ℕ           -- Violations detected
-      last-violation  : Maybe ℕ     -- For convergence analysis
+      current-depth   : Nat           -- Lookahead depth
+      samples-seen    : Nat           -- Total samples processed
+      violations-seen : Nat           -- Violations detected
+      last-violation  : Maybe Nat     -- For convergence analysis
   
   -- A violation records where ranking disagrees with traces
   record Violation : Set where
@@ -652,14 +673,14 @@ module UniversalLearning (State Action : Set)
       viol-state  : State
       viol-better : Action   -- Should be ranked higher
       viol-worse  : Action   -- Should be ranked lower
-      viol-depth  : ℕ        -- Depth where detected
+      viol-depth  : Nat        -- Depth where detected
   
   -- Create a learner from a test function
-  make-learner : (ℕ → Sample → Maybe Violation) → Learner
+  make-learner : (Nat -> Sample -> Maybe Violation) -> Learner
   
   -- Active refinement: swap ranking on violation
-  make-active-learner : (ℕ → Sample → Maybe Violation) →
-                        RankingUpdater → ActiveLearner
+  make-active-learner : (Nat -> Sample -> Maybe Violation) ->
+                        RankingUpdater -> ActiveLearner
 \end{lstlisting}
 
 \subsection{Passive vs Active Learning}
@@ -683,21 +704,53 @@ active-curried-step test updater ls s with test (current-depth ls) s
     }
 \end{lstlisting}
 
-\subsection{Monotonicity Guarantees}
+\subsection{The Dominance Oracle}
 
-The key theoretical contribution is that learning \emph{monotonically decreases violations}. We prove:
-
-\begin{itemize}
-\item \textbf{Depth monotonicity}: $\text{depth}(t) \leq \text{depth}(t+1)$
-\item \textbf{Violations-seen monotonicity}: Counter never decreases
-\item \textbf{Violation-count decrease}: After each swap, total violations $\downarrow$
-\end{itemize}
+The learning process requires a \emph{dominance oracle}---the ``ground truth'' ordering of actions:
 
 \begin{lstlisting}
--- Proved in CSHRL.Learning.Base
-depth-mono : ∀ test updater ls s →
-  get-active-depth ls ≤ get-active-depth (active-step test updater ls s)
+-- The oracle represents the "true" dominance relation.
+-- oracle s a b = true means action b dominates a at state s.
+--
+-- In practice: comes from traces at sufficient depth.
+-- For FiniteDeterministicMDPs: provable from MDP structure.
+-- For general ECs: assumed preorder (reflexive, transitive).
+--
+-- Key insight: The oracle need not be computable!
+-- Learning approximates it via finite-depth traces.
+DominanceOracle : Set
+DominanceOracle = State -> Action -> Action -> Bool
 \end{lstlisting}
+
+This separation is crucial: the oracle defines \emph{what} is correct, while the learner discovers \emph{how} to approximate it. The oracle's preorder properties (reflexivity, transitivity) are passed as parameters, not postulates---keeping proofs constructive.
+
+\subsection{Monotonicity Guarantees}
+
+The key theoretical contribution is that learning \emph{monotonically decreases violations}. We prove a chain of lemmas:
+
+\begin{enumerate}
+\item \textbf{SwapFixesPair}: After swapping $(better, worse)$, the pair is correctly ordered.
+\item \textbf{SwapPreservesUnrelated}: Pairs not involving $better$ or $worse$ are unchanged.
+\item \textbf{SingleStepMono}: Violations decrease at the violated state.
+\item \textbf{TotalStepMono}: Total violations across all states decrease.
+\item \textbf{BatchMono}: Batch training monotonically decreases violations.
+\end{enumerate}
+
+\begin{lstlisting}
+-- Core lemma: swap makes 'worse' dominated by 'better'
+swap-fixes-pair : forall  (better worse : Action) (xs : List Action) ->
+  (better == worse -> Bot) ->
+  is-dominated-by (swap-in-list better worse xs) worse better == true
+
+-- Total monotonicity (induction on states)
+TotalViolationsMono : Set
+TotalViolationsMono = forall  (v : Violation) (ranking : ExplicitRanking) ->
+  oracle (viol-state v) (viol-better v) (viol-worse v) == true ->
+  count-total-violations (global-swap-updater v ranking) oracle all-states <=
+  count-total-violations ranking oracle all-states
+\end{lstlisting}
+
+The proof of \texttt{swap-fixes-pair} proceeds by induction on the list, carefully analyzing when the head matches $worse$, $better$, or neither. The oracle's transitivity ensures no new violations are created among unrelated pairs.
 
 \subsection{Action Unavailability}
 
@@ -705,26 +758,59 @@ Real environments may have actions that become temporarily unavailable. The Lear
 
 \begin{lstlisting}
 -- Restrict ranking to available actions
-find-ranking-restricted : Available → State → ℕ → List Action
+find-ranking-restricted : Available -> State -> Nat -> List Action
 find-ranking-restricted avail s k =
   let available = filter-available avail all-actions
-      scored = map (λ a → (a , trace-action-restricted avail s a k)) available
-  in map proj₁ (sort-scored scored)
+      scored = map (\ a -> (a , trace-action-restricted avail s a k)) available
+  in map proj_1 (sort-scored scored)
 
 -- Demote unavailable actions to bottom of ranking
-demote-unavailable : Available → ExplicitRanking → ExplicitRanking
+demote-unavailable : Available -> ExplicitRanking -> ExplicitRanking
 \end{lstlisting}
 
 This allows the learner to adapt when actions are blocked, broken, or forbidden---without restarting training.
 
-\subsection{Convergence Bounds}
+\subsection{Convergence Theorem}
 
-We prove an upper bound on violations, guaranteeing termination:
+We prove a full convergence guarantee with an explicit bound:
+
 \[
 \text{max-violations} \leq |S| \times \binom{|A|}{2} = |S| \times \frac{|A|(|A|-1)}{2}
 \]
 
-Since each violation-fixing swap reduces violations by at least one, convergence is guaranteed in at most this many steps.
+\begin{lstlisting}
+-- Iterated update: apply n violation fixes
+iterated-update : (ExplicitRanking -> Maybe Violation) -> 
+                  ExplicitRanking -> Nat -> ExplicitRanking
+iterated-update find-viol ranking zero = ranking
+iterated-update find-viol ranking (suc n) with find-viol ranking
+... | nothing = ranking  -- No violations left
+... | just v = iterated-update find-viol (global-swap-updater v ranking) n
+
+-- Full convergence: exists n <= max-violations such that violations = 0
+convergence-corollary : StrictDecrease -> TotalBounded ->
+  forall  (ranking0 : ExplicitRanking) (find-viol : ...) -> ... ->
+  exists[ n ] (n <= max-violations x
+               count-total-violations (iterated-update find-viol ranking0 n) 
+                 oracle all-states == 0)
+\end{lstlisting}
+
+The proof proceeds by strong induction on the initial violation count. If violations are zero, we're done with $n = 0$. Otherwise, one swap strictly decreases violations (by \texttt{StrictDecrease}), and the inductive hypothesis gives convergence for the reduced count. The total bound follows from \texttt{TotalBounded}.
+
+\subsection{Efficient Violation Counting}
+
+For large action spaces, na\"ive $O(|A|^2)$ counting becomes a bottleneck. We provide an $O(|A| \log |A|)$ alternative via merge-sort-based inversion counting:
+
+\begin{lstlisting}
+-- O(n log n) inversion count using merge sort
+count-inversions-fast : State -> List Action -> Nat
+count-inversions-fast s xs = proj_2 (merge-sort-count-fuel s (len xs) xs)
+
+-- Efficient total violations
+count-total-violations-fast : ExplicitRanking -> List State -> Nat
+\end{lstlisting}
+
+This makes the learning loop practical even for environments with hundreds of actions.
 
 \section{Testing the Finder: The Silence of the Zeros}
 
@@ -765,11 +851,11 @@ We implemented this environment in \texttt{CSHRL.Tasks.Classic.DelayedGratificat
 
 \begin{lstlisting}
 -- Depth 1: Tie (both 0). Our insertion sort is not stable for ties.
-test-ranking-1 : find-ranking Start 1 ≡ GoB ∷ GoA ∷ []
+test-ranking-1 : find-ranking Start 1 == GoB :: GoA :: []
 test-ranking-1 = refl
 
 -- Depth 2: GoB (0,1) > GoA (0,0).
-test-ranking-2 : find-ranking Start 2 ≡ GoB ∷ GoA ∷ []
+test-ranking-2 : find-ranking Start 2 == GoB :: GoA :: []
 test-ranking-2 = refl
 \end{lstlisting}
 
@@ -786,34 +872,34 @@ module CSHRL.Tasks.Classic.Maze where
 open import Data.Bool using (Bool; true; false; T)  -- T lifts Bool to Set
 
 -- Boolean ranking for pattern matching ease
-my-rankᵇ : State → Action → Action → Bool
-my-rankᵇ P0 Fwd Fwd = true
-my-rankᵇ P0 Fwd Bwd = false   -- Fwd > Bwd at P0
-my-rankᵇ P0 Bwd Fwd = true 
-my-rankᵇ P0 Bwd Bwd = true
-my-rankᵇ P1 Fwd Fwd = true
-my-rankᵇ P1 Fwd Bwd = false   -- Fwd > Bwd at P1
-my-rankᵇ P1 Bwd Fwd = true
-my-rankᵇ P1 Bwd Bwd = true
-my-rankᵇ P2 Fwd Fwd = true
-my-rankᵇ P2 Fwd Bwd = false   -- Fwd > Bwd at P2
-my-rankᵇ P2 Bwd Fwd = true
-my-rankᵇ P2 Bwd Bwd = true
+my-rankb : State -> Action -> Action -> Bool
+my-rankb P0 Fwd Fwd = true
+my-rankb P0 Fwd Bwd = false   -- Fwd > Bwd at P0
+my-rankb P0 Bwd Fwd = true 
+my-rankb P0 Bwd Bwd = true
+my-rankb P1 Fwd Fwd = true
+my-rankb P1 Fwd Bwd = false   -- Fwd > Bwd at P1
+my-rankb P1 Bwd Fwd = true
+my-rankb P1 Bwd Bwd = true
+my-rankb P2 Fwd Fwd = true
+my-rankb P2 Fwd Bwd = false   -- Fwd > Bwd at P2
+my-rankb P2 Bwd Fwd = true
+my-rankb P2 Bwd Bwd = true
 
--- Lift to a proposition using T : Bool → Set
--- T true = ⊤, T false = ⊥
-my-rank : State → Action → Action → Set
-my-rank s a b = T (my-rankᵇ s a b)
+-- Lift to a proposition using T : Bool -> Set
+-- T true = T, T false = Bot
+my-rank : State -> Action -> Action -> Set
+my-rank s a b = T (my-rankb s a b)
 
 postulate
-  preserves-impl : ∀ a b s →
-                  my-rank s a b →        -- Now a proof, not Bool equality!
-                  action-value s a ≤ₛ action-value s b
+  preserves-impl : forall  a b s ->
+                  my-rank s a b ->        -- Now a proof, not Bool equality!
+                  action-value s a <=_s action-value s b
 
 instance
   MyHomo : CoindHomo
   MyHomo = record
-    { _≤ₐ_ = my-rank            -- Proposition (Set), not Bool
+    { _<=_a_ = my-rank            -- Proposition (Set), not Bool
     ; preserves = preserves-impl
     }
 \end{lstlisting}
@@ -857,16 +943,16 @@ Our agent does not need to "learn" this propagation. It simply needs to verify i
 
 \begin{lstlisting}
 -- State is (Position, HasKey)
-rank-score : State → Action → ℕ
+rank-score : State -> Action -> Nat
 rank-score (p , hasKey) a =
   let (p' , k') = transition (p , hasKey) a
   in heuristic p' k'
   where
-    heuristic : Position → Bool → ℕ
+    heuristic : Position -> Bool -> Nat
     heuristic pos k =
       if k
-      then (100 ∸ (dist-to pos 4)) -- Have Key: close to 4 is best
-      else (50 ∸ (dist-to pos 0))  -- No Key: close to 0 is best
+      then (100 - (dist-to pos 4)) -- Have Key: close to 4 is best
+      else (50 - (dist-to pos 0))  -- No Key: close to 0 is best
 \end{lstlisting}
 
 \subsection{The "Flip": Instantaneous Global Insight}
@@ -930,7 +1016,7 @@ If false, the "Forward" action is asymmetric (suicide), and the "Backward" actio
 -- Phase 1: Exploitation (Race to goal). Fwd > Bwd.
 -- Phase 2: Survival (Retreat to charger). Bwd > Fwd.
 
-score : State → Action → ℕ
+score : State -> Action -> Nat
 score (pos , en) act =
   let (next-s , r) = step (pos , en) act
       (n-pos , n-en) = next-s
@@ -940,11 +1026,11 @@ score (pos , en) act =
     if eq? pos Target then 100
     else
       if gte? en needed
-      then (100 ∸ n-needed)
+      then (100 - n-needed)
       else
         if eq? pos 0
         then (if eq-action? act Recharge then 50 else 0)
-        else (if eq-action? act Bwd then (50 ∸ n-pos) else 0)
+        else (if eq-action? act Bwd then (50 - n-pos) else 0)
 \end{lstlisting}
 
 This demonstrates that "Goal-Directed Behavior" and "Homeostatic Drive" (hunger/energy) are not separate modules. They are different phases of the same coinductive symmetry, toggled by the internal state variable.
@@ -960,17 +1046,17 @@ We do \emph{not} write a ranking function. We let the \texttt{CSHRL.Finder} algo
 \begin{lstlisting}
 module SparseFinder where
   open import CSHRL.Finder
-  open Finder State Action Reward step-sparse _≤?_ TakeSafe all-actions
+  open Finder State Action Reward step-sparse _<=?_ TakeSafe all-actions
     hiding (trace-action)
     renaming (find-ranking to sparse-rank)
 
   -- Depth 0: all 0 (immediate only). Defaults preserved.
-  test-blind : sparse-rank Start 0 ≡ TakeTrap ∷ TakeSafe ∷ Wait ∷ []
+  test-blind : sparse-rank Start 0 == TakeTrap :: TakeSafe :: Wait :: []
   test-blind = refl
 
   -- Depth 1: lookahead 1.
   -- Trap -> (0,0), Safe -> (0,100). Safe > Trap.
-  test-insight : sparse-rank Start 1 ≡ TakeSafe ∷ TakeTrap ∷ Wait ∷ []
+  test-insight : sparse-rank Start 1 == TakeSafe :: TakeTrap :: Wait :: []
   test-insight = refl
 \end{lstlisting}
 
@@ -989,7 +1075,7 @@ This shows that "Constraints" are just another form of "Sparse Rewards" in our f
 \begin{lstlisting}
 -- Classic example (CSHRL.Tasks.Classic.Queens)
 -- Uses postulate for preservation proof
-N : ℕ
+N : Nat
 N = 8
 
 -- The finder solves N=8 efficiently at runtime
@@ -999,7 +1085,7 @@ test-queens = find-policy (Ongoing []) N
 
 \subsection{The Verification Gap}
 
-While the Finder algorithm \emph{solves} N-Queens efficiently, \emph{proving} correctness in Agda requires explicit verification of the coinductive preservation property. For $N=8$, this would require the type-checker to reason about exponentially many configurations—a computational barrier, not a theoretical one.
+While the Finder algorithm \emph{solves} N-Queens efficiently, \emph{proving} correctness in Agda requires explicit verification of the coinductive preservation property. For $N=8$, this would require the type-checker to reason about exponentially many configurations---a computational barrier, not a theoretical one.
 
 Using our \texttt{CombinatorialPlacementMDP} Environment Class, we have fully verified the $N=1$ case:
 
@@ -1011,8 +1097,8 @@ module CSHRL.Tasks.Verified.Queens1 where
 open CombinatorialPlacementMDP ... -- EC provides structure
 
 -- Domain-specific preservation proof (propositional!)
-direct-preserves : ∀ a b s → s ranks a ≤ b →    -- Proof, not Bool equality
-                   action-value s a ≤ₛ action-value s b
+direct-preserves : forall  a b s -> s ranks a <= b ->    -- Proof, not Bool equality
+                   action-value s a <=_s action-value s b
 direct-preserves Col0 Col0 (Ongoing []) p = ... -- Coinductive proof
 direct-preserves Col0 Col0 Dead p = ...          -- Dead case (trivial)
 direct-preserves Col0 Col0 (Solved _) p = ...    -- Solved case (trivial)
@@ -1051,15 +1137,15 @@ If yes great. If no move the offending actions in the ranking until symmetry is 
 
 \item \textbf{Exploitation} is just picking the current top-ranked action.
 
-\item \textbf{Long-term reasoning} is forced — if two actions look equal now, but diverge in 1000 steps, strict distinction requires you to discover it.
+\item \textbf{Long-term reasoning} is forced --- if two actions look equal now, but diverge in 1000 steps, strict distinction requires you to discover it.
 
-\item \textbf{No bootstrapping instability} — there are no value targets to chase.
+\item \textbf{No bootstrapping instability} --- there are no value targets to chase.
 
-\item \textbf{No off-policy issues} — every experience directly tests the symmetry.
+\item \textbf{No off-policy issues} --- every experience directly tests the symmetry.
 
-\item \textbf{Quantum-ready} — superposition over permutations + amplitude amplification on symmetry violations = native exponential advantage in large action spaces [7]. In quantum reinforcement learning (QRL), action rankings can be encoded in quantum states, allowing superposition to evaluate multiple permutations simultaneously. Amplitude amplification, a generalization of Grover's algorithm, then boosts the detection of symmetry violations in the homomorphism, enabling quadratic to exponential speedups in verifying and refining the ranking in high-dimensional or large action spaces [3,5,0]. This makes SHRL naturally suited for quantum hardware, where classical methods struggle with combinatorial explosion.
+\item \textbf{Quantum-ready} --- superposition over permutations + amplitude amplification on symmetry violations = native exponential advantage in large action spaces [7]. In quantum reinforcement learning (QRL), action rankings can be encoded in quantum states, allowing superposition to evaluate multiple permutations simultaneously. Amplitude amplification, a generalization of Grover's algorithm, then boosts the detection of symmetry violations in the homomorphism, enabling quadratic to exponential speedups in verifying and refining the ranking in high-dimensional or large action spaces [3,5,0]. This makes SHRL naturally suited for quantum hardware, where classical methods struggle with combinatorial explosion.
 
-\item \textbf{Provably correct} — the core is 100\% verified.
+\item \textbf{Provably correct} --- the core is 100\% verified.
 \end{enumerate}
 
 \section{Undecidability Is the Point}
@@ -1068,12 +1154,12 @@ A natural question arises:
 
 \begin{quote}
 \itshape
-``The coinductive symmetric homomorphism is clearly undecidable in general — how can we ever verify an infinite tower of commuting diagrams in an arbitrary environment?''
+``The coinductive symmetric homomorphism is clearly undecidable in general --- how can we ever verify an infinite tower of commuting diagrams in an arbitrary environment?''
 \end{quote}
 
 Our answer is radical and liberating:
 
-\textbf{Undecidability is not a bug. It is the entire point — and the source of the theory’s universality.}
+\textbf{Undecidability is not a bug. It is the entire point --- and the source of the theory’s universality.}
 
 Recall what the homomorphism really says:
 
@@ -1081,7 +1167,7 @@ Recall what the homomorphism really says:
 For \emph{every} pair of distinct actions $a \neq b$, and for \emph{every} permutation $\sigma$ of the action labels, the infinite futures must respect the ranking \emph{at every single time step, forever}.
 \end{quote}
 
-This is an \textbf{infinite, uncountable collection of conditions} — of course it is undecidable in the general case.
+This is an \textbf{infinite, uncountable collection of conditions} --- of course it is undecidable in the general case.
 
 But observe what this means computationally:
 
@@ -1093,7 +1179,7 @@ If the environment \emph{does} admit such a perfect coinductive homomorphism (e.
 
 \item \textbf{Imperfect symmetry = necessary approximation}
 
-In rich, partially observable, or stochastic environments, no finite agent can maintain the full infinite tower. The homomorphism becomes an \textbf{ideal}, a Platonic form — and learning becomes the process of finding the \textbf{best possible finite approximation} to this infinite symmetry.
+In rich, partially observable, or stochastic environments, no finite agent can maintain the full infinite tower. The homomorphism becomes an \textbf{ideal}, a Platonic form --- and learning becomes the process of finding the \textbf{best possible finite approximation} to this infinite symmetry.
 
 \item \textbf{The approximation hierarchy is natural}
 
@@ -1127,7 +1213,7 @@ Both give rise to beautiful approximation schemes (Monte-Carlo tree search $\to$
 
 In practice, we maintain a learned total order on actions and periodically test random permutations.
 
-Every violation gives a clear, interpretable learning signal: “these two actions were ranked wrong — here is exactly where and by how much the symmetry broke.”
+Every violation gives a clear, interpretable learning signal: “these two actions were ranked wrong --- here is exactly where and by how much the symmetry broke.”
 
 No gradients needed. No credit assignment problem. Just symmetry restoration.
 
@@ -1135,7 +1221,7 @@ No gradients needed. No credit assignment problem. Just symmetry restoration.
 
 \textbf{Final remark}:
 
-Every foundational theory of intelligence must confront undecidability: Turing, Gödel, Solomonoff, Hutter — all did.
+Every foundational theory of intelligence must confront undecidability: Turing, Gödel, Solomonoff, Hutter --- all did.
 
 We do not hide from it.
 
@@ -1163,15 +1249,15 @@ This appendix shows that three formulations of the preservation property are equ
 In the main development, \texttt{CoindHomo.preserves} returns the coinductive record \texttt{\_$\le_s$\_} directly. Note that \texttt{\_$\le_a$\_} is now a \emph{proposition} (\texttt{Set}), not a Boolean:
 
 \begin{lstlisting}
-record _≤ₛ_ (x y : StreamR) : Set where
+record _<=_s_ (x y : StreamR) : Set where
   coinductive
   field
-    head≤ : head x ≤ᵣ head y
-    tail≤ : tail x ≤ₛ tail y
+    head<= : head x <=_r head y
+    tail<= : tail x <=_s tail y
 
 -- In CoindHomo (propositional version):
-preserves : ∀ a b s → _≤ₐ_ s a b →      -- Direct proof, not Bool equality!
-            action-value s a ≤ₛ action-value s b
+preserves : forall  a b s -> _<=_a_ s a b ->      -- Direct proof, not Bool equality!
+            action-value s a <=_s action-value s b
 \end{lstlisting}
 
 \subsection{An Alternative View: Products}
@@ -1179,11 +1265,11 @@ preserves : ∀ a b s → _≤ₐ_ s a b →      -- Direct proof, not Bool equa
 One could equivalently define preservation to return a \emph{product} of two obligations:
 
 \begin{lstlisting}
-preserves-× : (State → Action → Action → Set) → Set
-preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b →    -- Takes a proof directly
-                   let v₁ = action-value s a
-                       v₂ = action-value s b
-                   in head v₁ ≤ᵣ head v₂ × (tail v₁ ≤ₛ tail v₂)
+preserves-x : (State -> Action -> Action -> Set) -> Set
+preserves-x _<=_a_ = forall  a b s -> _<=_a_ s a b ->    -- Takes a proof directly
+                   let v_1 = action-value s a
+                       v_2 = action-value s b
+                   in head v_1 <=_r head v_2 x (tail v_1 <=_s tail v_2)
 \end{lstlisting}
 
 This says: if action $a$ is ranked below action $b$ in state $s$ (witnessed by a proof), then:
@@ -1197,12 +1283,12 @@ This says: if action $a$ is ranked below action $b$ in state $s$ (witnessed by a
 The \texttt{optimality-$\eta$} lemma converts the product formulation into the record formulation by projecting the components into record fields:
 
 \begin{lstlisting}
-optimality-η : {_≤ₐ_ : State → Action → Action → Set} →
-               preserves-× _≤ₐ_ →
-               ∀ s other opt → _≤ₐ_ s other opt →
-               action-value s other ≤ₛ action-value s opt
-head≤ (optimality-η pres s other opt r) = proj₁ (pres other opt s r)
-tail≤ (optimality-η pres s other opt r) = proj₂ (pres other opt s r)
+optimality-eta : {_<=_a_ : State -> Action -> Action -> Set} ->
+               preserves-x _<=_a_ ->
+               forall  s other opt -> _<=_a_ s other opt ->
+               action-value s other <=_s action-value s opt
+head<= (optimality-eta pres s other opt r) = proj_1 (pres other opt s r)
+tail<= (optimality-eta pres s other opt r) = proj_2 (pres other opt s r)
 \end{lstlisting}
 
 \subsection{The Equivalence: All Three Are the Same}
@@ -1210,17 +1296,17 @@ tail≤ (optimality-η pres s other opt r) = proj₂ (pres other opt s r)
 The following identity proves that starting with \texttt{Core.preserves}, converting to product form, and applying \texttt{optimality-$\eta$} yields back \texttt{Core.preserves}:
 
 \begin{lstlisting}
-all-three-equal : (h : CoindHomo) → ∀ s a b (p : CoindHomo._≤ₐ_ h s a b) →
-                  let -- Build preserves-× from Core.preserves
-                      pres-× : preserves-× (CoindHomo._≤ₐ_ h)
-                      pres-× a' b' s' r' = let q = CoindHomo.preserves h a' b' s' r'
-                                           in head≤ q , tail≤ q
-                      -- Apply optimality-η to get back a record
-                      via-η = optimality-η pres-× s a b p
+all-three-equal : (h : CoindHomo) -> forall  s a b (p : CoindHomo._<=_a_ h s a b) ->
+                  let -- Build preserves-x from Core.preserves
+                      pres-x : preserves-x (CoindHomo._<=_a_ h)
+                      pres-x a' b' s' r' = let q = CoindHomo.preserves h a' b' s' r'
+                                           in head<= q , tail<= q
+                      -- Apply optimality-eta to get back a record
+                      via-eta = optimality-eta pres-x s a b p
                       -- Original Core.preserves
                       original = CoindHomo.preserves h a b s p
-                  in (head≤ via-η ≡ head≤ original)
-                   × (tail≤ via-η ≡ tail≤ original)
+                  in (head<= via-eta == head<= original)
+                   x (tail<= via-eta == tail<= original)
 all-three-equal _ _ _ _ _ = refl , refl
 \end{lstlisting}
 
