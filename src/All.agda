@@ -12,6 +12,10 @@ import CSHRL.Finder
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
 
+-- Learning Infrastructure
+import CSHRL.Learning.Base
+import CSHRL.Learning.FiniteDeterministicMDP
+
 -- Classic Task Implementations (pedagogical, may use postulates)
 import CSHRL.Tasks.Classic.DelayedGratification
 import CSHRL.Tasks.Classic.Energy
