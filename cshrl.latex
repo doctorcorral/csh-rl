@@ -156,55 +156,115 @@ That is the entire theory. If this symmetry holds, the agent is optimal. If it d
 
 \section{The True Definition: A Mirror That Never Breaks}
 
-Let us write it down, slowly and carefully. We have a set of actions A. In any state s, the agent maintains a total ranking $\le_{\text{rank}}$. We have infinite streams of rewards: $\text{Rew}^\infty_\gamma$. The central object is a coinductive relation between permutations of actions and permutations of futures:
+Before we write any code, let us state the coinductive symmetric homomorphism mathematically. The definition has three components: the \emph{domain} (actions with their ranking), the \emph{codomain} (infinite outcome streams with their dominance order), and the \emph{homomorphism} (the map that preserves structure).
 
-\begin{lstlisting}
--- NOTE: Schematic/pedagogical (not the current Agda encoding in this repo).
--- The verified implementation lives in CSHRL.Core (see record CoindHomo).
-codata Homo : (sigma : Perm Action)
-            -> (tau : Perm (Stream (State _x_ Real)))
-            -> Set where
-  step : forall a b ->
-    sigma a <=_rank sigma b  ->
-    head (h a) <=_reward head (h b)  _x_
-    flat (Homo sigma tau (tail (*@$\circ$@*) h (*@$\circ$@*) sigma a) (tail (*@$\circ$@*) h (*@$\circ$@*) sigma b))
-\end{lstlisting}
+\subsection{The Domain: Actions and Rankings}
 
-Let us translate this line by line, with feeling.
+Let $\mathcal{A}$ be the finite set of actions available to the agent. In any state $s$, the agent maintains a \textbf{total preorder} $\le_{\text{rank}}$ on $\mathcal{A}$:
+\[
+a \le_{\text{rank}} b \quad \text{means ``action } b \text{ is at least as good as action } a \text{''}
+\]
+This ranking is what the agent \emph{believes} about the relative quality of actions. The question is: when is this belief \emph{correct}?
 
-\begin{itemize}
-\item $\sigma a \le_{\text{rank}} \sigma b$ means: under any relabeling $\sigma$ of the actions, a is still ranked above b.
-\item head (h a) $\le$ head (h b) means: right now, the next reward reflects that ranking.
-\item The magic is the second conjunct: $\flat (\text{Homo } \sigma \tau (\text{tail } \circ h \circ \sigma a) (\text{tail } \circ h \circ \sigma b))$ This says: at the next time step, the same symmetry $\sigma, \tau$ still holds between the remaining infinite futures.
-\end{itemize}
+\subsection{The Codomain: Infinite Outcome Streams}
 
-This is not one diagram. This is an infinite tower of commuting diagrams, one for every time step, forever.
+Let $\mathcal{O}$ be the set of infinite outcome streams---sequences of rewards (or state-reward pairs) extending forever into the future. We equip $\mathcal{O}$ with a \textbf{coinductive dominance order} $\le_s$, defined recursively:
+\[
+x \le_s y \;\;\Longleftrightarrow\;\; \text{head}(x) \le_r \text{head}(y) \;\wedge\; \text{tail}(x) \le_s \text{tail}(y)
+\]
+where $\le_r$ is the order on rewards, $\text{head}(x)$ is the first element of stream $x$, and $\text{tail}(x)$ is the remaining infinite stream after the first element.
+
+\begin{remark}
+This is \emph{coinductive}: the definition refers to itself on the tails. Unlike induction (which builds up from base cases), coinduction unfolds forever. The relation $x \le_s y$ holds if and only if at \emph{every} time step $t = 0, 1, 2, \ldots$, the $t$-th element of $x$ is $\le_r$ the $t$-th element of $y$.
+\end{remark}
+
+\subsection{The Homomorphism: Structure Preservation}
+
+Now we define the core concept. Let $h : \mathcal{A} \to \mathcal{O}$ be the \textbf{action-value map}: for each action $a$, the stream $h(a)$ represents the infinite sequence of rewards obtained by taking action $a$ and then acting optimally forever.
+
+\begin{definition}[Coinductive Symmetric Homomorphism]
+The map $h$ is a \textbf{coinductive symmetric homomorphism} if it satisfies:
+
+\begin{enumerate}
+\item \textbf{Order Preservation:} For all actions $a, b \in \mathcal{A}$,
+\[
+a \le_{\text{rank}} b \;\;\Longrightarrow\;\; h(a) \le_s h(b)
+\]
+The ranking of actions is \emph{exactly mirrored} by the dominance of their infinite futures.
+
+\item \textbf{Coinductive Unfolding:} The preservation holds not just at time $t=0$, but at \emph{every future time step}. Formally, if we denote $h_t$ as the action-value map at time $t$, then for all $t \ge 0$:
+\[
+a \le_{\text{rank}} b \;\;\Longrightarrow\;\; \text{head}(h_t(a)) \le_r \text{head}(h_t(b)) \;\wedge\; h_{t+1}(a') \le_s h_{t+1}(b')
+\]
+where $a'$ and $b'$ are the ``continuation actions'' after the first step.
+\end{enumerate}
+\end{definition}
+
+\subsection{The Symmetry Condition}
+
+The ``symmetric'' in coinductive symmetric homomorphism refers to \textbf{equivariance} under relabeling. Let $\sigma \in \text{Perm}(\mathcal{A})$ be any permutation of actions, and let $\tau \in \text{Perm}(\mathcal{O})$ be the induced permutation of outcome streams. The homomorphism commutes with these permutations:
+\[
+h \circ \sigma = \tau \circ h
+\]
+This says: if we relabel the actions by $\sigma$, the outcome streams are relabeled by the corresponding $\tau$. The structure is preserved under all possible renamings.
+
+\subsection{The Infinite Tower of Diagrams}
+
+Putting it all together, the coinductive symmetric homomorphism is an \textbf{infinite tower of commuting diagrams}---one for each time step, forever:
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    node distance=2.8cm and 4.5cm,
-    obj/.style={draw,rounded corners,minimum height=3.4em,minimum width=7em,align=center,font=\small},
-    arr/.style={->,thick,>=Stealth,shorten >=2pt,shorten <=2pt}
+    node distance=3cm and 5.5cm,
+    obj/.style={draw,rounded corners,minimum height=2.5em,minimum width=5.5em,align=center,font=\small},
+    arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt}
 ]
-\node[obj] (A1) {$\mathbf{Act}_t$};
-\node[obj,right=of A1] (S1) {$\mathbf{Rew}^\infty_t$};
-\draw[arr] (A1) to node[above] {$h_t$} (S1);
-\draw[arr,bend left=50] (A1) to node[above] {$\sigma$} (A1);
-\draw[arr,bend right=50] (S1) to node[above] {$\tau$} (S1);
+% Top row: time t
+\node[obj] (A1) {$\mathcal{A}$};
+\node[obj,right=of A1] (S1) {$\mathcal{O}$};
+\draw[arr] (A1) -- node[above] {$h_t$} (S1);
 
-\node[obj,below=of A1] (A2) {$\mathbf{Act}_{t+1}$};
-\node[obj,right=of A2] (S2) {$\mathbf{Rew}^\infty_{t+1}$};
-\draw[arr] (A2) to node[above] {$h_{t+1}$} (S2);
+% Self-loops on left and right sides of nodes (not top)
+\draw[arr] (A1) to[out=150,in=210,looseness=5] node[left] {$\sigma$} (A1);
+\draw[arr] (S1) to[out=330,in=30,looseness=5] node[right] {$\tau$} (S1);
 
-\draw[arr,dashed] (A1) -- (A2);
-\draw[arr,dashed] (S1) -- (S2);
+% Bottom row: time t+1
+\node[obj,below=of A1] (A2) {$\mathcal{A}$};
+\node[obj,right=of A2] (S2) {$\mathcal{O}$};
+\draw[arr] (A2) -- node[above] {$h_{t+1}$} (S2);
 
-\node[below=1.0cm of A2,font=\footnotesize,align=center,text width=8cm]
-  {Coinductive Homo = infinite descending tower\\of perfectly aligned symmetries};
+% Vertical arrows (tail operations)
+\draw[arr,dashed] (A1) -- node[right,font=\footnotesize] {tail} (A2);
+\draw[arr,dashed] (S1) -- node[left,font=\footnotesize] {tail} (S2);
+
+% Ellipsis indicating continuation
+\node[below=0.6cm of A2] {$\vdots$};
+\node[below=0.6cm of S2] {$\vdots$};
+
+% Time labels on left margin
+\node[left=1.8cm of A1,font=\footnotesize] {$t=0$};
+\node[left=1.2cm of A2,font=\footnotesize] {$t=1$};
+
 \end{tikzpicture}
-\caption{The mirror never breaks --- not even once, not ever.}
+
+\vspace{0.2cm}
+{\footnotesize 
+At each time step: ranking preservation ($a \le_{\text{rank}} b \Rightarrow h(a) \le_s h(b)$) and equivariance ($h \circ \sigma = \tau \circ h$).
+}
+\caption{The coinductive symmetric homomorphism as an infinite tower of commuting diagrams.}
 \end{figure}
+
+\subsection{Why This Defines Optimality}
+
+This definition captures something profound: \textbf{optimality is not a number to maximize, but a symmetry to preserve}. An agent is optimal if and only if:
+
+\begin{enumerate}
+\item Its ranking of actions \emph{exactly} reflects the dominance of their infinite futures.
+\item This reflection holds not just now, but at every future moment---forever.
+\item The structure is invariant under all possible relabelings of actions.
+\end{enumerate}
+
+When this symmetry holds, the agent cannot be ``wrong'' about any action comparison at any time. When it does not hold, learning is the process of \emph{restoring the symmetry}---swapping misordered pairs until the mirror is perfect.
 
 \section{The Agda Core: From Inertia to Optimality}
 
