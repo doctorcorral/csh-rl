@@ -1,0 +1,4 @@
+name: cshrl-literate
+include: .
+depend: standard-library
+
