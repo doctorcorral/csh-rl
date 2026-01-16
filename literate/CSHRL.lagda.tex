@@ -1,4 +1,4 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[9pt,a4paper]{article}
 
 % Basic packages
 \usepackage[margin=1in]{geometry}
@@ -8,6 +8,8 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.17}
 \usepackage{xcolor}
+\usepackage{array}
+\usepackage{tabularx}
 \usepackage{hyperref}
 \usepackage{microtype}
 \usepackage{float}
@@ -300,6 +302,29 @@ The central definition---when is a ranking ``correct''?
 \end{itemize}
 
 This clean separation: Finder uses \texttt{Bool} for speed; Core uses \texttt{Set} for proofs; Environment Classes bridge them via \texttt{Dec}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Scope, Assumptions, and Limits}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+It is important to distinguish the \emph{coinductive ideal} from the \emph{algorithmic machinery} built around it:
+\begin{itemize}
+\item \textbf{Coinductive optimality (ideal):} The definition in \S3 is about infinite streams and pointwise dominance at every time step. This is the mathematical target.
+\item \textbf{Finder (approximation):} The Finder compares \emph{finite} traces lexicographically at a fixed depth. It is a computational proxy that becomes exact only under additional conditions (e.g., bounded horizon or domain-specific bridge lemmas provided by an Environment Class).
+\item \textbf{Learner (policy discovery):} The Learner wraps Finder-style comparisons into a stateful learning loop that detects violations and refines rankings over time (depth increase and/or swaps). It is an algorithmic policy finder, not part of the coinductive definition itself.
+\end{itemize}
+
+The core framework and its verified infrastructure currently assume:
+\begin{itemize}
+\item \textbf{Finite action space:} All actions must be listed explicitly (\texttt{all-actions}).
+\item \textbf{Deterministic step function:} The Environment Classes in \S\ref{sec:env-classes} are for deterministic MDPs; stochastic extensions are future work.
+\item \textbf{Decidable reward order for computation:} The Finder requires a Boolean or decidable comparison to execute; the Core uses propositional order for proofs.
+\item \textbf{Horizon parameter for approximation:} The Finder uses a fixed depth (often the task horizon); correctness relies on task-specific lemmas that relate traces to streams.
+\item \textbf{Preservation is discharged by ECs:} The proof that a ranking preserves the coinductive order is provided by the Environment Class infrastructure, either via a bridge lemma or direct preservation module.
+\item \textbf{Postulates vs.\ verified instances:} ``Classic'' tasks may postulate bridge lemmas; ``Verified'' tasks (e.g., TwoState, Queens1) are postulate-free.
+\end{itemize}
+
+These limits are not cosmetic: they are precisely where we can measure progress (e.g., adding stochastic ECs, extending bridge lemmas, or tightening approximation guarantees).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{CSHRL Subsumes Classical RL}
