@@ -503,7 +503,7 @@ Sort actions by their traces to get a full ranking:
 % ENVIRONMENT CLASSES: MODULARITY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Environment Classes: Modularity Without Postulates}
+\section{Environment Classes: Modularity Without Postulates}\label{sec:env-classes}
 
 A key architectural achievement of the CSHRL implementation is the \textbf{Environment Class} abstraction. Rather than proving preservation from scratch for each task, we factor out common structure into reusable modules.
 
@@ -956,6 +956,19 @@ When the ranking of actions perfectly mirrors the ranking of their infinite futu
 \end{itemize}
 
 This is Coinductive Symmetric Homomorphism Reinforcement Learning. The future is structural.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Reproducibility and Build}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The paper is a literate Agda document. Building the PDF type-checks all code.
+
+\begin{itemize}
+\item \textbf{Tested toolchain:} Agda 2.7.x (2.7.0 recommended), Agda StdLib 2.0, Lua\LaTeX.
+\item \textbf{Build commands:} In \texttt{literate/}, run \texttt{make all} (or \texttt{agda --latex CSHRL.lagda.tex} followed by \texttt{lualatex} on the generated \texttt{CSHRL.tex}).
+\item \textbf{Fonts:} The document uses \texttt{fontspec} and Unicode math fonts (see preamble for \texttt{DejaVu} and \texttt{STIX Two Math}).
+\item \textbf{Artifacts:} The final PDF is copied to \texttt{literate/CSHRL.pdf}.
+\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{thebibliography}{11}
