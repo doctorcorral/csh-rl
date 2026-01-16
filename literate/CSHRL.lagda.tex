@@ -360,6 +360,39 @@ Just as products and records are interchangeable \emph{representations} of the s
 When we prove $\text{refl} , \text{refl}$ for the formulation equivalence, we're witnessing that the coinductive structure is primary; the scalar is a derived quantity.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Related Work and Positioning}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+CSHRL connects to multiple traditions but makes a distinct structural move: it replaces scalar aggregation with a coinductive order on infinite futures. The table below summarizes how this differs from common baselines.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Line of work} & \textbf{Objective / structure} & \textbf{Relation to CSHRL} \\
+\hline
+Classical RL~[1] & Scalar return $\sum_t \gamma^t r_t$ & Recovered as a consequence when CSHRL holds \\
+\hline
+Policy gradients~[2] & Optimize expected scalar return & Optimization method, not structural criterion \\
+\hline
+Max-ent RL~[3] & Scalar return + entropy regularization & Same scalar bottleneck, different exploration bias \\
+\hline
+Universal RL (AIXI)~[4] & Optimality via universal prior & Uncomputable ideal; CSHRL gives structural ideal \\
+\hline
+Coalgebra / coinduction~[5] & Infinite behaviors via coinduction & Formal basis for stream ordering \\
+\hline
+MDP symmetries~[6] & Structural invariances & CSHRL treats ranking as a symmetry constraint \\
+\hline
+Quantum RL surveys~[7,8] & Quantum speedups for RL primitives & We outline a ranking-based speedup path \\
+\hline
+\end{tabularx}
+\end{table}
+
+This positioning clarifies what is new: the optimality criterion is \emph{structural} (a preserved ordering), and numerical maximization becomes a derived, not primitive, concept.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART V: THE ALGORITHM
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
