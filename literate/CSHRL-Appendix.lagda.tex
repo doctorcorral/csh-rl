@@ -1,0 +1,230 @@
+\documentclass[11pt,a4paper]{article}
+
+% Basic packages
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{float}
+
+% Unicode font support (required for Agda output - compile with lualatex)
+\usepackage{fontspec}
+\usepackage{unicode-math}
+
+% Use DejaVu for excellent Unicode coverage
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+\setmathfont{STIX Two Math}
+
+% Agda literate support
+\usepackage{agda}
+
+% Override Agda font style (must come AFTER loading agda.sty)
+\renewcommand{\AgdaFontStyle}[1]{{\sffamily #1}}
+\renewcommand{\AgdaKeywordFontStyle}[1]{{\sffamily\bfseries #1}}
+\renewcommand{\AgdaBoundFontStyle}[1]{{\sffamily\itshape #1}}
+
+\title{\textbf{CSHRL Appendix} \\
+A Pedagogical Note on Products and Coinductive Records}
+
+\author{Ricardo Corral-Corral}
+\date{January 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This appendix shows that three formulations of the preservation property are equivalent. The correspondence is a \textbf{tautology}---linked by $\eta$-reduction---but spelling it out explicitly can build intuition for readers encountering coinductive proofs for the first time.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This document accompanies the main CSHRL paper. We demonstrate the equivalence between:
+\begin{enumerate}
+\item The \textbf{coinductive record} formulation (used in \texttt{Core.preserves})
+\item The \textbf{product} formulation (common in mathematical presentations)
+\item The \textbf{$\eta$-expanded} reconstruction
+\end{enumerate}
+
+All code here is literate Agda that imports from and extends the main development.
+
+\begin{code}
+{-# OPTIONS --safe --guardedness #-}
+
+module CSHRL-Appendix where
+
+open import Data.List using (List; map; foldr; []; _∷_)
+open import Data.Nat using (ℕ; _⊔_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Codata.Guarded.Stream using (Stream; head; tail; tabulate)
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Core Definition: Coinductive Records}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In the main development, \AgdaField{CoindHomo.preserves} returns the coinductive record \AgdaRecord{\_≤ₛ\_} directly. Recall the definitions:
+
+\begin{code}
+module PreservationEquivalence
+  (State Action Reward : Set)
+  (step                : State → Action → State × Reward)
+  (_≤ᵣ_                : Reward → Reward → Set)
+  (max                 : Reward → Reward → Reward)
+  (bottom              : Reward)
+  (all-actions         : List Action)
+  where
+
+  -- Stream of rewards
+  StreamR : Set
+  StreamR = Stream Reward
+
+  -- Optimal value at depth n
+  max-list : List Reward → Reward
+  max-list = foldr max bottom
+
+  solve : State → ℕ → Reward
+  solve s ℕ.zero    = max-list (map (λ a → proj₂ (step s a)) all-actions)
+  solve s (ℕ.suc n) = max-list (map (λ a → solve (proj₁ (step s a)) n) all-actions)
+
+  value : State → StreamR
+  value s = tabulate (solve s)
+
+  action-value : State → Action → StreamR
+  head (action-value s a) = proj₂ (step s a)
+  tail (action-value s a) = value (proj₁ (step s a))
+
+  -- Coinductive stream ordering
+  record _≤ₛ_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : tail x ≤ₛ tail y
+
+  open _≤ₛ_ public
+
+  -- The coinductive symmetric homomorphism
+  record CoindHomo : Set₁ where
+    field
+      _≤ₐ_      : State → Action → Action → Set
+      preserves : ∀ a b s → _≤ₐ_ s a b →
+                  action-value s a ≤ₛ action-value s b
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{An Alternative View: Products}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+One could equivalently define preservation to return a \emph{product} of two obligations:
+
+\begin{code}
+  preserves-× : (State → Action → Action → Set) → Set
+  preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b →
+                     let v₁ = action-value s a
+                         v₂ = action-value s b
+                     in (head v₁ ≤ᵣ head v₂) × (tail v₁ ≤ₛ tail v₂)
+\end{code}
+
+This says: if action $a$ is ranked below action $b$ in state $s$ (witnessed by a proof), then:
+\begin{enumerate}
+\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (left component).
+\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (right component).
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Bridge: optimality-η}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The \AgdaFunction{optimality-η} lemma converts the product formulation into the record formulation by projecting the components into record fields:
+
+\begin{code}
+  optimality-η : {_≤ₐ_ : State → Action → Action → Set} →
+                 preserves-× _≤ₐ_ →
+                 ∀ s a b → _≤ₐ_ s a b →
+                 action-value s a ≤ₛ action-value s b
+  head≤ (optimality-η pres s a b p) = proj₁ (pres a b s p)
+  tail≤ (optimality-η pres s a b p) = proj₂ (pres a b s p)
+\end{code}
+
+Note the copattern matching: we define the record by specifying how each field is computed. The \AgdaField{head≤} field projects the first component of the product; the \AgdaField{tail≤} field projects the second.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Equivalence: All Three Are the Same}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The following identity proves that starting with \AgdaField{Core.preserves}, converting to product form, and applying \AgdaFunction{optimality-η} yields back \AgdaField{Core.preserves}:
+
+\begin{code}
+  all-three-equal : (h : CoindHomo) →
+                    ∀ s a b (p : CoindHomo._≤ₐ_ h s a b) →
+                    let -- Build preserves-× from CoindHomo.preserves
+                        pres-× : preserves-× (CoindHomo._≤ₐ_ h)
+                        pres-× a' b' s' r' = let q = CoindHomo.preserves h a' b' s' r'
+                                             in head≤ q , tail≤ q
+                        -- Apply optimality-η to get back a record
+                        via-η = optimality-η pres-× s a b p
+                        -- Original CoindHomo.preserves
+                        original = CoindHomo.preserves h a b s p
+                    in (head≤ via-η ≡ head≤ original)
+                     × (tail≤ via-η ≡ tail≤ original)
+  all-three-equal _ _ _ _ _ = refl , refl
+\end{code}
+
+The \AgdaInductiveConstructor{refl} \AgdaInductiveConstructor{,} \AgdaInductiveConstructor{refl} compiles, witnessing that the three formulations---\AgdaField{Core.preserves}, \AgdaFunction{preserves-×}, and \AgdaFunction{optimality-η}---are definitionally the same function.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Why This Is a Tautology}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The formulations are \textbf{equivalent by construction}. Converting between products and records is $\eta$-expansion: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$, and vice versa.
+
+Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how definitions are formulated. The lemmas carry no computational content beyond projection---they are rephrasings, not proofs of non-trivial properties.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pedagogical Value}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Despite being a tautology, this reformulation serves two purposes:
+
+\begin{enumerate}
+\item \textbf{Bridging notations:} Readers may encounter coinductive properties stated either as products (common in mathematical presentations) or as records (idiomatic in Agda). Seeing the explicit correspondence demystifies both.
+
+\item \textbf{Highlighting the recursive structure:} The record formulation makes the coinductive nature visually apparent: the \AgdaField{tail≤} field has the same type as the record itself, emphasizing that the property must hold at every future time step.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 3.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=7em,align=center,font=\footnotesize},
+    arr/.style={->,thick,>=Stealth}
+]
+\node[box] (core) {\texttt{Core.preserves}\\(record)};
+\node[box,right=of core] (prod) {\texttt{preserves-×}\\(product)};
+\node[box,below=1.5cm of prod] (eta) {\texttt{optimality-η}\\(record)};
+
+\draw[arr] (core) -- node[above] {\footnotesize unpack} (prod);
+\draw[arr] (prod) -- node[right] {\footnotesize $\eta$-expand} (eta);
+\draw[arr,dashed] (eta) -- node[below left] {\footnotesize $\equiv$} (core);
+\end{tikzpicture}
+\caption{The three formulations form a triangle of equivalences.}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Connection to the Main Development}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This appendix corresponds to the module \texttt{appendix.PreservationEquivalence} in the main codebase. The literate version here makes the same points but in a self-contained, pedagogical format.
+
+The key takeaway: \textbf{coinductive records and products are interchangeable}. Choose whichever notation suits your presentation---the proofs will work either way.
+
+\end{document}
+
