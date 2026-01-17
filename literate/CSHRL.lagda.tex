@@ -1116,8 +1116,14 @@ module TwoStateExample where
 
 The ``Marshmallow Test'' for RL agents: rewards are hidden deep in the future. This example demonstrates how the Finder discovers structure through depth increase.
 
-\begin{spec}
+\begin{code}[hide]
 module DelayedGratificationExample where
+  open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
+  open import Data.List using (List; _∷_; [])
+  open import Data.Product using (_×_; _,_)
+  open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+\end{code}
+\begin{code}
   data DGState : Set where
     Start : DGState
     PathA : DGState  -- Immediate but dead-end
@@ -1134,7 +1140,14 @@ module DelayedGratificationExample where
   dg-step PathA _   = (PathA , 0)  -- Stuck at 0
   dg-step PathB _   = (End , 1)    -- Reveals hidden reward
   dg-step End   _   = (End , 1)    -- Absorbing at 1
-\end{spec}
+
+  all-actions : List DGAction
+  all-actions = GoA ∷ GoB ∷ []
+
+  -- Instantiate Core with this environment
+  open Core DGState DGAction ℕ dg-step _≤_ _⊔_ 0 all-actions
+\end{code}
+\noindent The key insight: at depth 1, both actions yield trace $[0]$---indistinguishable. At depth 2, \texttt{GoA} yields $[0, 0]$ while \texttt{GoB} yields $[0, 1]$. Lexicographic comparison reveals the winner. The full implementation with \texttt{find-ranking} tests is in \texttt{src/CSHRL/Tasks/Classic/DelayedGratification.agda}.
 
 \noindent\textbf{The phenomenon:} At depth 1, both paths yield reward 0---\emph{indistinguishable}. At depth 2, the traces diverge: \texttt{GoA} $\to [0, 0]$, \texttt{GoB} $\to [0, 1]$. Lexicographically, $[0, 0] < [0, 1]$. One depth increase reveals the correct ranking.
 
@@ -1207,35 +1220,50 @@ The moment the key is acquired, the ranking \emph{inverts}. This is not gradual 
 \noindent\textbf{What this validates:} State-dependent rankings work correctly. The Environment Class machinery (\texttt{FiniteDeterministicMDP}) handles the state encoding. Full implementation in \texttt{src/CSHRL/Tasks/Classic/KeyDoor.agda}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Eight Gifts That Fall Out for Free}
+\section{Practical Implications}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{enumerate}
-\item \textbf{Infeasible actions:} Rank them lowest. Done.
+CSHRL's structural approach yields immediate benefits in systems where action availability changes dynamically or long-term reasoning is critical.
 
-\item \textbf{Exploration:} Uniform sampling over permutation group~[11].
+\subsection{Instant Adaptation to Action Unavailability}
 
-\item \textbf{Exploitation:} Pick the top-ranked action.
+Because CSHRL maintains a \emph{full ranking} over actions (not just a single best-action pointer), adaptation to unavailable actions is $O(1)$:
 
-\item \textbf{Long-term reasoning:} Forced---if actions differ only at step 1000, you must discover it.
+\begin{description}
+\item[Robotics:] A manipulator arm has 6 joints. If joint 3 jams, the agent simply demotes all actions using joint 3 to ``unavailable'' and the next-best action is already ranked. \textbf{No replanning, no value recomputation.} Classical methods must re-solve the MDP with the reduced action space.
 
-\item \textbf{No bootstrapping instability:} No value targets to chase.
+\item[Network Routing:] A router maintains rankings over outbound paths. When link A fails, packets immediately flow to the second-ranked path. \textbf{Failover is $O(1)$}, not $O(|V| \cdot |E|)$ as in shortest-path recomputation.
 
-\item \textbf{No off-policy issues:} Every experience tests the symmetry directly.
+\item[Game AI:] An opponent blocks your preferred move. The backup is already ranked---no minimax tree search required for the next choice.
+\end{description}
 
-\item \textbf{Quantum speedup:} Action rankings encode as quantum states; amplitude amplification detects violations in $O(\sqrt{|G|})$ vs $O(|G|)$ classically~[7,8]. For large action spaces, this is exponential.
+\subsection{Exploration and Exploitation as Group Operations}
 
-\item \textbf{Provably correct:} This document is the proof.
-\end{enumerate}
+The permutation structure provides natural exploration-exploitation trade-offs:
 
-\subsection{On the Quantum Gift}
+\begin{description}
+\item[Exploitation:] Select the top-ranked action. Trivial.
 
-Superposition over permutations evaluates multiple rankings simultaneously. Grover's amplitude amplification then boosts violation detection:
-\begin{itemize}
-\item Classical: test $|G|$ permutations sequentially
-\item Quantum: test in $O(\sqrt{|G|})$ via interference
-\end{itemize}
-For $|A| = 10$ actions, $|G| = 10! \approx 3.6$ million. Quantum gives $\sqrt{3.6M} \approx 1900\times$ speedup.
+\item[Exploration:] Sample uniformly from the symmetric group $S_{|A|}$~[11]. Each permutation represents a hypothesis about the true ranking. Violation detection tests these hypotheses directly.
+
+\item[Epsilon-greedy analog:] With probability $\epsilon$, apply a random transposition to the ranking before acting. This explores ``nearby'' policies in permutation space.
+\end{description}
+
+\subsection{Eliminating Common Failure Modes}
+
+CSHRL's structure avoids several pathologies of scalar-based RL:
+
+\begin{description}
+\item[No bootstrapping instability:] Classical temporal difference methods chase moving value targets. CSHRL compares \emph{rankings}, which are discrete and stable. A swap either fixes a violation or it doesn't.
+
+\item[No off-policy issues:] Every experience directly tests whether the current ranking agrees with the environment's stream dominance. There is no importance sampling, no replay ratio tuning.
+
+\item[Forced long-term reasoning:] If two actions differ only at step 1000, lexicographic trace comparison \emph{must} discover this difference at sufficient depth. Discounted methods might wash out the distinction; CSHRL cannot.
+\end{description}
+
+\subsection{Provable Correctness}
+
+This document is the proof. Every theorem about monotonic learning, instant adaptation, and classical subsumption is machine-checked by Agda during PDF compilation. No external trust assumptions beyond the type checker.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Undecidability Is the Point}
@@ -1259,6 +1287,44 @@ Just as AIXI~[4] is uncomputable yet foundational, our coinductive ideal admits 
 This hierarchy mirrors the Arithmetical Hierarchy~[9] in computability theory. We have touched the absolute.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Future Work}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Stochastic Environments via the Giry Monad}
+
+Our current formalization handles deterministic environments. Extending to stochastic MDPs requires lifting stream dominance through probability distributions. We conjecture that the \emph{Giry monad}~[10] provides the correct categorical framework:
+
+\begin{itemize}
+\item Replace $\texttt{State} \to \texttt{Action} \to \texttt{State} \times \texttt{Reward}$ with $\texttt{State} \to \texttt{Action} \to \mathcal{G}(\texttt{State} \times \texttt{Reward})$, where $\mathcal{G}$ is the Giry monad on measurable spaces.
+\item Stream dominance $\leq_s$ lifts to stochastic dominance over distributions of streams.
+\item The coinductive homomorphism property becomes: rankings preserve \emph{expected} stream dominance in the monadic sense.
+\end{itemize}
+
+This extension would unify CSHRL with measure-theoretic RL while preserving the structural characterization of optimality.
+
+\subsection{Quantum Speedup for Violation Detection}
+
+We conjecture that CSHRL's permutation structure admits quantum advantage. The intuition:
+
+\begin{itemize}
+\item Action rankings can be encoded as superpositions over the symmetric group $S_{|A|}$.
+\item Violation detection becomes an oracle query: ``does this ranking have a violation at state $s$?''
+\item Grover's amplitude amplification~[7,8] can detect violations in $O(\sqrt{|S_{|A|}|})$ queries instead of $O(|S_{|A|}|)$ classically.
+\end{itemize}
+
+For $|A| = 10$ actions, $|S_{10}| = 10! \approx 3.6$ million. Quantum search could provide $\sqrt{3.6M} \approx 1900\times$ speedup for finding violating rankings. Formalizing this requires connecting CSHRL to quantum computation models---we leave this to future work.
+
+\subsection{Additional Environment Classes}
+
+The modular Environment Class design invites extensions:
+
+\begin{itemize}
+\item \textbf{Continuous State/Action Spaces:} Parameterize by metric spaces with approximation guarantees.
+\item \textbf{Partially Observable MDPs:} Lift rankings to belief states.
+\item \textbf{Multi-Agent Settings:} Rankings over joint action spaces with game-theoretic equilibrium conditions.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion: The Mirror Is the Message}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1267,14 +1333,6 @@ For seventy years we have tried to approximate optimality with scalars. Today we
 \textbf{Optimality is not a number. It is a symmetry.}
 
 When the ranking of actions perfectly mirrors the ranking of their infinite futures---step by step, forever---the agent is optimal. When it does not, learning is simply \emph{polishing the mirror}.
-
-\subsection{Practical Implications}
-
-\begin{itemize}
-\item \textbf{Robotics:} When a joint fails, use the next-best action instantly. No replanning.
-\item \textbf{Networks:} When a route dies, the backup is already ranked. $O(1)$ failover.
-\item \textbf{Games:} When a move is blocked, the alternative is immediate. No tree search.
-\end{itemize}
 
 This is Coinductive Symmetric Homomorphism Reinforcement Learning. The future is structural.
 
