@@ -59,6 +59,28 @@
 \definecolor{AgdaRecord}                {HTML}{81A1C1}  % Light blue
 \definecolor{AgdaArgument}              {HTML}{4C566A}  % Dark gray
 
+% Nord palette colors for figures and diagrams
+% Polar Night (dark backgrounds)
+\definecolor{nord0}{HTML}{2E3440}
+\definecolor{nord1}{HTML}{3B4252}
+\definecolor{nord2}{HTML}{434C5E}
+\definecolor{nord3}{HTML}{4C566A}
+% Snow Storm (light backgrounds)
+\definecolor{nord4}{HTML}{D8DEE9}
+\definecolor{nord5}{HTML}{E5E9F0}
+\definecolor{nord6}{HTML}{ECEFF4}
+% Frost (blues/cyans)
+\definecolor{nord7}{HTML}{8FBCBB}   % Teal
+\definecolor{nord8}{HTML}{88C0D0}   % Cyan
+\definecolor{nord9}{HTML}{81A1C1}   % Light blue
+\definecolor{nord10}{HTML}{5E81AC}  % Steel blue
+% Aurora (accent colors)
+\definecolor{nord11}{HTML}{BF616A}  % Red
+\definecolor{nord12}{HTML}{D08770}  % Orange
+\definecolor{nord13}{HTML}{EBCB8B}  % Yellow
+\definecolor{nord14}{HTML}{A3BE8C}  % Green
+\definecolor{nord15}{HTML}{B48EAD}  % Purple
+
 % Theorem environments
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}
@@ -183,28 +205,28 @@ and this holds at \emph{every future time step}---an infinite tower of commuting
 \centering
 \begin{tikzpicture}[
     node distance=2.5cm and 5cm,
-    obj/.style={draw,rounded corners,minimum height=2.5em,minimum width=5em,align=center,font=\small},
-    arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt}
+    obj/.style={draw=nord3,rounded corners,minimum height=2.5em,minimum width=5em,align=center,font=\small,fill=nord5},
+    arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt,nord10}
 ]
-\node[obj] (A1) {$\mathcal{A}$};
-\node[obj,right=of A1] (S1) {$\mathcal{O}$};
-\draw[arr] (A1) -- node[above] {$h_t$} (S1);
+\node[obj,fill=nord9!25] (A1) {$\mathcal{A}$};
+\node[obj,fill=nord7!30,right=of A1] (S1) {$\mathcal{O}$};
+\draw[arr] (A1) -- node[above,color=nord10] {$h_t$} (S1);
 
-\draw[arr] (A1) to[out=150,in=210,looseness=5] node[left] {$\sigma$} (A1);
-\draw[arr] (S1) to[out=330,in=30,looseness=5] node[right] {$\tau$} (S1);
+\draw[arr,nord15] (A1) to[out=150,in=210,looseness=5] node[left,color=nord15] {$\sigma$} (A1);
+\draw[arr,nord15] (S1) to[out=330,in=30,looseness=5] node[right,color=nord15] {$\tau$} (S1);
 
-\node[obj,below=of A1] (A2) {$\mathcal{A}$};
-\node[obj,right=of A2] (S2) {$\mathcal{O}$};
-\draw[arr] (A2) -- node[above] {$h_{t+1}$} (S2);
+\node[obj,fill=nord9!25,below=of A1] (A2) {$\mathcal{A}$};
+\node[obj,fill=nord7!30,right=of A2] (S2) {$\mathcal{O}$};
+\draw[arr] (A2) -- node[above,color=nord10] {$h_{t+1}$} (S2);
 
-\draw[arr,dashed] (A1) -- node[right,font=\footnotesize] {tail} (A2);
-\draw[arr,dashed] (S1) -- node[left,font=\footnotesize] {tail} (S2);
+\draw[arr,dashed,nord3] (A1) -- node[right,font=\footnotesize,color=nord3] {tail} (A2);
+\draw[arr,dashed,nord3] (S1) -- node[left,font=\footnotesize,color=nord3] {tail} (S2);
 
-\node[below=0.5cm of A2] {$\vdots$};
-\node[below=0.5cm of S2] {$\vdots$};
+\node[below=0.5cm of A2,color=nord3] {$\vdots$};
+\node[below=0.5cm of S2,color=nord3] {$\vdots$};
 
-\node[left=1.5cm of A1,font=\footnotesize] {$t=0$};
-\node[left=1.2cm of A2,font=\footnotesize] {$t=1$};
+\node[left=1.5cm of A1,font=\footnotesize,color=nord3] {$t=0$};
+\node[left=1.2cm of A2,font=\footnotesize,color=nord3] {$t=1$};
 \end{tikzpicture}
 \caption{The infinite tower: at each level, ranking preservation ($a \le b \Rightarrow h(a) \le_s h(b)$) and equivariance ($h \circ \sigma = \tau \circ h$) must hold.}
 \end{figure}
@@ -703,12 +725,12 @@ The environment class architecture means:
     inherit/.style={->,thick,>=Stealth,dashed},
     arr/.style={->,thick,>=Stealth}
 ]
-\node[box,fill=blue!10] (core) {Core.agda\\(Theory)};
-\node[box,fill=green!10,below left=1.5cm and 0.5cm of core] (fdmdp) {FiniteDeterministic\\MDP};
-\node[box,fill=green!10,below right=1.5cm and 0.5cm of core] (cpmdp) {Combinatorial\\PlacementMDP};
-\node[box,fill=yellow!10,below=1.5cm of fdmdp] (two) {TwoState\\(verified)};
-\node[box,fill=yellow!10,below=1.5cm of cpmdp] (queens) {Queens1\\(verified)};
-\node[box,fill=orange!10,right=0.8cm of queens] (maze) {Maze\\(classic)};
+\node[box,fill=nord9!20] (core) {Core.agda\\(Theory)};
+\node[box,fill=nord7!25,below left=1.5cm and 0.5cm of core] (fdmdp) {FiniteDeterministic\\MDP};
+\node[box,fill=nord7!25,below right=1.5cm and 0.5cm of core] (cpmdp) {Combinatorial\\PlacementMDP};
+\node[box,fill=nord13!30,below=1.5cm of fdmdp] (two) {TwoState\\(verified)};
+\node[box,fill=nord13!30,below=1.5cm of cpmdp] (queens) {Queens1\\(verified)};
+\node[box,fill=nord12!25,right=0.8cm of queens] (maze) {Maze\\(classic)};
 
 \draw[inherit] (core) -- (fdmdp);
 \draw[inherit] (core) -- (cpmdp);
@@ -766,21 +788,21 @@ The Finder computes rankings at a fixed depth. But real learning is \emph{increm
 \centering
 \begin{tikzpicture}[
     node distance=2cm,
-    box/.style={draw,rounded corners,minimum height=2.5em,minimum width=6em,align=center,font=\small},
-    arr/.style={->,thick,>=Stealth}
+    box/.style={draw=nord3,rounded corners,minimum height=2.5em,minimum width=6em,align=center,font=\small,fill=nord5},
+    arr/.style={->,thick,>=Stealth,nord3}
 ]
-\node[box] (sample) {Sample\\Experience};
-\node[box,right=of sample] (test) {Test\\Symmetry};
-\node[box,right=of test] (update) {Update\\Ranking};
-\node[box,below=1.5cm of test] (refine) {Increase\\Depth};
+\node[box,fill=nord8!30] (sample) {Sample\\Experience};
+\node[box,fill=nord9!25] (test) at (3.5,0) {Test\\Symmetry};
+\node[box,fill=nord11!25] (update) at (7,0) {Update\\Ranking};
+\node[box,fill=nord14!30] (refine) at (3.5,-1.8) {Increase\\Depth};
 
 \draw[arr] (sample) -- (test);
-\draw[arr] (test) -- node[above,font=\footnotesize] {violation} (update);
-\draw[arr] (update) -- ++(0,-1.5) -| (sample);
-\draw[arr] (test) -- node[right,font=\footnotesize] {ok} (refine);
+\draw[arr] (test) -- node[above,font=\footnotesize,color=nord11] {violation} (update);
+\draw[arr] (update) -- ++(0,-1.8) -| (sample);
+\draw[arr] (test) -- node[right,font=\footnotesize,color=nord14] {ok} (refine);
 \draw[arr] (refine) -| (sample);
 
-\node[below=3cm of test,font=\footnotesize] {Loop until convergence};
+\node[below=3.3cm of test,font=\footnotesize,color=nord3] {Loop until convergence};
 \end{tikzpicture}
 \caption{The CSHRL learning loop: sample, test for violations, update ranking, refine depth.}
 \end{figure}
@@ -1158,17 +1180,20 @@ module DelayedGratificationExample where
     width=9cm,height=4.5cm,
     xlabel={Depth},
     ylabel={Violations},
-    ymin=0,ymax=2,
+    ymin=0,ymax=4,
     xmin=0,xmax=5,
     xtick={1,2,3,4,5},
-    ytick={0,1,2},
+    ytick={0,1,2,3,4},
     grid=major,
+    grid style={nord4,thin},
+    axis line style={nord3},
+    tick style={nord3},
     legend pos=north east,
-    legend style={font=\footnotesize}
+    legend style={font=\footnotesize,draw=nord4}
 ]
-\addplot[thick,mark=*,blue] coordinates {(1,1) (2,0) (3,0) (4,0) (5,0)};
+\addplot[thick,mark=*,nord10] coordinates {(1,1) (2,0) (3,0) (4,0) (5,0)};
 \addlegendentry{Delayed Gratification}
-\addplot[thick,mark=square,red,dashed] coordinates {(1,3) (2,2) (3,1) (4,0) (5,0)};
+\addplot[thick,mark=square,nord11,dashed] coordinates {(1,3) (2,2) (3,1) (4,0) (5,0)};
 \addlegendentry{Hypothetical 4-action}
 \end{axis}
 \end{tikzpicture}
@@ -1184,11 +1209,11 @@ A robot must collect a key, unlock a door, then reach treasure. This demonstrate
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=1.4cm]
-  \node[draw,circle,fill=yellow!30,font=\small] (key) {Key};
-  \node[draw,circle,right=of key,font=\small] (start) {Start};
-  \node[draw,circle,right=of start,font=\small] (hall) {Hall};
-  \node[draw,circle,right=of hall,fill=red!20,font=\small] (door) {Door};
-  \node[draw,circle,right=of door,fill=green!30,font=\small] (Goal) {Goal};
+  \node[draw,circle,fill=nord13!40,font=\small] (key) {Key};
+  \node[draw,circle,right=of key,fill=nord4,font=\small] (start) {Start};
+  \node[draw,circle,right=of start,fill=nord4,font=\small] (hall) {Hall};
+  \node[draw,circle,right=of hall,fill=nord11!25,font=\small] (door) {Door};
+  \node[draw,circle,right=of door,fill=nord14!35,font=\small] (Goal) {Goal};
   \draw[->] (key) -- (start);
   \draw[->] (start) -- (hall);
   \draw[->] (hall) -- (door) node[midway,above,font=\scriptsize] {Need key};
@@ -1237,17 +1262,21 @@ Because CSHRL maintains a \emph{full ranking} over actions (not just a single be
 \item[Game AI:] An opponent blocks your preferred move. The backup is already ranked---no minimax tree search required for the next choice.
 \end{description}
 
-\subsection{Exploration and Exploitation as Group Operations}
+\subsection{Beyond Exploration vs.\ Exploitation}
 
-The permutation structure provides natural exploration-exploitation trade-offs:
+Traditional RL frames learning as a trade-off: exploit what you know, or explore to learn more. CSHRL dissolves this dichotomy.
 
-\begin{description}
-\item[Exploitation:] Select the top-ranked action. Trivial.
+\textbf{The key insight:} To correctly rank \emph{any} pair of actions---even the bottom two---the agent must understand both of their infinite futures. This means:
 
-\item[Exploration:] Sample uniformly from the symmetric group $S_{|A|}$~[11]. Each permutation represents a hypothesis about the true ranking. Violation detection tests these hypotheses directly.
+\begin{itemize}
+\item Knowing that action $a_5$ is worse than $a_4$ requires understanding $a_5$'s full trajectory
+\item By transitivity, correctly ordering the worst actions requires understanding the \emph{entire} action space
+\item There is no ``exploitation without exploration''---the ranking \emph{is} the understanding
+\end{itemize}
 
-\item[Epsilon-greedy analog:] With probability $\epsilon$, apply a random transposition to the ranking before acting. This explores ``nearby'' policies in permutation space.
-\end{description}
+In a neural network approximation setting, this has practical consequences: a network that correctly predicts rankings must have learned the environment dynamics, because ranking the bottom actions is just as hard as ranking the top ones. The full permutation structure forces comprehensive learning.
+
+This contrasts sharply with scalar value functions, where approximation errors in low-value regions are ``invisible'' to argmax selection. In CSHRL, every comparison matters.
 
 \subsection{Eliminating Common Failure Modes}
 
