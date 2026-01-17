@@ -1,0 +1,377 @@
+\documentclass[9pt,a4paper]{article}
+
+% Basic packages
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{float}
+
+% Unicode font support (required for Agda output - compile with lualatex)
+\usepackage{fontspec}
+\usepackage{unicode-math}
+
+% Use DejaVu for excellent Unicode coverage (subscripts, arrows, etc.)
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+\setmathfont{STIX Two Math}
+
+% Agda literate support
+\usepackage{agda}
+
+% Override Agda font style: smaller size + DejaVu Sans for Unicode
+% Must come AFTER loading agda.sty
+\renewcommand{\AgdaFontStyle}[1]{{\small\sffamily #1}}
+\renewcommand{\AgdaKeywordFontStyle}[1]{{\small\sffamily\bfseries #1}}
+\renewcommand{\AgdaBoundFontStyle}[1]{{\small\sffamily\itshape #1}}
+\renewcommand{\AgdaStringFontStyle}[1]{{\small\ttfamily #1}}
+\renewcommand{\AgdaCommentFontStyle}[1]{{\small\ttfamily #1}}
+
+% Custom color scheme: "Nord-inspired" - cool, muted tones
+% More readable and modern than the default saturated colors
+\definecolor{AgdaComment}      {HTML}{616E88}  % Muted blue-gray
+\definecolor{AgdaPragma}       {HTML}{616E88}
+\definecolor{AgdaKeyword}      {HTML}{5E81AC}  % Steel blue
+\definecolor{AgdaString}       {HTML}{A3BE8C}  % Sage green
+\definecolor{AgdaNumber}       {HTML}{B48EAD}  % Muted purple
+\definecolor{AgdaSymbol}       {HTML}{4C566A}  % Dark gray
+
+\definecolor{AgdaBound}                 {HTML}{2E3440}  % Near black
+\definecolor{AgdaGeneralizable}         {HTML}{5E81AC}
+\definecolor{AgdaInductiveConstructor}  {HTML}{8FBCBB}  % Teal
+\definecolor{AgdaCoinductiveConstructor}{HTML}{88C0D0}  % Cyan
+\definecolor{AgdaDatatype}              {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaField}                 {HTML}{B48EAD}  % Purple
+\definecolor{AgdaFunction}              {HTML}{5E81AC}  % Steel blue
+\definecolor{AgdaMacro}                 {HTML}{A3BE8C}  % Green
+\definecolor{AgdaModule}                {HTML}{E0BA62}  % Gold
+\definecolor{AgdaPostulate}             {HTML}{BF616A}  % Muted red
+\definecolor{AgdaPrimitive}             {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaRecord}                {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaArgument}              {HTML}{4C566A}  % Dark gray
+
+% Theorem environments
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\title{\textbf{CSHRL Appendix} \\
+A Pedagogical Note on Products and Coinductive Records}
+
+\author{Ricardo Corral-Corral}
+\date{January 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This appendix shows that three formulations of the preservation property are equivalent. The correspondence is a \textbf{tautology}---linked by $\eta$-reduction---but spelling it out explicitly can build intuition for readers encountering coinductive proofs for the first time.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This document accompanies the main CSHRL paper. We demonstrate the equivalence between:
+\begin{enumerate}
+\item The \textbf{coinductive record} formulation (used in \texttt{Core.preserves})
+\item The \textbf{product} formulation (common in mathematical presentations)
+\item The \textbf{$\eta$-expanded} reconstruction
+\end{enumerate}
+
+All code here is literate Agda that imports from and extends the main development.
+
+\begin{code}
+{-# OPTIONS --safe --guardedness #-}
+
+module CSHRL-Appendix where
+
+open import Data.List using (List; map; foldr; []; _∷_)
+open import Data.Nat using (ℕ; _⊔_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Codata.Guarded.Stream using (Stream; head; tail; tabulate)
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Core Definition: Coinductive Records}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In the main development, \AgdaField{CoindHomo.preserves} returns the coinductive record \AgdaRecord{\_≤ₛ\_} directly. Recall the definitions:
+
+\begin{code}
+module PreservationEquivalence
+  (State Action Reward : Set)
+  (step                : State → Action → State × Reward)
+  (_≤ᵣ_                : Reward → Reward → Set)
+  (max                 : Reward → Reward → Reward)
+  (bottom              : Reward)
+  (all-actions         : List Action)
+  where
+
+  -- Stream of rewards
+  StreamR : Set
+  StreamR = Stream Reward
+
+  -- Optimal value at depth n
+  max-list : List Reward → Reward
+  max-list = foldr max bottom
+
+  solve : State → ℕ → Reward
+  solve s ℕ.zero    = max-list (map (λ a → proj₂ (step s a)) all-actions)
+  solve s (ℕ.suc n) = max-list (map (λ a → solve (proj₁ (step s a)) n) all-actions)
+
+  value : State → StreamR
+  value s = tabulate (solve s)
+
+  action-value : State → Action → StreamR
+  head (action-value s a) = proj₂ (step s a)
+  tail (action-value s a) = value (proj₁ (step s a))
+
+  -- Coinductive stream ordering
+  record _≤ₛ_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : tail x ≤ₛ tail y
+
+  open _≤ₛ_ public
+
+  -- The coinductive symmetric homomorphism
+  record CoindHomo : Set₁ where
+    field
+      _≤ₐ_      : State → Action → Action → Set
+      preserves : ∀ a b s → _≤ₐ_ s a b →
+                  action-value s a ≤ₛ action-value s b
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{An Alternative View: Products}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+One could equivalently define preservation to return a \emph{product} of two obligations:
+
+\begin{code}
+  preserves-× : (State → Action → Action → Set) → Set
+  preserves-× _≤ₐ_ = ∀ a b s → _≤ₐ_ s a b →
+                     let v₁ = action-value s a
+                         v₂ = action-value s b
+                     in (head v₁ ≤ᵣ head v₂) × (tail v₁ ≤ₛ tail v₂)
+\end{code}
+
+This says: if action $a$ is ranked below action $b$ in state $s$ (witnessed by a proof), then:
+\begin{enumerate}
+\item The \textbf{immediate reward} of $a$ is $\le_r$ the immediate reward of $b$ (left component).
+\item The \textbf{infinite future} of $a$ is coinductively dominated by the future of $b$ (right component).
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Bridge: optimality-η}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The \AgdaFunction{optimality-η} lemma converts the product formulation into the record formulation by projecting the components into record fields:
+
+\begin{code}
+  optimality-η : {_≤ₐ_ : State → Action → Action → Set} →
+                 preserves-× _≤ₐ_ →
+                 ∀ s a b → _≤ₐ_ s a b →
+                 action-value s a ≤ₛ action-value s b
+  head≤ (optimality-η pres s a b p) = proj₁ (pres a b s p)
+  tail≤ (optimality-η pres s a b p) = proj₂ (pres a b s p)
+\end{code}
+
+Note the copattern matching: we define the record by specifying how each field is computed. The \AgdaField{head≤} field projects the first component of the product; the \AgdaField{tail≤} field projects the second.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Equivalence: All Three Are the Same}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The following identity proves that starting with \AgdaField{Core.preserves}, converting to product form, and applying \AgdaFunction{optimality-η} yields back \AgdaField{Core.preserves}:
+
+\begin{code}
+  all-three-equal : (h : CoindHomo) →
+                    ∀ s a b (p : CoindHomo._≤ₐ_ h s a b) →
+                    let -- Build preserves-× from CoindHomo.preserves
+                        pres-× : preserves-× (CoindHomo._≤ₐ_ h)
+                        pres-× a' b' s' r' = let q = CoindHomo.preserves h a' b' s' r'
+                                             in head≤ q , tail≤ q
+                        -- Apply optimality-η to get back a record
+                        via-η = optimality-η pres-× s a b p
+                        -- Original CoindHomo.preserves
+                        original = CoindHomo.preserves h a b s p
+                    in (head≤ via-η ≡ head≤ original)
+                     × (tail≤ via-η ≡ tail≤ original)
+  all-three-equal _ _ _ _ _ = refl , refl
+\end{code}
+
+The \AgdaInductiveConstructor{refl} \AgdaInductiveConstructor{,} \AgdaInductiveConstructor{refl} compiles, witnessing that the three formulations---\AgdaField{Core.preserves}, \AgdaFunction{preserves-×}, and \AgdaFunction{optimality-η}---are definitionally the same function.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Why This Is a Tautology}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The formulations are \textbf{equivalent by construction}. Converting between products and records is $\eta$-expansion: given a product $(p_1, p_2)$, we construct a record $\{ \text{head} \le = p_1; \text{tail} \le = p_2 \}$, and vice versa.
+
+Note that while this equivalence is conceptually immediate, achieving \emph{definitional} equality in Agda (where terms reduce to the same normal form) may require care in how definitions are formulated. The lemmas carry no computational content beyond projection---they are rephrasings, not proofs of non-trivial properties.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pedagogical Value}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Despite being a tautology, this reformulation serves two purposes:
+
+\begin{enumerate}
+\item \textbf{Bridging notations:} Readers may encounter coinductive properties stated either as products (common in mathematical presentations) or as records (idiomatic in Agda). Seeing the explicit correspondence demystifies both.
+
+\item \textbf{Highlighting the recursive structure:} The record formulation makes the coinductive nature visually apparent: the \AgdaField{tail≤} field has the same type as the record itself, emphasizing that the property must hold at every future time step.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 3.5cm,
+    box/.style={draw,rounded corners,minimum height=2.2em,minimum width=7em,align=center,font=\footnotesize},
+    arr/.style={->,thick,>=Stealth}
+]
+\node[box] (core) {\texttt{Core.preserves}\\(record)};
+\node[box,right=of core] (prod) {\texttt{preserves-×}\\(product)};
+\node[box,below=1.5cm of prod] (eta) {\texttt{optimality-η}\\(record)};
+
+\draw[arr] (core) -- node[above] {\footnotesize unpack} (prod);
+\draw[arr] (prod) -- node[right] {\footnotesize $\eta$-expand} (eta);
+\draw[arr,dashed] (eta) -- node[below left] {\footnotesize $\equiv$} (core);
+\end{tikzpicture}
+\caption{The three formulations form a triangle of equivalences.}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Connection to the Main Development}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This appendix corresponds to the module \texttt{appendix.PreservationEquivalence} in the main codebase. The literate version here makes the same points but in a self-contained, pedagogical format.
+
+The key takeaway: \textbf{coinductive records and products are interchangeable}. Choose whichever notation suits your presentation---the proofs will work either way.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Subsumption of Classical Argmax}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The main paper proves that CSHRL's coinductive optimality \emph{subsumes} classical RL's argmax criterion. Here we provide additional detail on the proof structure.
+
+\subsection{The Bridge: Pointwise Dominance}
+
+The key insight is that coinductive stream ordering ($\le_s$) implies \emph{pointwise} dominance at every index:
+
+\begin{code}
+  -- Extract the n-th element of a stream
+  iter-head : ℕ → StreamR → Reward
+  iter-head ℕ.zero    s = head s
+  iter-head (ℕ.suc n) s = iter-head n (tail s)
+
+  -- Pointwise dominance: at every index
+  PointwiseDominance : StreamR → StreamR → Set
+  PointwiseDominance x y = ∀ n → iter-head n x ≤ᵣ iter-head n y
+
+  -- The bridge lemma
+  ≤ₛ-to-pointwise : ∀ {x y} → x ≤ₛ y → PointwiseDominance x y
+  ≤ₛ-to-pointwise p ℕ.zero    = head≤ p
+  ≤ₛ-to-pointwise p (ℕ.suc n) = ≤ₛ-to-pointwise (tail≤ p) n
+\end{code}
+
+This lemma is the crucial connection: it converts the \emph{infinite} coinductive structure into a property we can use for \emph{finite} sums.
+
+\subsection{The Full Subsumption Module}
+
+The complete proof requires extending Core with reward arithmetic. The standalone implementation is in \texttt{src/appendix/Arithmetic.agda}. Here we show the module signature and key theorem:
+
+\begin{code}
+module SubsumptionTheorem
+  (State Action Reward : Set)
+  (step    : State → Action → State × Reward)
+  (_≤ᵣ_    : Reward → Reward → Set)
+  (max     : Reward → Reward → Reward)
+  (bottom  : Reward)
+  (actions : List Action)
+  -- Arithmetic extension
+  (_+ᵣ_      : Reward → Reward → Reward)
+  (≤ᵣ-refl   : ∀ {r} → r ≤ᵣ r)
+  (+ᵣ-mono-≤ : ∀ {a b c d} → a ≤ᵣ b → c ≤ᵣ d → (a +ᵣ c) ≤ᵣ (b +ᵣ d))
+  where
+
+  open PreservationEquivalence State Action Reward step _≤ᵣ_ max bottom actions
+
+  -- Partial sum definition
+  partial-sum : ℕ → StreamR → Reward
+  partial-sum ℕ.zero    _ = bottom
+  partial-sum (ℕ.suc n) s = head s +ᵣ partial-sum n (tail s)
+
+  -- The subsumption theorem type
+  SubsumesPartialSum : CoindHomo → Set
+  SubsumesPartialSum homo = ∀ s a b N →
+    CoindHomo._≤ₐ_ homo s a b →
+    partial-sum N (action-value s a) ≤ᵣ partial-sum N (action-value s b)
+\end{code}
+
+\subsection{Proof Structure}
+
+The proof proceeds in three steps:
+
+\begin{enumerate}
+\item \textbf{Preservation:} Given $a \le_a b$ in the ranking, \texttt{CoindHomo.preserves} yields \texttt{action-value s a $\le_s$ action-value s b}.
+
+\item \textbf{Pointwise conversion:} Apply \texttt{≤ₛ-to-pointwise} to get $\forall n.\, r^a_n \le_r r^b_n$.
+
+\item \textbf{Induction on horizon:} Prove \texttt{partial-sum-mono} by induction on $N$:
+  \begin{itemize}
+  \item Base ($N = 0$): Both sums equal \texttt{bottom}; use \texttt{≤ᵣ-refl}.
+  \item Step ($N = k+1$): The sum is $r_0 + \sum_{t=1}^{k} r_t$. Apply \texttt{+ᵣ-mono-≤} to the head inequality and the inductive hypothesis on tails.
+  \end{itemize}
+\end{enumerate}
+
+\begin{code}
+  -- Helper for shifting pointwise to tails
+  pointwise-tail : ∀ {x y} → PointwiseDominance x y → 
+                   PointwiseDominance (tail x) (tail y)
+  pointwise-tail pw n = pw (ℕ.suc n)
+
+  -- Partial sum monotonicity (the inductive core)
+  partial-sum-mono : ∀ N x y → PointwiseDominance x y → 
+                     partial-sum N x ≤ᵣ partial-sum N y
+  partial-sum-mono ℕ.zero _ _ _ = ≤ᵣ-refl
+  partial-sum-mono (ℕ.suc n) x y pw = 
+    +ᵣ-mono-≤ (pw ℕ.zero) 
+              (partial-sum-mono n (tail x) (tail y) (pointwise-tail pw))
+
+  -- The complete proof
+  subsumes-partial-sum : (h : CoindHomo) → SubsumesPartialSum h
+  subsumes-partial-sum h s a b N p = 
+    partial-sum-mono N (action-value s a) (action-value s b) 
+                     (≤ₛ-to-pointwise (CoindHomo.preserves h a b s p))
+\end{code}
+
+\subsection{Corollary: Argmax Identification}
+
+An immediate corollary: if action $b$ is ranked highest ($\forall a.\, a \le_a b$), then $b$ has the highest partial sum for \emph{any} horizon:
+
+\begin{code}
+  argmax-subsumed : (h : CoindHomo) → ∀ s b →
+    (∀ a → CoindHomo._≤ₐ_ h s a b) →
+    ∀ a N → partial-sum N (action-value s a) ≤ᵣ partial-sum N (action-value s b)
+  argmax-subsumed h s b b-top a N = subsumes-partial-sum h s a b N (b-top a)
+\end{code}
+
+This is the formal statement that \textbf{CSHRL rankings identify the classical argmax}---not by computing expected returns, but as a structural consequence of the coinductive homomorphism property.
+
+\end{document}
+
+

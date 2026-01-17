@@ -1,130 +1,126 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-blue.svg)](VERSION)
+[![Version 0.3.1](https://img.shields.io/badge/version-0.3.0-blue.svg)](VERSION)
 
-This repository contains the source code and paper for "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure" by Ricardo Corral-Corral.
+A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
+
+## The Paper
+
+The paper is a **literate Agda document**—compiling it type-checks all embedded code while producing the PDF:
+
+```bash
+cd literate
+make all
+```
+
+This produces:
+- `literate/CSHRL.pdf` — The main paper
+- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption theorem, preservation equivalence)
+
+**Requirements:** Agda 2.7.x, Agda StdLib 2.0, LuaLaTeX
+
+## Key Claims (Machine-Verified)
+
+1. **Subsumption:** The coinductive homomorphism implies classical argmax optimality for any finite horizon
+2. **Monotonic Learning:** Ranking updates via violation-correction converge in at most |S| × C(|A|,2) swaps
+3. **Instant Adaptation:** When actions become unavailable, the next-best action is O(1) lookup
 
 ## Description
 
-CSHRL is a novel foundational framework for reinforcement learning that redefines optimality not as maximizing a scalar reward sum, but as preserving a coinductive symmetric homomorphism between action rankings and infinite future streams. This structural approach automatically handles constraints, exploration, and long-term credit assignment, and is verified in Agda.
-The paper introduces the theory, provides Agda proofs, and demonstrates it in concrete environments like mazes and key-door-treasure worlds. The code is modular, parameterized, and ready for extension. Tasks can be machine-verified once they are instantiated under an Environment Class (EC) that packages both a verified solver and the preservation proof.
+CSHRL redefines optimality not as maximizing a scalar reward sum, but as preserving a **coinductive symmetric homomorphism** between action rankings and infinite future streams. If action *a* is ranked below action *b*, then at every future timestep t = 0, 1, 2, ..., the reward from *a*'s trajectory must be dominated by *b*'s.
 
-Key contributions:
+This structural approach:
+- Eliminates the discount factor γ (no arbitrary future-devaluation)
+- Dissolves the exploration/exploitation dichotomy (full rankings require full understanding)
+- Enables O(1) adaptation when actions become unavailable
+- Provides monotonic convergence guarantees
 
-- A coinductive definition of optimality as symmetry preservation.
-- Machine-verified core in Agda.
-- The "Symmetry Restoration Algorithm" for discovering optimal rankings.
-- Instantaneous "flips" for hierarchical planning without value propagation.
-- Environment Classes (ECs) let you reuse solver + proof patterns for families of environments.
+## Installation
 
-### Installation
+**Prerequisites:**
+- Agda 2.7.x (2.7.0 recommended). Note: Agda 2.8.0 has a known serialization bug.
+- Agda Standard Library 2.0
 
-Prerequisites
-
-- Agda 2.7.x (recommended) or 2.7.0 specifically. Note: Agda 2.8.0 has a known serialization bug that prevents compilation.
-- Agda Standard Library 2.0.
-
-No other dependencies—pure Agda!
-
-### Setup
-
-Clone the repo:
-```
+**Setup:**
+```bash
 git clone https://github.com/doctorcorral/csh-rl.git
-cd csh-rl/main
+cd csh-rl
 ```
-Open in your editor (e.g., Emacs with agda-mode: `M-x` `agda-mode`).
-Load the core: `C-c C-l` in `CSHRL.Core.agda` (it should type-check instantly).
 
-### Usage
+Load `src/CSHRL/Core.agda` in your editor (e.g., Emacs with agda-mode: `C-c C-l`).
 
-Verifying the Core Theory
-
-Load `CSHRL.Core.agda` in Agda.
-The optimality theorem is `machine-checked—try` normalizing it with `C-c C-n` to see it unfold.
-Extend with your own environments: define step and `_≤ᵣ_` for your MDP, instantiate CoindHomo, and the proof holds for free.
-
-#### Running the Finder Algorithm
-
-Load `CSHRL.Tasks.DelayedGratification.agda`.
-Evaluate `test-ranking-2` with `C-c C-n` to see the symmetry flip in action.
-
-### Code Structure
+## Code Structure
 
 ```
 src/
 ├── All.agda                          # Master import
 ├── CSHRL/
-│   ├── Core.agda                     # The coinductive homomorphism theory
-│   ├── Finder.agda                   # The symmetry restoration algorithm
+│   ├── Core.agda                     # Coinductive homomorphism theory
+│   ├── Finder.agda                   # Symmetry restoration algorithm
 │   ├── EnvironmentClass/
 │   │   ├── FiniteDeterministicMDP.agda
 │   │   └── CombinatorialPlacementMDP.agda
 │   ├── Learning/
-│   │   ├── Base.agda                    # Universal learning infrastructure
-│   │   └── FiniteDeterministicMDP.agda  # FDMDP-specific learner
+│   │   ├── Base.agda                 # Universal learning infrastructure
+│   │   └── FiniteDeterministicMDP.agda
 │   └── Tasks/
-│       ├── Classic/
-│       │   ├── DelayedGratification.agda # Sparse reward / Marshmallow test
-│       │   ├── Energy.agda               # Desert crossing (resource management)
-│       │   ├── KeyDoor.agda              # Hierarchical planning (tool use)
-│       │   ├── Maze.agda                 # Simple 1D navigation
-│       │   ├── Queens.agda               # N-Queens (combinatorial constraints)
-│       │   └── Trap.agda                 # Trap avoidance (greedy vs patient)
-│       └── Verified/
-│           ├── TwoState.agda            # Verified FDMDP instantiation
-│           ├── OnePlacement.agda        # Verified combinatorial placement
-│           └── Queens1.agda             # Verified Queens1 using EC
-└── appendix/
-    └── PreservationEquivalence.agda  # Pedagogical proofs
+│       ├── Classic/                  # Pedagogical examples (may use postulate)
+│       │   ├── DelayedGratification.agda
+│       │   ├── Energy.agda
+│       │   ├── KeyDoor.agda
+│       │   ├── Maze.agda
+│       │   ├── Queens.agda
+│       │   └── Trap.agda
+│       └── Verified/                 # Fully machine-checked (no postulates)
+│           ├── TwoState.agda
+│           ├── OnePlacement.agda
+│           └── Queens1.agda
+├── appendix/
+│   ├── Arithmetic.agda               # Subsumption proof extensions
+│   └── PreservationEquivalence.agda  # Pedagogical equivalences
+│
+literate/
+├── CSHRL.lagda.tex                   # Main paper (literate Agda)
+├── CSHRL-Appendix.lagda.tex          # Appendix document
+├── Makefile                          # Build system
+└── agda-spec.sty                     # Styling for spec blocks
 ```
 
-#### Framework Core (`CSHRL/`):
+### Framework Core
 
-- `Core.agda`: Coinductive optimal value, action-value, stream dominance `_≤ₛ_`, and `CoindHomo` record.
-- `Finder.agda`: The symmetry restoration algorithm using ordinal value iteration.
+- **Core.agda:** Coinductive optimal value, action-value streams, stream dominance `_≤ₛ_`, and `CoindHomo` record
+- **Finder.agda:** Lexicographic trace comparison for symmetry discovery
 
-#### Learning Infrastructure (`CSHRL/Learning/`):
+### Environment Classes
 
-- `Base.agda`: Universal learning primitives—LearnerState, violation detection, ranking updates, convergence bounds, monotonicity proofs.
-- `FiniteDeterministicMDP.agda`: FDMDP-specific learner with trace-based violation detection and active refinement.
+Reusable templates bundling structure requirements, finder algorithms, and preservation proof machinery:
 
-The Learning module provides stateful, checkpoint-friendly learning with proven monotonicity guarantees:
-- Passive learning: increase depth on violation detection
-- Active refinement: swap rankings based on violations for faster convergence
-- Unavailability handling: adapt rankings when actions become unavailable
+- **FiniteDeterministicMDP:** For grid worlds, mazes, navigation tasks
+- **CombinatorialPlacementMDP:** For constraint satisfaction (N-Queens, etc.)
 
-#### Environment Classes (`CSHRL/EnvironmentClass/`):
+### Learning Infrastructure
 
-- `FiniteDeterministicMDP.agda`: Ordinal value iteration + preservation template for any finite deterministic MDP.
-- `CombinatorialPlacementMDP.agda`: Constraint-placement EC with absorbing Dead/Solved analysis so Queens-like tasks reuse the solver/proof.
+- Passive learning (increase depth on violation)
+- Active refinement (swap rankings for faster convergence)
+- Unavailability handling (O(1) adaptation)
+- Proven monotonicity guarantees
 
-#### Task Implementations (`CSHRL/Tasks/`):
+## Citation
 
-- `Classic/*`: Pedagogical examples that may rely on `postulate`.
-- `Verified/*`: Fully machine-checked instances built by instantiating the ECs (see below).
-
-#### Verified Tasks (`CSHRL/Tasks/Verified/`):
-
-- `TwoState.agda`: Fully verified FDMDP instantiation.
-- `OnePlacement.agda`: Verified combinatorial placement example.
-- `Queens1.agda`: Verified Queens instantiation built on the combinatorial EC.
-
-### Citation
-If you use this work, please cite:
-
-```
-@article{corral2025cshrl,
-  title={Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure},
+```bibtex
+@article{corral2026cshrl,
+  title={Coinductive Symmetric Homomorphism Reinforcement Learning: 
+         A New Foundation Where Optimality Is Pure Structure},
   author={Corral-Corral, Ricardo},
-  year={2025}
+  year={2026}
 }
 ```
 
-### Future Work
+## Future Work
 
-- Full permutation groups for explicit symmetries.
-- Neural approximations for learned rankings.
-- Quantum implementations for large action spaces.
+- **Stochastic Environments:** Extension via the Giry monad
+- **Continuous State/Action Spaces:** Metric space parameterization
+- **Neural Approximations:** DNN-based ranking prediction
+- **Quantum Implementations:** Amplitude amplification for violation detection
 
 Contributions welcome—fork and PR!

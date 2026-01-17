@@ -1,0 +1,70 @@
+% agda-spec.sty - Provides the 'spec' environment for literate Agda
+% This is for illustrative code snippets that are NOT type-checked
+% (e.g., code from other modules shown for pedagogical purposes)
+%
+% Uses listings with LuaLaTeX Unicode support for proper rendering of
+% Agda symbols like ℕ, →, ∀, ≤ₛ, ≤ᵣ, etc.
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{agda-spec}[2026/01/16 Spec environment for literate Agda (Unicode-aware)]
+
+\RequirePackage{listings}
+\RequirePackage{xcolor}
+
+% Subtle colors - less intrusive than the main code blocks
+\definecolor{spectext}{rgb}{0.25,0.25,0.35}
+\definecolor{speccomment}{rgb}{0.45,0.45,0.55}
+\definecolor{specframe}{rgb}{0.6,0.6,0.75}
+\definecolor{specbg}{rgb}{0.97,0.97,0.99}
+
+% lstlisting style for spec environment
+% Smaller font, subtle background, gray tones to distinguish from verified code
+\lstdefinestyle{agdaspec}{
+  basicstyle=\footnotesize\ttfamily\color{spectext},
+  commentstyle=\color{speccomment}\itshape,
+  backgroundcolor=\color{specbg},
+  frame=l,
+  framesep=4pt,
+  framerule=1.5pt,
+  rulecolor=\color{specframe},
+  xleftmargin=1em,
+  aboveskip=0.8em,
+  belowskip=0.8em,
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  extendedchars=true,
+  columns=flexible,
+  keepspaces=true,
+  literate=
+    {→}{{$\rightarrow$}}1
+    {←}{{$\leftarrow$}}1
+    {∀}{{$\forall$}}1
+    {∃}{{$\exists$}}1
+    {λ}{{$\lambda$}}1
+    {≡}{{$\equiv$}}1
+    {≢}{{$\not\equiv$}}1
+    {≤}{{$\leq$}}1
+    {≥}{{$\geq$}}1
+    {⊥}{{$\bot$}}1
+    {⊤}{{$\top$}}1
+    {×}{{$\times$}}1
+    {∷}{{$::$}}1
+    {ℕ}{{$\mathbb{N}$}}1
+    {≤ᵣ}{{$\leq_r$}}2
+    {≤ₛ}{{$\leq_s$}}2
+    {≤ₐ}{{$\leq_a$}}2
+    {≤ₜ}{{$\leq_t$}}2
+    {≤ᵇ}{{$\leq^b$}}2
+    {₀}{{$_0$}}1
+    {₁}{{$_1$}}1
+    {₂}{{$_2$}}1
+    {ₜ}{{$_t$}}1
+    {∸}{{$\dotminus$}}1
+    {++}{{$\mathbin{+\mkern-6mu+}$}}1
+}
+
+% Define the spec environment using lstlisting
+\lstnewenvironment{spec}
+  {\lstset{style=agdaspec}}
+  {}

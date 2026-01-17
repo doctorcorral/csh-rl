@@ -8,6 +8,10 @@ module All where
 import CSHRL.Core
 import CSHRL.Finder
 
+-- Appendix (pedagogical and classical RL connection)
+import appendix.PreservationEquivalence
+import appendix.Arithmetic
+
 -- Environment Classes
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
