@@ -1,4 +1,4 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[9pt,a4paper]{article}
 
 % Basic packages
 \usepackage[margin=1in]{geometry}
@@ -14,7 +14,7 @@
 \usepackage{fontspec}
 \usepackage{unicode-math}
 
-% Use DejaVu for excellent Unicode coverage
+% Use DejaVu for excellent Unicode coverage (subscripts, arrows, etc.)
 \setmainfont{DejaVu Serif}
 \setsansfont{DejaVu Sans}
 \setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
@@ -23,10 +23,46 @@
 % Agda literate support
 \usepackage{agda}
 
-% Override Agda font style (must come AFTER loading agda.sty)
-\renewcommand{\AgdaFontStyle}[1]{{\sffamily #1}}
-\renewcommand{\AgdaKeywordFontStyle}[1]{{\sffamily\bfseries #1}}
-\renewcommand{\AgdaBoundFontStyle}[1]{{\sffamily\itshape #1}}
+% Override Agda font style: smaller size + DejaVu Sans for Unicode
+% Must come AFTER loading agda.sty
+\renewcommand{\AgdaFontStyle}[1]{{\small\sffamily #1}}
+\renewcommand{\AgdaKeywordFontStyle}[1]{{\small\sffamily\bfseries #1}}
+\renewcommand{\AgdaBoundFontStyle}[1]{{\small\sffamily\itshape #1}}
+\renewcommand{\AgdaStringFontStyle}[1]{{\small\ttfamily #1}}
+\renewcommand{\AgdaCommentFontStyle}[1]{{\small\ttfamily #1}}
+
+% Custom color scheme: "Nord-inspired" - cool, muted tones
+% More readable and modern than the default saturated colors
+\definecolor{AgdaComment}      {HTML}{616E88}  % Muted blue-gray
+\definecolor{AgdaPragma}       {HTML}{616E88}
+\definecolor{AgdaKeyword}      {HTML}{5E81AC}  % Steel blue
+\definecolor{AgdaString}       {HTML}{A3BE8C}  % Sage green
+\definecolor{AgdaNumber}       {HTML}{B48EAD}  % Muted purple
+\definecolor{AgdaSymbol}       {HTML}{4C566A}  % Dark gray
+
+\definecolor{AgdaBound}                 {HTML}{2E3440}  % Near black
+\definecolor{AgdaGeneralizable}         {HTML}{5E81AC}
+\definecolor{AgdaInductiveConstructor}  {HTML}{8FBCBB}  % Teal
+\definecolor{AgdaCoinductiveConstructor}{HTML}{88C0D0}  % Cyan
+\definecolor{AgdaDatatype}              {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaField}                 {HTML}{B48EAD}  % Purple
+\definecolor{AgdaFunction}              {HTML}{5E81AC}  % Steel blue
+\definecolor{AgdaMacro}                 {HTML}{A3BE8C}  % Green
+\definecolor{AgdaModule}                {HTML}{E0BA62}  % Gold
+\definecolor{AgdaPostulate}             {HTML}{BF616A}  % Muted red
+\definecolor{AgdaPrimitive}             {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaRecord}                {HTML}{81A1C1}  % Light blue
+\definecolor{AgdaArgument}              {HTML}{4C566A}  % Dark gray
+
+% Theorem environments
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
 
 \title{\textbf{CSHRL Appendix} \\
 A Pedagogical Note on Products and Coinductive Records}
@@ -226,5 +262,116 @@ This appendix corresponds to the module \texttt{appendix.PreservationEquivalence
 
 The key takeaway: \textbf{coinductive records and products are interchangeable}. Choose whichever notation suits your presentation---the proofs will work either way.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Subsumption of Classical Argmax}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The main paper proves that CSHRL's coinductive optimality \emph{subsumes} classical RL's argmax criterion. Here we provide additional detail on the proof structure.
+
+\subsection{The Bridge: Pointwise Dominance}
+
+The key insight is that coinductive stream ordering ($\le_s$) implies \emph{pointwise} dominance at every index:
+
+\begin{code}
+  -- Extract the n-th element of a stream
+  iter-head : ℕ → StreamR → Reward
+  iter-head ℕ.zero    s = head s
+  iter-head (ℕ.suc n) s = iter-head n (tail s)
+
+  -- Pointwise dominance: at every index
+  PointwiseDominance : StreamR → StreamR → Set
+  PointwiseDominance x y = ∀ n → iter-head n x ≤ᵣ iter-head n y
+
+  -- The bridge lemma
+  ≤ₛ-to-pointwise : ∀ {x y} → x ≤ₛ y → PointwiseDominance x y
+  ≤ₛ-to-pointwise p ℕ.zero    = head≤ p
+  ≤ₛ-to-pointwise p (ℕ.suc n) = ≤ₛ-to-pointwise (tail≤ p) n
+\end{code}
+
+This lemma is the crucial connection: it converts the \emph{infinite} coinductive structure into a property we can use for \emph{finite} sums.
+
+\subsection{The Full Subsumption Module}
+
+The complete proof requires extending Core with reward arithmetic. The standalone implementation is in \texttt{src/appendix/Arithmetic.agda}. Here we show the module signature and key theorem:
+
+\begin{code}
+module SubsumptionTheorem
+  (State Action Reward : Set)
+  (step    : State → Action → State × Reward)
+  (_≤ᵣ_    : Reward → Reward → Set)
+  (max     : Reward → Reward → Reward)
+  (bottom  : Reward)
+  (actions : List Action)
+  -- Arithmetic extension
+  (_+ᵣ_      : Reward → Reward → Reward)
+  (≤ᵣ-refl   : ∀ {r} → r ≤ᵣ r)
+  (+ᵣ-mono-≤ : ∀ {a b c d} → a ≤ᵣ b → c ≤ᵣ d → (a +ᵣ c) ≤ᵣ (b +ᵣ d))
+  where
+
+  open PreservationEquivalence State Action Reward step _≤ᵣ_ max bottom actions
+
+  -- Partial sum definition
+  partial-sum : ℕ → StreamR → Reward
+  partial-sum ℕ.zero    _ = bottom
+  partial-sum (ℕ.suc n) s = head s +ᵣ partial-sum n (tail s)
+
+  -- The subsumption theorem type
+  SubsumesPartialSum : CoindHomo → Set
+  SubsumesPartialSum homo = ∀ s a b N →
+    CoindHomo._≤ₐ_ homo s a b →
+    partial-sum N (action-value s a) ≤ᵣ partial-sum N (action-value s b)
+\end{code}
+
+\subsection{Proof Structure}
+
+The proof proceeds in three steps:
+
+\begin{enumerate}
+\item \textbf{Preservation:} Given $a \le_a b$ in the ranking, \texttt{CoindHomo.preserves} yields \texttt{action-value s a $\le_s$ action-value s b}.
+
+\item \textbf{Pointwise conversion:} Apply \texttt{≤ₛ-to-pointwise} to get $\forall n.\, r^a_n \le_r r^b_n$.
+
+\item \textbf{Induction on horizon:} Prove \texttt{partial-sum-mono} by induction on $N$:
+  \begin{itemize}
+  \item Base ($N = 0$): Both sums equal \texttt{bottom}; use \texttt{≤ᵣ-refl}.
+  \item Step ($N = k+1$): The sum is $r_0 + \sum_{t=1}^{k} r_t$. Apply \texttt{+ᵣ-mono-≤} to the head inequality and the inductive hypothesis on tails.
+  \end{itemize}
+\end{enumerate}
+
+\begin{code}
+  -- Helper for shifting pointwise to tails
+  pointwise-tail : ∀ {x y} → PointwiseDominance x y → 
+                   PointwiseDominance (tail x) (tail y)
+  pointwise-tail pw n = pw (ℕ.suc n)
+
+  -- Partial sum monotonicity (the inductive core)
+  partial-sum-mono : ∀ N x y → PointwiseDominance x y → 
+                     partial-sum N x ≤ᵣ partial-sum N y
+  partial-sum-mono ℕ.zero _ _ _ = ≤ᵣ-refl
+  partial-sum-mono (ℕ.suc n) x y pw = 
+    +ᵣ-mono-≤ (pw ℕ.zero) 
+              (partial-sum-mono n (tail x) (tail y) (pointwise-tail pw))
+
+  -- The complete proof
+  subsumes-partial-sum : (h : CoindHomo) → SubsumesPartialSum h
+  subsumes-partial-sum h s a b N p = 
+    partial-sum-mono N (action-value s a) (action-value s b) 
+                     (≤ₛ-to-pointwise (CoindHomo.preserves h a b s p))
+\end{code}
+
+\subsection{Corollary: Argmax Identification}
+
+An immediate corollary: if action $b$ is ranked highest ($\forall a.\, a \le_a b$), then $b$ has the highest partial sum for \emph{any} horizon:
+
+\begin{code}
+  argmax-subsumed : (h : CoindHomo) → ∀ s b →
+    (∀ a → CoindHomo._≤ₐ_ h s a b) →
+    ∀ a N → partial-sum N (action-value s a) ≤ᵣ partial-sum N (action-value s b)
+  argmax-subsumed h s b b-top a N = subsumes-partial-sum h s a b N (b-top a)
+\end{code}
+
+This is the formal statement that \textbf{CSHRL rankings identify the classical argmax}---not by computing expected returns, but as a structural consequence of the coinductive homomorphism property.
+
 \end{document}
+
 
