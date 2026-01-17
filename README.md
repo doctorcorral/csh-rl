@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-blue.svg)](VERSION)
+[![Version 0.3.1](https://img.shields.io/badge/version-0.3.0-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
