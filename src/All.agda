@@ -12,6 +12,10 @@ import CSHRL.Finder
 import CSHRL.Probability.Finite
 import CSHRL.Core.Stochastic
 
+-- Appendix (pedagogical and classical RL connection)
+import appendix.PreservationEquivalence
+import appendix.Arithmetic
+
 -- Environment Classes
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
