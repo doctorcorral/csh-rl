@@ -1002,6 +1002,19 @@ The convergence theorem and its full proof are in \texttt{src/CSHRL/Learning/Bas
 
 Learning is guaranteed to converge in at most \texttt{max-violations} swaps. The full proofs are in \texttt{CSHRL.Learning.Base}.
 
+\subsection{Practical Learning Interface}
+
+The learning infrastructure provides a \emph{curried} (stateful) interface that supports practical deployment:
+
+\begin{itemize}
+\item \textbf{Checkpointing:} The \texttt{LearnerState} record captures training progress (current depth, samples seen, violations detected). Save it to pause training; resume by passing it to \texttt{train-step}.
+\item \textbf{Incremental learning:} Process samples one at a time with \texttt{train-step}, or in batches with \texttt{train-batch}. Inspect state between samples.
+\item \textbf{Training traces:} The \texttt{training-trace} function returns the full history of learner states---useful for plotting convergence curves or debugging.
+\item \textbf{Active refinement:} The \texttt{ActiveLearner} maintains an explicit ranking that is directly updated on violation (swap), rather than re-querying the Finder. This provides faster convergence in practice.
+\end{itemize}
+
+\noindent These features are demonstrated in \texttt{src/CSHRL/Tasks/Verified/CurriedLearnerDemo.agda}, which uses a ``Late Bloomer'' MDP where traces are indistinguishable at low depth but diverge later---validating that depth increase and violation-driven swaps correctly discover the optimal ranking.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART VII: THE KILLER APP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1409,7 +1422,7 @@ Sannai, A., et al. (2024). An Introduction to Quantum Reinforcement Learning. ar
 Rogers, H. (1987). Theory of Recursive Functions and Effective Computability. MIT Press.
 
 \bibitem{ref10}
-Chomsky, N. (1956). Three models for the description of language. IRE Trans. Info. Theory.
+Giry, M. (1982). A categorical approach to probability theory. In Categorical Aspects of Topology and Analysis, Lecture Notes in Mathematics, vol 915, pp.~68--85. Springer.
 
 \bibitem{ref11}
 Diaconis, P. (1988). Group representations in probability and statistics. IMS.
