@@ -16,6 +16,7 @@ Key contributions:
 - The "Symmetry Restoration Algorithm" for discovering optimal rankings.
 - Instantaneous "flips" for hierarchical planning without value propagation.
 - Environment Classes (ECs) let you reuse solver + proof patterns for families of environments.
+- **Stochastic extension via the Giry monad** for probabilistic environments.
 
 ### Installation
 
@@ -56,10 +57,15 @@ src/
 ├── All.agda                          # Master import
 ├── CSHRL/
 │   ├── Core.agda                     # The coinductive homomorphism theory
+│   ├── Core/
+│   │   └── Stochastic.agda           # Stochastic extension (Giry monad)
 │   ├── Finder.agda                   # The symmetry restoration algorithm
+│   ├── Probability/
+│   │   └── Finite.agda               # Finite distribution monad
 │   ├── EnvironmentClass/
 │   │   ├── FiniteDeterministicMDP.agda
-│   │   └── CombinatorialPlacementMDP.agda
+│   │   ├── CombinatorialPlacementMDP.agda
+│   │   └── StochasticFiniteMDP.agda  # Stochastic EC
 │   ├── Learning/
 │   │   ├── Base.agda                    # Universal learning infrastructure
 │   │   └── FiniteDeterministicMDP.agda  # FDMDP-specific learner
@@ -71,10 +77,12 @@ src/
 │       │   ├── Maze.agda                 # Simple 1D navigation
 │       │   ├── Queens.agda               # N-Queens (combinatorial constraints)
 │       │   └── Trap.agda                 # Trap avoidance (greedy vs patient)
-│       └── Verified/
-│           ├── TwoState.agda            # Verified FDMDP instantiation
-│           ├── OnePlacement.agda        # Verified combinatorial placement
-│           └── Queens1.agda             # Verified Queens1 using EC
+│       ├── Verified/
+│       │   ├── TwoState.agda            # Verified FDMDP instantiation
+│       │   ├── OnePlacement.agda        # Verified combinatorial placement
+│       │   └── Queens1.agda             # Verified Queens1 using EC
+│       └── Stochastic/
+│           └── CoinFlip.agda            # Stochastic MDP example
 └── appendix/
     └── PreservationEquivalence.agda  # Pedagogical proofs
 ```
@@ -94,10 +102,19 @@ The Learning module provides stateful, checkpoint-friendly learning with proven 
 - Active refinement: swap rankings based on violations for faster convergence
 - Unavailability handling: adapt rankings when actions become unavailable
 
+#### Probability (`CSHRL/Probability/`):
+
+- `Finite.agda`: Finite distribution monad (Giry monad for discrete probability). Provides `Dist A`, monadic operations (`pure`, `>>=`, `fmap`), expected value computation, and distribution combinators.
+
+#### Stochastic Core (`CSHRL/Core/`):
+
+- `Stochastic.agda`: Lifts the coinductive homomorphism to stochastic environments. Defines `StochasticCoindHomo` where rankings preserve **expected** stream dominance.
+
 #### Environment Classes (`CSHRL/EnvironmentClass/`):
 
 - `FiniteDeterministicMDP.agda`: Ordinal value iteration + preservation template for any finite deterministic MDP.
 - `CombinatorialPlacementMDP.agda`: Constraint-placement EC with absorbing Dead/Solved analysis so Queens-like tasks reuse the solver/proof.
+- `StochasticFiniteMDP.agda`: Stochastic EC using expected traces for ranking. Handles probabilistic transitions via the Giry monad.
 
 #### Task Implementations (`CSHRL/Tasks/`):
 
@@ -109,6 +126,10 @@ The Learning module provides stateful, checkpoint-friendly learning with proven 
 - `TwoState.agda`: Fully verified FDMDP instantiation.
 - `OnePlacement.agda`: Verified combinatorial placement example.
 - `Queens1.agda`: Verified Queens instantiation built on the combinatorial EC.
+
+#### Stochastic Tasks (`CSHRL/Tasks/Stochastic/`):
+
+- `CoinFlip.agda`: Simple stochastic MDP (fair coin flip). Demonstrates expected trace computation and stochastic ranking.
 
 ### Citation
 If you use this work, please cite:
@@ -123,6 +144,8 @@ If you use this work, please cite:
 
 ### Future Work
 
+- **Continuous distributions**: Extend the Giry monad to continuous state/action spaces.
+- **Risk-aware objectives**: CVaR, variance-penalized, and distributional RL extensions.
 - Full permutation groups for explicit symmetries.
 - Neural approximations for learned rankings.
 - Quantum implementations for large action spaces.

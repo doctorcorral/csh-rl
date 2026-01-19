@@ -8,9 +8,14 @@ module All where
 import CSHRL.Core
 import CSHRL.Finder
 
+-- Probability (for stochastic extensions)
+import CSHRL.Probability.Finite
+import CSHRL.Core.Stochastic
+
 -- Environment Classes
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
+import CSHRL.EnvironmentClass.StochasticFiniteMDP
 
 -- Learning Infrastructure
 import CSHRL.Learning.Base
@@ -28,3 +33,6 @@ import CSHRL.Tasks.Classic.Trap
 import CSHRL.Tasks.Verified.TwoState
 import CSHRL.Tasks.Verified.OnePlacement
 import CSHRL.Tasks.Verified.Queens1
+
+-- Stochastic Task Implementations
+import CSHRL.Tasks.Stochastic.CoinFlip
