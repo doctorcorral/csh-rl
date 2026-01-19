@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.2](https://img.shields.io/badge/version-0.3.2-blue.svg)](VERSION)
+[![Version 0.3.3](https://img.shields.io/badge/version-0.3.3-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
@@ -72,9 +72,23 @@ src/
 │       │   ├── Queens.agda
 │       │   └── Trap.agda
 │       └── Verified/                 # Fully machine-checked (no postulates)
-│           ├── TwoState.agda
-│           ├── OnePlacement.agda
-│           └── Queens1.agda
+│           │
+│           │   # Core Tasks
+│           ├── TwoState.agda              # Minimal 2-state MDP
+│           ├── OnePlacement.agda          # Single-slot placement
+│           ├── Queens1.agda               # 1-queen (trivial case)
+│           ├── GridWorld5x5.agda          # 25-state navigation
+│           │
+│           │   # Learning Demos
+│           ├── TwoStateLearning.agda      # Learning on TwoState MDP
+│           ├── CurriedLearnerDemo.agda    # Checkpointing, traces, active learning
+│           ├── ActiveRefinementDemo.agda  # Swap-based ranking updates
+│           ├── DelayedGratificationLearning.agda  # Marshmallow test analysis
+│           │
+│           │   # KeyTreasure Suite (flagship)
+│           ├── KeyTreasure10x10.agda      # 100-state key-door-treasure
+│           ├── KeyTreasure10x10Data.agda  # Tabular data extraction
+│           └── KeyTreasureViolations.agda # Machine-verified monotonicity
 ├── appendix/
 │   ├── Arithmetic.agda               # Subsumption proof extensions
 │   └── PreservationEquivalence.agda  # Pedagogical equivalences
@@ -100,10 +114,11 @@ Reusable templates bundling structure requirements, finder algorithms, and prese
 
 ### Learning Infrastructure
 
-- Passive learning (increase depth on violation)
-- Active refinement (swap rankings for faster convergence)
-- Unavailability handling (O(1) adaptation)
-- Proven monotonicity guarantees
+- **Passive learning:** Increase depth on violation detection
+- **Active refinement:** Swap rankings directly for faster convergence
+- **Curried interface:** Checkpointing, incremental training, training traces
+- **Unavailability handling:** O(1) adaptation when actions fail
+- **Proven guarantees:** Monotonic violation decrease, bounded convergence
 
 ## Citation
 
