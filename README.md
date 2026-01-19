@@ -87,8 +87,8 @@ src/
 │           │
 │           │   # KeyTreasure Suite (flagship)
 │           ├── KeyTreasure10x10.agda      # 100-state key-door-treasure
-│           ├── KeyTreasure10x10Data.agda  # Tabular data extraction
-│           └── KeyTreasureViolations.agda # Machine-verified monotonicity
+│           ├── KeyTreasureViolations.agda # Machine-verified monotonicity
+│           └── KeyTreasureTests.agda      # Concrete test assertions
 ├── appendix/
 │   ├── Arithmetic.agda               # Subsumption proof extensions
 │   └── PreservationEquivalence.agda  # Pedagogical equivalences
