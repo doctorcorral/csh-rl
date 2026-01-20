@@ -202,7 +202,7 @@ and this holds at \emph{every future time step}---an infinite tower of commuting
 \end{definition}
 
 \begin{remark}[On ``Symmetric'']
-The term ``symmetric'' reflects two aspects: (1) action rankings are permutations---elements of the symmetric group $S_{|A|}$; (2) the correspondence between rankings and stream dominance is conjectured to be bidirectional (an isomorphism, not just a homomorphism). The Appendix explores the converse direction as future work.
+The term ``symmetric'' reflects two aspects: (1) action rankings are permutations---elements of the symmetric group $S_{|A|}$; (2) the correspondence between coinductive stream ordering and pointwise dominance is an \emph{isomorphism} (proven in \texttt{appendix/StreamIsomorphism.agda}): $x \le_s y \Leftrightarrow \forall n.\, x_n \le_r y_n$. This justifies treating the homomorphism as bidirectional.
 \end{remark}
 
 \begin{figure}[H]
