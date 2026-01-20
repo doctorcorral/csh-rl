@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.3](https://img.shields.io/badge/version-0.3.3-blue.svg)](VERSION)
+[![Version 0.3.4](https://img.shields.io/badge/version-0.3.4-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
@@ -15,7 +15,7 @@ make all
 
 This produces:
 - `literate/CSHRL.pdf` — The main paper
-- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption theorem, preservation equivalence)
+- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption, stream isomorphism, stochastic conjecture)
 
 **Requirements:** Agda 2.7.x, Agda StdLib 2.0, LuaLaTeX
 
@@ -91,7 +91,8 @@ src/
 │           └── KeyTreasureTests.agda      # Concrete test assertions
 ├── appendix/
 │   ├── Arithmetic.agda               # Subsumption proof extensions
-│   └── PreservationEquivalence.agda  # Pedagogical equivalences
+│   ├── PreservationEquivalence.agda  # Pedagogical equivalences
+│   └── StreamIsomorphism.agda        # x ≤ₛ y ⟺ ∀n. xₙ ≤ yₙ
 │
 literate/
 ├── CSHRL.lagda.tex                   # Main paper (literate Agda)

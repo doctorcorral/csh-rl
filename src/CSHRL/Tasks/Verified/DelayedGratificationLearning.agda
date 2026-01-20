@@ -3,7 +3,8 @@
 ------------------------------------------------------------------------
 -- DelayedGratificationLearning: Learning Convergence Analysis
 --
--- This module demonstrates CSHRL learning on the "Marshmallow Test":
+-- This module demonstrates CSHRL learning on the "Marshmallow Test"
+-- (choosing immediate low reward vs. waiting for delayed high reward):
 -- - Path A: 0 → 0 → 0 → ... (instant flatness)
 -- - Path B: 0 → 0 → 1 → 1 → ... (hidden reward)
 --
@@ -100,10 +101,15 @@ open FDMDPLearning
 -- Understanding what the agent "sees" at each depth.
 ------------------------------------------------------------------------
 
--- At depth 1: immediate rewards only
--- GoA: Start → PathA, reward 0
--- GoB: Start → PathB, reward 0  
--- Both traces are [0] - INDISTINGUISHABLE!
+-- At depth 0: immediate rewards only
+-- GoA: Start → PathA, reward 0  → trace [0]
+-- GoB: Start → PathB, reward 0  → trace [0]
+-- INDISTINGUISHABLE at depth 0!
+
+-- At depth 1: look one step further
+-- GoA: [0, 0] (PathA stays at 0)
+-- GoB: [0, 1] (PathB transitions to End with reward 1)
+-- GoB > GoA lexicographically at position 1!
 
 test-trace-GoA-1 : trace-action Start GoA 1 ≡ 0 ∷ 0 ∷ []
 test-trace-GoA-1 = refl
@@ -111,10 +117,9 @@ test-trace-GoA-1 = refl
 test-trace-GoB-1 : trace-action Start GoB 1 ≡ 0 ∷ 1 ∷ []
 test-trace-GoB-1 = refl
 
--- At depth 2: look one step further
--- GoA: [0, 0] (PathA → PathA, reward 0)
--- GoB: [0, 1] (PathB → End, reward 1)
--- Now GoB > GoA lexicographically!
+-- At depth 2: even clearer separation
+-- GoA: [0, 0, 0]
+-- GoB: [0, 1, 1]
 
 test-trace-GoA-2 : trace-action Start GoA 2 ≡ 0 ∷ 0 ∷ 0 ∷ []
 test-trace-GoA-2 = refl
