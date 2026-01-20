@@ -75,7 +75,7 @@ Supplementary Proofs: Subsumption, Stream Isomorphism, and Stochastic Extension}
 \maketitle
 
 \begin{abstract}
-This appendix provides supplementary machine-verified proofs for the main CSHRL paper. We establish three results: (1) the equivalence of coinductive record and product formulations of preservation ($\eta$-reduction); (2) the \textbf{Subsumption Theorem}---that coinductive optimality implies classical argmax for any finite horizon; and (3) the \textbf{Stream Isomorphism}---that coinductive stream ordering is equivalent to pointwise dominance, formally justifying the ``symmetric'' in CSHRL. We conclude with a conjecture extending the isomorphism to stochastic environments via first-order stochastic dominance.
+This appendix provides supplementary machine-verified proofs for the main CSHRL paper. We establish four results: (1) the equivalence of coinductive record and product formulations of preservation ($\eta$-reduction); (2) the \textbf{Subsumption Theorem}---that coinductive optimality implies classical argmax for any finite horizon; (3) the \textbf{Stream Isomorphism}---that coinductive stream ordering is equivalent to pointwise dominance; and (4) the \textbf{Stochastic Subsumption Theorem}---extending argmax subsumption to stochastic MDPs via expected reward streams. We conclude with a conjecture on first-order stochastic dominance (FOSD) for risk-sensitive extensions.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -87,7 +87,8 @@ This document accompanies the main CSHRL paper with supplementary proofs:
 \item \textbf{Preservation equivalence:} The coinductive record, product, and $\eta$-expanded formulations are equivalent (a tautology, but pedagogically useful).
 \item \textbf{Subsumption Theorem:} Coinductive optimality implies classical argmax optimality for any finite horizon $N$.
 \item \textbf{Stream Isomorphism:} $x \le_s y \Longleftrightarrow \forall n.\, x_n \le_r y_n$---the correspondence is bidirectional.
-\item \textbf{Stochastic Conjecture:} A proposed extension to distributions over streams.
+\item \textbf{Stochastic Subsumption:} The subsumption theorem extends to stochastic MDPs via expected reward streams.
+\item \textbf{FOSD Conjecture:} A proposed extension to first-order stochastic dominance for risk-sensitive RL.
 \end{enumerate}
 
 All code here is literate Agda that imports from and extends the main development.
@@ -452,14 +453,156 @@ With the isomorphism proven, future work includes:
 \item \textbf{Symmetric group structure:} Characterizing which permutations in $S_{|A|}$ satisfy the homomorphism.
 \end{itemize}
 
-\subsection{Conjecture: Stochastic Isomorphism}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Stochastic Subsumption Theorem}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-The deterministic isomorphism raises a natural question: does an analogous result hold for \emph{stochastic} MDPs, where each action induces a \emph{distribution} over reward streams?
+The deterministic subsumption theorem (Section 6) shows that coinductive optimality implies classical argmax for any finite horizon. A natural question: does this extend to \emph{stochastic} MDPs?
+
+\subsection{The Key Insight: Linearity of Expectation}
+
+Classical RL maximizes \emph{expected} cumulative reward:
+\[
+\text{argmax}_a \; \mathbb{E}\left[\sum_{t=0}^{N-1} r_t(a)\right]
+\]
+
+By linearity of expectation:
+\[
+\mathbb{E}\left[\sum_{t=0}^{N-1} r_t\right] = \sum_{t=0}^{N-1} \mathbb{E}[r_t]
+\]
+
+This means comparing partial sums of \emph{expected} rewards is equivalent to comparing \emph{expected} partial sums---exactly what classical RL optimizes. The deterministic subsumption proof applies directly to expected reward streams!
+
+\subsection{Stochastic Pointwise Dominance}
+
+For subsumption, we use \textbf{pointwise expected dominance} (stronger than lexicographic):
+
+\begin{code}[hide]
+module StochasticSubsumptionSection
+  (State Action Reward : Set)
+  (step : State → Action → List (Reward × ℕ))
+  (_≤ᵣ_ : Reward → Reward → Set)
+  (≤ᵣ-refl : ∀ {r} → r ≤ᵣ r)
+  (_+ᵣ_ : Reward → Reward → Reward)
+  (_*ᵣ_ : ℕ → Reward → Reward)
+  (zeroᵣ : Reward)
+  (+ᵣ-mono-≤ : ∀ {a b c d} → a ≤ᵣ b → c ≤ᵣ d → (a +ᵣ c) ≤ᵣ (b +ᵣ d))
+  where
+
+  open import Codata.Guarded.Stream using (Stream; head; tail)
+  open import Relation.Binary.PropositionalEquality using (_≡_)
+  StreamR : Set
+  StreamR = Stream Reward
+\end{code}
+
+\begin{code}
+  -- Pointwise expected stream dominance (for subsumption)
+  record _≤ₛ-expected_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : tail x ≤ₛ-expected tail y
+\end{code}
+
+Compare with the \emph{lexicographic} version from the main stochastic theory:
+
+\begin{code}
+  -- Lexicographic: tail comparison is CONDITIONAL on head equality
+  record _≤ₛ-lex_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : head x ≡ head y → tail x ≤ₛ-lex tail y
+\end{code}
+
+The pointwise version requires tail dominance \emph{unconditionally}, while lexicographic only requires it when heads are equal. Pointwise is strictly stronger: it implies lexicographic, but not vice versa.
+
+\subsection{The Stochastic Subsumption Theorem}
+
+\begin{code}[hide]
+  open _≤ₛ-expected_ public
+
+  iter-head : ℕ → StreamR → Reward
+  iter-head ℕ.zero    s = head s
+  iter-head (ℕ.suc n) s = iter-head n (tail s)
+
+  PointwiseDominance : StreamR → StreamR → Set
+  PointwiseDominance x y = ∀ n → iter-head n x ≤ᵣ iter-head n y
+
+  ≤ₛ-expected-to-pointwise : ∀ {x y} → x ≤ₛ-expected y → PointwiseDominance x y
+  ≤ₛ-expected-to-pointwise p ℕ.zero    = head≤ p
+  ≤ₛ-expected-to-pointwise p (ℕ.suc n) = ≤ₛ-expected-to-pointwise (tail≤ p) n
+
+  partial-sum : ℕ → StreamR → Reward
+  partial-sum ℕ.zero    _ = zeroᵣ
+  partial-sum (ℕ.suc n) s = head s +ᵣ partial-sum n (tail s)
+
+  pointwise-tail : ∀ {x y} → PointwiseDominance x y → PointwiseDominance (tail x) (tail y)
+  pointwise-tail pw n = pw (ℕ.suc n)
+\end{code}
+
+The proof structure mirrors the deterministic case exactly:
+
+\begin{code}
+  -- Partial sum respects pointwise dominance
+  partial-sum-mono : ∀ N x y → PointwiseDominance x y →
+                     partial-sum N x ≤ᵣ partial-sum N y
+  partial-sum-mono ℕ.zero    _ _ _  = ≤ᵣ-refl
+  partial-sum-mono (ℕ.suc n) x y pw =
+    +ᵣ-mono-≤ (pw ℕ.zero)
+              (partial-sum-mono n (tail x) (tail y) (pointwise-tail pw))
+\end{code}
+
+\begin{theorem}[Stochastic Subsumption]
+If action rankings satisfy pointwise expected stream dominance, then for any finite horizon $N$, the ranked-higher action has higher expected cumulative reward:
+\[
+a \le_{\text{rank}} b \;\wedge\; \mathbb{E}[v(a)] \le_s^{\text{pw}} \mathbb{E}[v(b)] \;\Longrightarrow\; \sum_{t=0}^{N-1} \mathbb{E}[r_t(a)] \le \sum_{t=0}^{N-1} \mathbb{E}[r_t(b)]
+\]
+\end{theorem}
+
+The standalone implementation is in \texttt{src/appendix/StochasticSubsumption.agda}.
+
+\subsection{Two Orderings, Two Purposes}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Ordering} & \textbf{Purpose} & \textbf{Role} \\
+\hline
+Lexicographic ($\le_s^{\text{lex}}$) & Trace-based learning, ranking semantics & \textbf{Primary} \\
+Pointwise ($\le_s^{\text{pw}}$) & Argmax subsumption, classical RL connection & Auxiliary \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Lexicographic (primary):} The natural choice for CSHRL---aligned with finite trace learning and captures the ``first difference decides'' semantics. This is the ordering used in \texttt{StochasticCoindHomo}.
+\item \textbf{Pointwise (auxiliary):} A more restrictive ordering used \emph{only} to establish the subsumption connection to classical RL. Many well-behaved MDPs satisfy pointwise when the ranking is sound.
+\item \textbf{CoinFlip:} Satisfies both---Flip pointwise-dominates Stay (strictly at head, equal tails).
+\end{itemize}
+
+The relationship: $\text{Pointwise} \Rightarrow \text{Lexicographic}$, but not vice versa. Pointwise is more restrictive (requires dominance at \emph{all} timesteps), while lexicographic is more permissive (only requires comparison when heads are equal). The lexicographic choice is intentional: it matches how finite trace comparison naturally extends to the infinite case.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conjecture: First-Order Stochastic Dominance Isomorphism}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Beyond Expected Values: Risk-Sensitive Orderings}
+
+The stochastic subsumption theorem (Section 8) compares \emph{expected values}---collapsing distributions to their means. A richer question: can we compare \emph{full distributions} over reward streams?
+
+\textbf{First-Order Stochastic Dominance (FOSD)} is a classical ordering on probability distributions: distribution $\mu$ FOSD-dominates $\nu$ (written $\mu \ge_{\text{FOSD}} \nu$) iff for all thresholds $r$:
+\[
+P_\mu(X \le r) \le P_\nu(X \le r)
+\]
+Equivalently, the CDF of $\mu$ lies everywhere below the CDF of $\nu$. FOSD is strictly stronger than expected-value comparison: $\mu \ge_{\text{FOSD}} \nu \Rightarrow \mathbb{E}[\mu] \ge \mathbb{E}[\nu]$, but not vice versa.
+
+\subsection{The Conjecture}
 
 Let $\mu, \nu$ be probability distributions over infinite reward streams. Define:
 \begin{itemize}
-\item \textbf{Coinductive stochastic ordering:} $\mu \le_s \nu$ iff the marginal distribution of heads satisfies first-order stochastic dominance, and the conditional tail distributions satisfy $\mu_{\text{tail}} \le_s \nu_{\text{tail}}$ (corecursively).
-\item \textbf{Pointwise stochastic dominance:} $\mu \le_{\text{pw}} \nu$ iff for all $n$ and all $r$, $P_\mu(X_n \le r) \ge P_\nu(X_n \le r)$.
+\item \textbf{Coinductive FOSD:} $\mu \le_s \nu$ iff the marginal distribution of heads satisfies FOSD, and the conditional tail distributions satisfy $\mu_{\text{tail}} \le_s \nu_{\text{tail}}$ (corecursively).
+\item \textbf{Pointwise FOSD:} $\mu \le_{\text{pw}} \nu$ iff for all timesteps $n$ and thresholds $r$, $P_\mu(X_n \le r) \ge P_\nu(X_n \le r)$.
 \end{itemize}
 
 \begin{center}
@@ -468,7 +611,18 @@ Let $\mu, \nu$ be probability distributions over infinite reward streams. Define
 
 If true, this would extend CSHRL to stochastic environments with a \emph{risk-sensitive} interpretation: a policy that stochastically dominates is preferred by \emph{all} risk-averse decision makers, not just those maximizing expected return.
 
-Formalizing this requires measure-theoretic infrastructure (e.g., the Giry monad) and is left for future work. The deterministic isomorphism proven here provides the template: the stochastic case should follow by lifting the corecursive construction to distribution-valued streams.
+\subsection{Current Infrastructure and Remaining Gap}
+
+The Giry monad foundation is now in place (\texttt{CSHRL.Probability.Finite}): finite distributions as weighted lists, with monadic operations (\texttt{pure}, \texttt{>>=}, \texttt{fmap}) and expected value computation. The stochastic extension (\texttt{CSHRL.Core.Stochastic}) uses this to define expected reward streams and lexicographic comparison.
+
+However, proving the FOSD isomorphism conjecture requires additional infrastructure not yet implemented:
+\begin{itemize}
+\item \textbf{CDF computation:} Cumulative distribution functions for \texttt{Dist Reward}, requiring decidable ordering on rewards.
+\item \textbf{FOSD comparison:} $d_1 \le_{\text{FOSD}} d_2$ iff $\forall r.\, \text{cdf}(d_1, r) \ge \text{cdf}(d_2, r)$.
+\item \textbf{Conditional tail distributions:} Preserving correlation structure through coinductive unfolding.
+\end{itemize}
+
+The current expected-value approach (Section 8) is sufficient for classical RL subsumption. The FOSD extension would enable \emph{risk-sensitive} comparisons---a distinct research direction beyond expected-value optimization.
 
 The ``symmetric homomorphism'' is now formally justified: the correspondence between rankings and stream dominance is an isomorphism, not just a one-way map.
 
