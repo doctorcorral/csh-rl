@@ -31,7 +31,7 @@ open import Relation.Nullary using (Dec; yes; no)
 data State : Set where
   Start : State
   PathA : ℕ → State  -- Path A: reward 1 once, then 0 forever
-  PathB : ℕ → State  -- Path B: reward 0 for 5 steps, then 10 forever
+  PathB : ℕ → State  -- Path B: reward 0 for 6 steps, then 10 forever
 
 data Action : Set where
   GoA GoB : Action
@@ -49,8 +49,9 @@ all-actions : List Action
 all-actions = GoA ∷ GoB ∷ []
 
 -- Step function
--- GoA → PathA 0 (with reward 1) → PathA 1 (reward 0) → PathA 2 (reward 0) → ...
--- GoB → PathB 0 (reward 0) → PathB 1 (reward 0) → ... → PathB 4 (reward 0) → PathB 5 (reward 10) → (reward 10 forever)
+-- GoA → PathA 0 (reward 1) → PathA 1 (reward 0) → PathA 2 (reward 0) → ...
+-- GoB → PathB 0 (reward 0) → ... → PathB 5 (reward 0) → PathB 6 (reward 10) → (reward 10 forever)
+-- Note: reward 10 starts when n ≥ 5, i.e., from PathB 5 onward (6 zeros total)
 step : State → Action → State × Reward
 step Start GoA = PathA 0 , 1
 step Start GoB = PathB 0 , 0
