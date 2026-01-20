@@ -21,7 +21,7 @@ open import Relation.Nullary using (Dec; yes; no)
 -- =============================================================================
 -- Immediate-Dominance MDP
 -- =============================================================================
--- Two actions: GoA (immediate reward 1, then 0 forever) and GoB (0 for 5 steps,
+-- Two actions: GoA (immediate reward 1, then 0 forever) and GoB (0 for 6 steps,
 -- then 10 forever). Under lexicographic ordering, GoA *always* wins because
 -- trace(GoA)[0] = 1 > 0 = trace(GoB)[0]. This demonstrates that CSHRL's 
 -- lexicographic comparison differs from cumulative/discounted reward—GoA has
