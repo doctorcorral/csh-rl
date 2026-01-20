@@ -1,6 +1,4 @@
-{-# OPTIONS --guardedness #-}
--- Note: Not --safe due to one postulate in the tail bridge lemma.
--- See notes below on the theoretical gap between trace and stream dominance.
+{-# OPTIONS --safe --guardedness #-}
 
 ------------------------------------------------------------------------
 -- CoinFlip: A Simple Stochastic MDP Example
@@ -14,6 +12,12 @@
 -- - Stochastic step function as distribution
 -- - Expected trace computation
 -- - Ranking based on expected value
+-- - POSTULATE-FREE preservation via lexicographic ordering
+--
+-- KEY INSIGHT: Lexicographic coinductive comparison is the correct
+-- notion for stochastic MDPs. The tail comparison is only required
+-- when expected heads are equal, which correctly captures the
+-- semantics of "earlier rewards break ties."
 ------------------------------------------------------------------------
 
 module CSHRL.Tasks.Stochastic.CoinFlip where
@@ -21,13 +25,12 @@ module CSHRL.Tasks.Stochastic.CoinFlip where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; _≤?_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans)
 open import Data.List using (List; []; _∷_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂; Σ-syntax)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (Dec; yes; no)
 open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Codata.Guarded.Stream using (head; tail)
 
 open import CSHRL.Probability.Finite using (Dist; pure; _>>=_; fmap; bernoulli)
@@ -154,103 +157,83 @@ test-policy : Action
 test-policy = find-policy Ready horizon
 
 ------------------------------------------------------------------------
--- Preservation Proofs
+-- LEXICOGRAPHIC PRESERVATION PROOFS (Postulate-Free!)
 ------------------------------------------------------------------------
 
--- Key insight: 
--- 1. Terminal states (Won, Lost): all actions give 0 reward, reflexivity works
--- 2. Ready state:
---    - Same action: reflexivity
---    - Stay ≤ Flip: This is the "correct" ranking, head 0 ≤ 1 holds
---    - Flip ≤ Stay: IMPOSSIBLE ranking! head would need 1 ≤ 0, which is absurd
---
--- For the impossible case, the ranking hypothesis contains a proof of 1 ≤ 0,
--- which has no inhabitants. We use absurd pattern matching.
+-- The key insight: lexicographic comparison has CONDITIONAL tail comparison.
+-- When head(a) < head(b), we don't need to prove anything about tails!
+-- This is exactly what makes the CoinFlip proof work without postulates.
 
 -- Helper: 1 ≤ 0 is absurd (no constructor for suc n ≤ zero)
 1≤0-absurd : 1 ≤ 0 → ∀ {A : Set} → A
 1≤0-absurd ()
 
--- Direct preservation proof
--- For stochastic streams, we need careful handling of the tail.
--- The key observation is that the "bad" rankings are actually impossible.
+------------------------------------------------------------------------
+-- Head Preservation
+------------------------------------------------------------------------
 
-preserves-coinflip : ∀ a b s → 
-                     s ranks a ≤ b → 
-                     expected-action-value s a ≤ₛ-expected expected-action-value s b
+-- For lexicographic ordering, we need:
+-- s ranks a ≤ b → head(expected-action-value s a) ≤ᵣ head(expected-action-value s b)
 
--- Won state: terminal, both actions lead to same (0 reward) outcome
--- All rankings between actions at Won are valid (reflexive case)
-head≤ (preserves-coinflip Flip Flip Won p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Flip Flip Won p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Flip Stay Won p) = proj₁ p
-tail≤ (preserves-coinflip Flip Stay Won p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Stay Flip Won p) = proj₁ p
-tail≤ (preserves-coinflip Stay Flip Won p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Stay Stay Won p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Stay Stay Won p) = ≤ₛ-expected-refl _
+coinflip-head-lex-≤ : ∀ s a b →
+                      s ranks a ≤ b →
+                      head (expected-action-value s a) ≤ᵣ head (expected-action-value s b)
 
--- Lost state: terminal, same as Won
-head≤ (preserves-coinflip Flip Flip Lost p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Flip Flip Lost p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Flip Stay Lost p) = proj₁ p
-tail≤ (preserves-coinflip Flip Stay Lost p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Stay Flip Lost p) = proj₁ p
-tail≤ (preserves-coinflip Stay Flip Lost p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Stay Stay Lost p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Stay Stay Lost p) = ≤ₛ-expected-refl _
+-- Terminal states: both actions give 0 immediate reward
+coinflip-head-lex-≤ Won Flip Flip _ = ≤ᵣ-refl
+coinflip-head-lex-≤ Won Flip Stay p = proj₁ p
+coinflip-head-lex-≤ Won Stay Flip p = proj₁ p
+coinflip-head-lex-≤ Won Stay Stay _ = ≤ᵣ-refl
+coinflip-head-lex-≤ Lost Flip Flip _ = ≤ᵣ-refl
+coinflip-head-lex-≤ Lost Flip Stay p = proj₁ p
+coinflip-head-lex-≤ Lost Stay Flip p = proj₁ p
+coinflip-head-lex-≤ Lost Stay Stay _ = ≤ᵣ-refl
 
 -- Ready state: the interesting case
--- Same action: reflexivity
-head≤ (preserves-coinflip Flip Flip Ready p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Flip Flip Ready p) = ≤ₛ-expected-refl _
-head≤ (preserves-coinflip Stay Stay Ready p) = ≤ᵣ-refl
-tail≤ (preserves-coinflip Stay Stay Ready p) = ≤ₛ-expected-refl _
-
--- Stay ≤ Flip: valid ranking, head 0 ≤ 1
--- THEORETICAL GAP: The tail comparison exposes a gap between trace and stream dominance.
---
--- For stochastic MDPs:
---   - Expected TRACE dominance (what ranking uses): lexicographic comparison
---   - Expected STREAM dominance (what preservation needs): pointwise comparison
---
--- In CoinFlip:
---   - Stay's expected trace: [0, 1, 1, ...] (wait then Flip)
---   - Flip's expected trace: [1, 0, 0, ...] (immediate reward, then terminal)
---   - Lexicographically: [0, ...] < [1, ...], so Stay < Flip ✓
---
--- But for stream dominance:
---   - tail(Stay) = value(Ready) ≈ [1, 1, ...] (can always Flip later)
---   - tail(Flip) = value(terminal) = [0, 0, ...] (absorbing)
---   - We'd need [1, 1, ...] ≤ [0, 0, ...], which is FALSE!
---
--- CONCLUSION: Expected stream dominance is TOO STRONG for stochastic MDPs.
--- The ranking based on expected traces is correct for decision-making,
--- but the preservation theorem needs reformulation for the stochastic case.
---
--- Possible fixes:
--- 1. Use expected cumulative sum dominance instead of stream dominance
--- 2. Define a different notion of "stochastic stream dominance"
--- 3. Accept that the stochastic CoindHomo preserves traces, not streams
---
-head≤ (preserves-coinflip Stay Flip Ready p) = z≤n
-tail≤ (preserves-coinflip Stay Flip Ready p) = stay-flip-tail-bridge
-  where
-    postulate
-      stay-flip-tail-bridge : tail (expected-action-value Ready Stay) ≤ₛ-expected 
-                              tail (expected-action-value Ready Flip)
-
--- Flip ≤ Stay: IMPOSSIBLE ranking!
--- The expected head of Flip is 1, Stay is 0, so 1 ≤ 0 is required
--- The ranking hypothesis proj₁ p : 1 ≤ 0 is absurd
-head≤ (preserves-coinflip Flip Stay Ready (h≤ , _)) = 1≤0-absurd h≤
-tail≤ (preserves-coinflip Flip Stay Ready (h≤ , _)) = 1≤0-absurd h≤
+coinflip-head-lex-≤ Ready Flip Flip _ = ≤ᵣ-refl
+coinflip-head-lex-≤ Ready Stay Stay _ = ≤ᵣ-refl
+coinflip-head-lex-≤ Ready Stay Flip _ = z≤n  -- 0 ≤ 1 ✓
+coinflip-head-lex-≤ Ready Flip Stay (h≤ , _) = 1≤0-absurd h≤  -- 1 ≤ 0 is absurd
 
 ------------------------------------------------------------------------
--- Verified CoindHomo Instance
+-- Tail Preservation (Conditional!)
 ------------------------------------------------------------------------
 
-open WithDirectPreservation preserves-coinflip public
+-- For lexicographic ordering, tail preservation is CONDITIONAL:
+-- s ranks a ≤ b → head(a) ≡ head(b) → tail(a) ≤ₛ-lex tail(b)
+--
+-- The crucial case Stay ≤ Flip at Ready:
+-- - head(Stay) = 0, head(Flip) = 1
+-- - The condition head(Stay) ≡ head(Flip) requires 0 ≡ 1, which is FALSE!
+-- - Therefore, the tail proof obligation is TRIVIALLY satisfied.
+
+coinflip-tail-lex-≤ : ∀ s a b →
+                      s ranks a ≤ b →
+                      head (expected-action-value s a) ≡ head (expected-action-value s b) →
+                      tail (expected-action-value s a) ≤ₛ-lex tail (expected-action-value s b)
+
+-- Terminal states: all actions give same stream, reflexivity
+coinflip-tail-lex-≤ Won _ _ _ _ = ≤ₛ-lex-refl _
+coinflip-tail-lex-≤ Lost _ _ _ _ = ≤ₛ-lex-refl _
+
+-- Ready state with same action: reflexivity
+coinflip-tail-lex-≤ Ready Flip Flip _ _ = ≤ₛ-lex-refl _
+coinflip-tail-lex-≤ Ready Stay Stay _ _ = ≤ₛ-lex-refl _
+
+-- Ready state, Stay ≤ Flip:
+-- head(Stay) = 0, head(Flip) = 1
+-- The condition 0 ≡ 1 is FALSE, so this case is impossible!
+coinflip-tail-lex-≤ Ready Stay Flip _ ()
+
+-- Ready state, Flip ≤ Stay:
+-- This ranking is impossible (would require 1 ≤ 0 in the ranking hypothesis)
+coinflip-tail-lex-≤ Ready Flip Stay (h≤ , _) _ = 1≤0-absurd h≤
+
+------------------------------------------------------------------------
+-- Verified CoindHomo Instance (Postulate-Free!)
+------------------------------------------------------------------------
+
+open WithLexPreservation coinflip-head-lex-≤ coinflip-tail-lex-≤ public
 
 -- Now we have the verified instance:
 -- StochasticMDPHomo : StochasticCoindHomo

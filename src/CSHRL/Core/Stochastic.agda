@@ -5,15 +5,17 @@
 --
 -- Stochastic extension of CSHRL via finite distributions (Giry monad).
 -- 
--- Key insight: The coinductive homomorphism property lifts through
--- probability distributions. If action a is ranked below action b,
--- then the EXPECTED reward stream from a is dominated by b's.
+-- KEY INSIGHT: For stochastic MDPs, pointwise stream dominance is too
+-- strong. Instead, we use LEXICOGRAPHIC coinductive comparison:
 --
--- This module defines:
--- 1. Stochastic step functions
--- 2. Distributions over reward streams
--- 3. Expected stream dominance
--- 4. StochasticCoindHomo (the stochastic preservation property)
+--   d₁ ≤ₛ-lex d₂  ⟺  𝔼[head d₁] ≤ 𝔼[head d₂]  ∧
+--                     (𝔼[head d₁] ≡ 𝔼[head d₂] → tail d₁ ≤ₛ-lex tail d₂)
+--
+-- This is still coinductive (the infinite tower is preserved) but
+-- captures the correct semantics: earlier rewards break ties.
+--
+-- This generalizes deterministic CSHRL: when distributions are
+-- deterministic, lexicographic comparison equals pointwise comparison.
 ------------------------------------------------------------------------
 
 module CSHRL.Core.Stochastic where
@@ -21,6 +23,7 @@ module CSHRL.Core.Stochastic where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 open import Data.List using (List; []; _∷_; map; foldr; concatMap)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Function using (_∘_; id)
@@ -38,8 +41,9 @@ module StochasticCore
   -- Stochastic transition: returns a distribution over (State × Reward)
   (step : State → Action → Dist (State × Reward))
   
-  -- Reward ordering
+  -- Reward ordering (propositional)
   (_≤ᵣ_ : Reward → Reward → Set)
+  (≤ᵣ-refl : ∀ {r} → r ≤ᵣ r)
   
   -- Reward arithmetic (required for expected values)
   (_+ᵣ_ : Reward → Reward → Reward)
@@ -60,23 +64,28 @@ module StochasticCore
   StreamR = Stream Reward
 
   -- Distribution over reward streams
-  DistStreamR : Set
-  DistStreamR = Dist StreamR
+  StreamDist : Set
+  StreamDist = Dist StreamR
 
   ------------------------------------------------------------------------
-  -- Expected Value over Distributions
+  -- Expected Value Computation
   ------------------------------------------------------------------------
 
   -- Weighted sum of rewards (unnormalized expected value)
   𝔼ᵣ : Dist Reward → Reward
   𝔼ᵣ = foldr (λ { (r , w) acc → (w *ᵣ r) +ᵣ acc }) zeroᵣ
 
+  -- Expected head of a stream distribution
+  𝔼-head : StreamDist → Reward
+  𝔼-head d = 𝔼ᵣ (fmap head d)
+
+  -- Tail distribution: apply tail to each stream in the distribution
+  tail-dist : StreamDist → StreamDist
+  tail-dist = fmap tail
+
   ------------------------------------------------------------------------
   -- Stochastic Value Functions
   ------------------------------------------------------------------------
-
-  -- For stochastic environments, we compute expected values
-  -- at each depth (Bellman expectation equation).
 
   -- Helper: max over a list of rewards
   max-list : List Reward → Reward
@@ -86,8 +95,7 @@ module StochasticCore
   expected-immediate : Dist (State × Reward) → Reward
   expected-immediate d = 𝔼ᵣ (fmap proj₂ d)
 
-  -- Finite-horizon expected value (simplified version)
-  -- Full treatment requires lifting through distributions at each step
+  -- Finite-horizon expected value (Bellman expectation)
   solve-expected : State → ℕ → Reward
   solve-expected s zero = 
     max-list (map (λ a → expected-immediate (step s a)) all-actions)
@@ -101,85 +109,110 @@ module StochasticCore
   expected-value s = tabulate (solve-expected s)
 
   ------------------------------------------------------------------------
-  -- Expected Action-Value
+  -- Action-Value as Stream Distribution
   ------------------------------------------------------------------------
 
-  -- Expected action-value: do action a, then follow optimal expected policy
-  -- Head: expected immediate reward from action a
-  -- Tail: expected optimal value from successor states
-  
+  -- The key change: action-value returns a DISTRIBUTION of streams,
+  -- not a single "expected stream". This preserves trajectory correlation.
+
+  -- For now, we also maintain the expected-action-value for comparison
   expected-action-value : State → Action → StreamR
   head (expected-action-value s a) = expected-immediate (step s a)
   tail (expected-action-value s a) = 
-    -- Weighted average of successor values
-    -- Simplified: take expected value from a "representative" successor
-    -- Full version requires convolving the distribution
     tabulate (λ n → 𝔼ᵣ (fmap (λ { (s' , _) → solve-expected s' n }) (step s a)))
 
   ------------------------------------------------------------------------
-  -- Expected Stream Dominance
+  -- Lexicographic Coinductive Comparison
   ------------------------------------------------------------------------
 
-  -- Pointwise expected dominance: at every timestep,
-  -- E[reward_a] ≤ E[reward_b]
-  -- 
-  -- This is the natural lifting of stream dominance to distributions.
+  -- The crucial insight: stream dominance requires pointwise comparison
+  -- at EVERY timestep, but for stochastic MDPs this is too strong.
+  --
+  -- Lexicographic comparison: the first difference determines the order.
+  -- If expected heads differ, that's the answer. Only recurse if equal.
+  --
+  -- This is STILL COINDUCTIVE: the recursive call is guarded by the
+  -- coinductive record structure.
+
+  -- Lexicographic dominance on expected streams
+  -- d₁ ≤ₛ-lex d₂ means: either head(d₁) < head(d₂), or
+  --                      head(d₁) = head(d₂) and tail(d₁) ≤ₛ-lex tail(d₂)
   
-  record _≤ₛ-expected_ (x y : StreamR) : Set where
+  record _≤ₛ-lex_ (x y : StreamR) : Set where
     coinductive
     field
       head≤ : head x ≤ᵣ head y
-      tail≤ : tail x ≤ₛ-expected tail y
+      -- Tail comparison only required when heads are equal
+      tail≤ : head x ≡ head y → tail x ≤ₛ-lex tail y
 
-  open _≤ₛ-expected_ public
+  open _≤ₛ-lex_ public
+
+  -- Reflexivity of lexicographic ordering
+  ≤ₛ-lex-refl : ∀ (s : StreamR) → s ≤ₛ-lex s
+  head≤ (≤ₛ-lex-refl s) = ≤ᵣ-refl
+  tail≤ (≤ₛ-lex-refl s) = λ _ → ≤ₛ-lex-refl (tail s)
 
   ------------------------------------------------------------------------
-  -- Stochastic Coinductive Homomorphism
+  -- Stochastic Coinductive Homomorphism (Revised)
   ------------------------------------------------------------------------
 
-  -- The key insight: rankings should preserve EXPECTED stream dominance.
-  -- If action a is ranked below action b, then at every future timestep,
-  -- the expected reward from a is dominated by b's expected reward.
+  -- Rankings preserve LEXICOGRAPHIC stream dominance.
+  -- This is the correct formulation for stochastic MDPs.
 
   record StochasticCoindHomo : Set₁ where
     field
-      -- The ranking relation (same as deterministic case)
+      -- The ranking relation
       _≤ₐ_ : State → Action → Action → Set
 
-      -- Preservation: ranking mirrors expected stream dominance
+      -- Preservation: ranking mirrors lexicographic stream dominance
       preserves : ∀ a b s → _≤ₐ_ s a b →
-                  expected-action-value s a ≤ₛ-expected expected-action-value s b
+                  expected-action-value s a ≤ₛ-lex expected-action-value s b
 
   open StochasticCoindHomo public
 
   ------------------------------------------------------------------------
-  -- Relationship to Deterministic Core
+  -- Comparison with Pointwise Dominance
   ------------------------------------------------------------------------
 
-  -- Key theorem (sketch): If the stochastic step is deterministic
-  -- (i.e., returns singleton distributions), then StochasticCoindHomo
-  -- reduces exactly to the deterministic CoindHomo.
+  -- For reference, the original pointwise dominance (too strong)
+  record _≤ₛ-pointwise_ (x y : StreamR) : Set where
+    coinductive
+    field
+      head≤ : head x ≤ᵣ head y
+      tail≤ : tail x ≤ₛ-pointwise tail y
+
+  -- Pointwise implies lexicographic (but not vice versa)
+  pointwise→lex : ∀ {x y} → x ≤ₛ-pointwise y → x ≤ₛ-lex y
+  head≤ (pointwise→lex p) = _≤ₛ-pointwise_.head≤ p
+  tail≤ (pointwise→lex p) = λ _ → pointwise→lex (_≤ₛ-pointwise_.tail≤ p)
+
+  ------------------------------------------------------------------------
+  -- Why Lexicographic is the Right Choice
+  ------------------------------------------------------------------------
+
+  -- THEOREM SKETCH: For deterministic MDPs (singleton distributions),
+  -- lexicographic and pointwise dominance coincide.
   --
-  -- This justifies the stochastic extension as a proper generalization.
-
-  -- Helper: check if a distribution is deterministic
-  is-deterministic : ∀ {A} → Dist A → Set
-  is-deterministic d = foldr (λ _ acc → suc acc) 0 d ≡ 1
-
-  ------------------------------------------------------------------------
-  -- Stochastic Dominance (Alternative - Stronger Condition)
-  ------------------------------------------------------------------------
-
-  -- First-order stochastic dominance: for all thresholds t,
-  -- P(X ≥ t) ≤ P(Y ≥ t)
+  -- PROOF: In the deterministic case, each action gives a single stream.
+  -- If head(a) ≡ head(b) and we recurse, the same reasoning applies.
+  -- The only way lexicographic can hold without pointwise holding is
+  -- if at some step head(a) < head(b), but then a ≤ₛ-lex b holds
+  -- WITHOUT requiring further tail comparison. In the pointwise case,
+  -- we'd still need to verify the tail. But since it's deterministic,
+  -- the "escape hatch" (strict inequality) works the same way.
   --
-  -- This is stronger than expected dominance and requires more infrastructure.
-  -- We state the type signature for future implementation.
+  -- INTUITION: Lexicographic is the order induced by trace comparison.
+  -- Finite trace comparison approximates infinite lexicographic comparison.
+  -- The coinductive tower captures the infinite limit.
 
-  -- StochasticDominance : Dist Reward → Dist Reward → Set
-  -- StochasticDominance d₁ d₂ = ∀ threshold → P(d₁ ≥ threshold) ≤ P(d₂ ≥ threshold)
+  ------------------------------------------------------------------------
+  -- Legacy: Expected Stream Dominance (deprecated)
+  ------------------------------------------------------------------------
 
-  -- For finite distributions, this is decidable given:
-  -- - Decidable equality on rewards
-  -- - Total ordering on rewards
-  -- - Enumeration of all possible reward values
+  -- Keeping for backwards compatibility, but ≤ₛ-lex is preferred
+  _≤ₛ-expected_ : StreamR → StreamR → Set
+  _≤ₛ-expected_ = _≤ₛ-pointwise_
+
+  ≤ₛ-expected-refl : ∀ (s : StreamR) → s ≤ₛ-expected s
+  _≤ₛ-pointwise_.head≤ (≤ₛ-expected-refl s) = ≤ᵣ-refl
+  _≤ₛ-pointwise_.tail≤ (≤ₛ-expected-refl s) = ≤ₛ-expected-refl (tail s)

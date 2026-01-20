@@ -79,7 +79,7 @@ module StochasticFiniteMDP
   ------------------------------------------------------------------------
 
   open import CSHRL.Core.Stochastic
-  open StochasticCore State Action Reward step _≤ᵣ_ _+ᵣ_ _*ᵣ_ zeroᵣ max bottom all-actions
+  open StochasticCore State Action Reward step _≤ᵣ_ ≤ᵣ-refl _+ᵣ_ _*ᵣ_ zeroᵣ max bottom all-actions
     public
 
   ------------------------------------------------------------------------
@@ -181,56 +181,56 @@ module StochasticFiniteMDP
   s ranks a ≤ b = expected-trace-action s a horizon ≤ₜ expected-trace-action s b horizon
 
   ------------------------------------------------------------------------
-  -- Helper Lemmas
-  ------------------------------------------------------------------------
-
-  -- Reflexivity of expected stream ordering
-  ≤ₛ-expected-refl : ∀ (s : StreamR) → s ≤ₛ-expected s
-  head≤ (≤ₛ-expected-refl s) = ≤ᵣ-refl
-  tail≤ (≤ₛ-expected-refl s) = ≤ₛ-expected-refl (tail s)
-
-  ------------------------------------------------------------------------
-  -- Preservation Proof Template
+  -- Preservation Proof Templates
   --
-  -- Instances provide the bridge lemma connecting expected traces
-  -- to expected stream dominance.
+  -- Two orderings are available:
+  -- 1. ≤ₛ-lex (lexicographic): appropriate for most stochastic MDPs
+  -- 2. ≤ₛ-expected (pointwise): only works when stream dominance holds
   ------------------------------------------------------------------------
 
-  module WithBridgeLemma 
-    -- Head preservation: instances must provide this
-    -- (depends on the specific reward structure)
-    (head-expected-≤ : ∀ s a b → 
-                       s ranks a ≤ b →
-                       head (expected-action-value s a) ≤ᵣ head (expected-action-value s b))
-    -- Tail preservation: the bridge lemma
-    (tail-expected-≤ₛ : ∀ s a b → 
-                        s ranks a ≤ b →
-                        tail (expected-action-value s a) ≤ₛ-expected tail (expected-action-value s b))
+  ------------------------------------------------------------------------
+  -- LEXICOGRAPHIC PRESERVATION (Recommended for Stochastic MDPs)
+  --
+  -- Uses conditional tail comparison: only require tail≤ when heads equal.
+  -- This correctly captures lexicographic trace semantics and is the
+  -- natural coinductive lifting for expected value comparison.
+  ------------------------------------------------------------------------
+
+  module WithLexPreservation
+    -- Head preservation: ranking implies expected head dominance
+    (head-lex-≤ : ∀ s a b → 
+                  s ranks a ≤ b →
+                  head (expected-action-value s a) ≤ᵣ head (expected-action-value s b))
+    -- Tail preservation: only required when heads are equal
+    (tail-lex-≤ : ∀ s a b → 
+                  s ranks a ≤ b →
+                  head (expected-action-value s a) ≡ head (expected-action-value s b) →
+                  tail (expected-action-value s a) ≤ₛ-lex tail (expected-action-value s b))
     where
 
-    -- Full preservation
-    bridge-preserves : ∀ a b s → 
-                       s ranks a ≤ b → 
-                       expected-action-value s a ≤ₛ-expected expected-action-value s b
-    head≤ (bridge-preserves a b s p) = head-expected-≤ s a b p
-    tail≤ (bridge-preserves a b s p) = tail-expected-≤ₛ s a b p
+    -- Full lexicographic preservation
+    lex-preserves : ∀ a b s → 
+                    s ranks a ≤ b → 
+                    expected-action-value s a ≤ₛ-lex expected-action-value s b
+    head≤ (lex-preserves a b s p) = head-lex-≤ s a b p
+    tail≤ (lex-preserves a b s p) = tail-lex-≤ s a b p
 
     -- The verified StochasticCoindHomo instance
     instance
       StochasticMDPHomo : StochasticCoindHomo
       StochasticMDPHomo = record
         { _≤ₐ_ = _ranks_≤_
-        ; preserves = bridge-preserves
+        ; preserves = lex-preserves
         }
 
   ------------------------------------------------------------------------
-  -- Alternative: Direct Preservation
+  -- Direct Lexicographic Preservation
   ------------------------------------------------------------------------
 
-  module WithDirectPreservation
+  module WithDirectLexPreservation
     (preserves-direct : ∀ a b s → 
                         s ranks a ≤ b → 
-                        expected-action-value s a ≤ₛ-expected expected-action-value s b)
+                        expected-action-value s a ≤ₛ-lex expected-action-value s b)
     where
 
     instance
@@ -239,6 +239,29 @@ module StochasticFiniteMDP
         { _≤ₐ_ = _ranks_≤_
         ; preserves = preserves-direct
         }
+
+  ------------------------------------------------------------------------
+  -- Pointwise Preservation (Legacy - Stronger Condition)
+  --
+  -- Requires pointwise stream dominance at every timestep.
+  -- Only works for special cases where expected traces coincide
+  -- with pointwise stream dominance.
+  ------------------------------------------------------------------------
+
+  module WithPointwisePreservation
+    (head-pw-≤ : ∀ s a b → 
+                 s ranks a ≤ b →
+                 head (expected-action-value s a) ≤ᵣ head (expected-action-value s b))
+    (tail-pw-≤ : ∀ s a b → 
+                 s ranks a ≤ b →
+                 tail (expected-action-value s a) ≤ₛ-expected tail (expected-action-value s b))
+    where
+
+    pw-preserves : ∀ a b s → 
+                   s ranks a ≤ b → 
+                   expected-action-value s a ≤ₛ-expected expected-action-value s b
+    _≤ₛ-pointwise_.head≤ (pw-preserves a b s p) = head-pw-≤ s a b p
+    _≤ₛ-pointwise_.tail≤ (pw-preserves a b s p) = tail-pw-≤ s a b p
 
   ------------------------------------------------------------------------
   -- Risk-Aware Extensions (Future Work)
