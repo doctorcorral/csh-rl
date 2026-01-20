@@ -40,7 +40,8 @@ open import Relation.Nullary using (Dec; yes; no)
 -- Testing at depth 3 reveals a VIOLATION: ranking says GoA ≥ GoB, but 
 -- trace(GoB) > trace(GoA).
 --
--- This is the "Marshmallow Test" that actually tests the learner!
+-- Unlike the Marshmallow Test (immediate vs. delayed reward), both paths here
+-- look identical at first—testing whether the learner looks *deep enough*.
 -- =============================================================================
 
 data State : Set where

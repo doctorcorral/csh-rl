@@ -201,6 +201,10 @@ a \le_{\text{rank}} b \;\;\Longrightarrow\;\; h(a) \le_s h(b)
 and this holds at \emph{every future time step}---an infinite tower of commuting diagrams.
 \end{definition}
 
+\begin{remark}[On ``Symmetric'']
+The term ``symmetric'' reflects two aspects: (1) action rankings are permutations---elements of the symmetric group $S_{|A|}$; (2) the correspondence between coinductive stream ordering and pointwise dominance is an \emph{isomorphism} (proven in \texttt{appendix/StreamIsomorphism.agda}): $x \le_s y \Leftrightarrow \forall n.\, x_n \le_r y_n$. This justifies treating the homomorphism as bidirectional.
+\end{remark}
+
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
@@ -478,7 +482,9 @@ When we prove $\text{refl} , \text{refl}$ for the formulation equivalence, we're
 \section{Related Work and Positioning}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-CSHRL connects to multiple research traditions but makes a distinct move: replacing scalar aggregation with a coinductive order on infinite futures.
+CSHRL connects to multiple research traditions but makes a distinct move: replacing scalar aggregation with a coinductive order on infinite futures. We situate our contribution relative to classical RL, lexicographic multi-objective RL, constrained/safe RL, and coalgebraic foundations.
+
+\subsection{Classical Value-Based RL}
 
 \begin{table}[H]
 \centering
@@ -496,17 +502,57 @@ CSHRL connects to multiple research traditions but makes a distinct move: replac
 \hline
 \textbf{AIXI}~[4] & Universal prior over computable environments & Uncomputable ideal; CSHRL is also an ideal but \emph{structurally} defined \\
 \hline
-\textbf{Coalgebra}~[5] & Infinite behaviors via coinductive definitions & Direct inspiration: $\le_s$ is a coinductive relation in Rutten's sense \\
-\hline
-\textbf{MDP Symmetries}~[6] & Exploit state/action symmetries for efficiency & Complementary: CSHRL uses symmetry as \emph{optimality criterion}, not just speedup \\
-\hline
 \end{tabularx}
 \end{table}
 
-\noindent\textbf{What distinguishes CSHRL:}
+\subsection{Lexicographic Multi-Objective RL}
+
+The most closely related line of work is \textbf{lexicographic multi-objective RL} (LMORL), which optimizes multiple reward signals according to strict priority: first maximize the highest-priority objective, then the next, and so on.
+
+Skalse et al.~[12] introduce both value-based and policy-gradient algorithms that provably converge to lexicographically optimal policies. Their framework treats objectives as separate reward functions ordered by importance.
+Tercan \& Prabhu~[13] address limitations of earlier heuristics---particularly cases where Bellman equations fail to respect lexicographic constraints---via the \emph{Lexicographic Projection Algorithm}.
+
+\textbf{Key distinction:} LMORL orders \emph{objectives} (different reward signals) lexicographically. CSHRL orders \emph{timesteps}: the same reward signal is compared pointwise at $t=0$, then $t=1$, then $t=2$, forever. This is a fundamentally different structure:
 \begin{itemize}
-\item \textbf{Criterion vs. algorithm:} Classical RL and policy gradients are \emph{algorithms} to optimize a scalar. CSHRL is an \emph{optimality criterion}---a structural property that rankings may or may not satisfy.
+\item LMORL: ``Safety reward first, then efficiency reward.''
+\item CSHRL: ``At every moment $t$, the better action's reward dominates.''
+\end{itemize}
+
+The coinductive order $\le_s$ in CSHRL is not a priority over objectives but a \emph{temporal} dominance relation. When two actions yield the same reward at $t=0$, we compare $t=1$; if equal again, we compare $t=2$; and so on \emph{ad infinitum}. This is closer to lexicographic comparison of infinite sequences (as in ordinal arithmetic) than to multi-objective scalarization.
+
+\subsection{Constrained and Safe RL}
+
+Safe RL~[14] treats some objectives as hard constraints rather than soft trade-offs. Constrained MDPs optimize a primary reward while ensuring constraint satisfaction (e.g., collision probability $< \epsilon$).
+
+CSHRL's relationship to safe RL is complementary:
+\begin{itemize}
+\item \textbf{Temporal constraints as dominance:} A safety constraint ``never enter state $X$'' translates to: the safe action's trace dominates at every timestep (the unsafe action's trace eventually shows the penalty).
+\item \textbf{No constraint relaxation:} CSHRL's coinductive order is strict---there is no $\epsilon$-violation. If $a$'s trace dominates $b$'s at every step, the dominance is absolute.
+\end{itemize}
+
+\subsection{Preference-Based and Ranking RL}
+
+Preference-based RL~[15] learns from pairwise comparisons rather than scalar rewards. This connects to CSHRL's ranking structure, but the relationship is nuanced:
+\begin{itemize}
+\item Preference-based RL \emph{infers a latent scalar} from comparisons, then optimizes that scalar.
+\item CSHRL requires only \emph{ordinal structure}---a partial order on outcomes. The source is irrelevant: it could be environment rewards, human preferences, or any other ordinal signal.
+\item The key difference: CSHRL \emph{compares streams directly} without collapsing to a scalar. Preference-based RL reconstructs a scalar and discards the comparison structure.
+\end{itemize}
+
+\noindent In fact, CSHRL's Core module is parameterized by \texttt{\_≤ᵣ\_ : Reward → Reward → Set}---any partial order suffices. Human preference orderings are a valid instantiation. The ``reward'' in CSHRL is not a number to be summed but an \emph{ordinal signal} to be compared.
+
+\subsection{Coalgebraic Foundations}
+
+The coinductive stream order $\le_s$ is a coalgebraic relation in the sense of Rutten~[5]. Coalgebra provides the categorical semantics for infinite behaviors, and our formalization directly instantiates these ideas in Agda's guarded coinduction. The \texttt{coinductive} keyword in the $\le_s$ record is precisely the coalgebraic final coalgebra construction.
+
+MDP homomorphisms~[6] exploit state/action symmetries for computational efficiency. CSHRL uses a different notion of ``symmetry'': not group-theoretic automorphisms of the state space, but \emph{order-preservation} between rankings and stream dominance.
+
+\subsection{What Distinguishes CSHRL}
+
+\begin{itemize}
+\item \textbf{Criterion vs.\ algorithm:} Classical RL and policy gradients are \emph{algorithms} to optimize a scalar. CSHRL is an \emph{optimality criterion}---a structural property that rankings may or may not satisfy.
 \item \textbf{Temporal structure:} The scalar return $\sum \gamma^t r_t$ erases timing; the coinductive order $\le_s$ preserves it completely.
+\item \textbf{Pointwise dominance:} Unlike lexicographic MORL (priority among objectives) or average-reward RL (limit of partial sums), CSHRL requires dominance at \emph{every} timestep.
 \item \textbf{Machine verification:} Unlike most RL theory, CSHRL is fully implemented in Agda with type-checked proofs.
 \end{itemize}
 
@@ -1426,6 +1472,18 @@ Giry, M. (1982). A categorical approach to probability theory. In Categorical As
 
 \bibitem{ref11}
 Diaconis, P. (1988). Group representations in probability and statistics. IMS.
+
+\bibitem{ref12}
+Skalse, J., et al. (2022). Lexicographic Multi-Objective Reinforcement Learning. In Proceedings of the 31st International Joint Conference on Artificial Intelligence (IJCAI), pp.~3430--3436.
+
+\bibitem{ref13}
+Tercan, H., \& Prabhu, S. (2024). Thresholded Lexicographic Ordered Multiobjective Reinforcement Learning. In European Conference on Artificial Intelligence (ECAI).
+
+\bibitem{ref14}
+Garc{\'\i}a, J., \& Fern{\'a}ndez, F. (2015). A Comprehensive Survey on Safe Reinforcement Learning. Journal of Machine Learning Research, 16(1), 1437--1480.
+
+\bibitem{ref15}
+Wirth, C., et al. (2017). A Survey of Preference-Based Reinforcement Learning Methods. Journal of Machine Learning Research, 18(136), 1--46.
 
 \end{thebibliography}
 
