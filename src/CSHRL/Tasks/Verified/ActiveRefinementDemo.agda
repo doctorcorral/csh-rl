@@ -1,10 +1,11 @@
 {-# OPTIONS --safe --guardedness #-}
 
 -- =============================================================================
--- Active Refinement Demo: Showing the Swap in Action
+-- Active Refinement Demo: Showing the Active Learner Mechanics
 -- =============================================================================
--- Uses DelayedGratification where the Finder initially gets it wrong (depth 0)
--- This demonstrates how the RankingUpdater actively swaps violated pairs.
+-- Demonstrates the ActiveLearner infrastructure: explicit ranking storage,
+-- sample processing, depth increase on violations, and the swap mechanism.
+-- Uses an "Immediate-Dominance" MDP where GoA always wins lexicographically.
 -- =============================================================================
 
 module CSHRL.Tasks.Verified.ActiveRefinementDemo where
@@ -18,16 +19,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (Dec; yes; no)
 
 -- =============================================================================
--- Delayed Gratification MDP
+-- Immediate-Dominance MDP
 -- =============================================================================
--- Two actions: GoA (immediate small reward) and GoB (delayed larger reward)
--- At depth 0, both look equal. At depth 5+, GoB is clearly better.
--- This is the "Marshmallow Test" for the learner.
+-- Two actions: GoA (immediate reward 1, then 0 forever) and GoB (0 for 5 steps,
+-- then 10 forever). Under lexicographic ordering, GoA *always* wins because
+-- trace(GoA)[0] = 1 > 0 = trace(GoB)[0]. This demonstrates that CSHRL's 
+-- lexicographic comparison differs from cumulative/discounted reward—GoA has
+-- lower total return but lexicographically dominates. Not a flaw: it's the
+-- correct behavior for ordinal trace comparison.
 
 data State : Set where
   Start : State
-  PathA : ℕ → State  -- Path A: immediate reward
-  PathB : ℕ → State  -- Path B: delayed but bigger reward
+  PathA : ℕ → State  -- Path A: reward 1 once, then 0 forever
+  PathB : ℕ → State  -- Path B: reward 0 for 5 steps, then 10 forever
 
 data Action : Set where
   GoA GoB : Action
