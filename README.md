@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.4](https://img.shields.io/badge/version-0.3.4-blue.svg)](VERSION)
+[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
@@ -15,7 +15,7 @@ make all
 
 This produces:
 - `literate/CSHRL.pdf` — The main paper
-- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption, stream isomorphism, stochastic conjecture)
+- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption, stream isomorphism, stochastic subsumption, FOSD conjecture)
 
 **Requirements:** Agda 2.7.x, Agda StdLib 2.0, LuaLaTeX
 
@@ -69,7 +69,8 @@ src/
 │   │   └── StochasticFiniteMDP.agda  # Stochastic EC
 │   ├── Learning/
 │   │   ├── Base.agda                 # Universal learning infrastructure
-│   │   └── FiniteDeterministicMDP.agda
+│   │   ├── FiniteDeterministicMDP.agda
+│   │   └── StochasticFiniteMDP.agda  # Stochastic learning (expected traces)
 │   └── Tasks/
 │       ├── Classic/                  # Pedagogical examples (may use postulate)
 │       │   ├── DelayedGratification.agda
@@ -96,12 +97,16 @@ src/
 │       │   ├── KeyTreasure10x10.agda      # 100-state key-door-treasure
 │       │   ├── KeyTreasureViolations.agda # Machine-verified monotonicity
 │       │   └── KeyTreasureTests.agda      # Concrete test assertions
-│       └── Stochastic/
-│           └── CoinFlip.agda              # Stochastic MDP example
+│       └── Stochastic/                # Stochastic MDPs (Giry monad)
+│           ├── CoinFlip.agda              # 2-state coin flip MDP
+│           ├── GamblersRuin.agda          # Classic absorbing chain
+│           ├── RandomWalk.agda            # 1D symmetric random walk
+│           └── BiasedBandit.agda          # Two-armed bandit with bias
 ├── appendix/
 │   ├── Arithmetic.agda               # Subsumption proof extensions
 │   ├── PreservationEquivalence.agda  # Pedagogical equivalences
-│   └── StreamIsomorphism.agda        # x ≤ₛ y ⟺ ∀n. xₙ ≤ yₙ
+│   ├── StreamIsomorphism.agda        # x ≤ₛ y ⟺ ∀n. xₙ ≤ yₙ
+│   └── StochasticSubsumption.agda    # Stochastic argmax subsumption
 │
 literate/
 ├── CSHRL.lagda.tex                   # Main paper (literate Agda)
