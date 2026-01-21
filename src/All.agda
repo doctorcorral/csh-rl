@@ -15,6 +15,7 @@ import CSHRL.Core.Stochastic
 -- Appendix (pedagogical and classical RL connection)
 import appendix.PreservationEquivalence
 import appendix.Arithmetic
+import appendix.StochasticSubsumption
 
 -- Environment Classes
 import CSHRL.EnvironmentClass.FiniteDeterministicMDP
