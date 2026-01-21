@@ -41,3 +41,6 @@ import CSHRL.Tasks.Verified.Queens1
 
 -- Stochastic Task Implementations
 import CSHRL.Tasks.Stochastic.CoinFlip
+import CSHRL.Tasks.Stochastic.GamblersRuin
+import CSHRL.Tasks.Stochastic.RandomWalk
+import CSHRL.Tasks.Stochastic.BiasedBandit
