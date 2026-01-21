@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.3.4](https://img.shields.io/badge/version-0.3.4-blue.svg)](VERSION)
+[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
@@ -15,7 +15,7 @@ make all
 
 This produces:
 - `literate/CSHRL.pdf` — The main paper
-- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption, stream isomorphism, stochastic conjecture)
+- `literate/CSHRL-Appendix.pdf` — Extended proofs (subsumption, stream isomorphism, stochastic subsumption, FOSD conjecture)
 
 **Requirements:** Agda 2.7.x, Agda StdLib 2.0, LuaLaTeX
 
@@ -24,6 +24,7 @@ This produces:
 1. **Subsumption:** The coinductive homomorphism implies classical argmax optimality for any finite horizon
 2. **Monotonic Learning:** Ranking updates via violation-correction converge in at most |S| × C(|A|,2) swaps
 3. **Instant Adaptation:** When actions become unavailable, the next-best action is O(1) lookup
+4. **Stochastic Extension:** Rankings preserve expected stream dominance via the Giry monad
 
 ## Description
 
@@ -34,6 +35,7 @@ This structural approach:
 - Dissolves the exploration/exploitation dichotomy (full rankings require full understanding)
 - Enables O(1) adaptation when actions become unavailable
 - Provides monotonic convergence guarantees
+- Extends naturally to stochastic environments via the Giry monad
 
 ## Installation
 
@@ -56,13 +58,19 @@ src/
 ├── All.agda                          # Master import
 ├── CSHRL/
 │   ├── Core.agda                     # Coinductive homomorphism theory
+│   ├── Core/
+│   │   └── Stochastic.agda           # Stochastic extension (Giry monad)
 │   ├── Finder.agda                   # Symmetry restoration algorithm
+│   ├── Probability/
+│   │   └── Finite.agda               # Finite distribution monad
 │   ├── EnvironmentClass/
 │   │   ├── FiniteDeterministicMDP.agda
-│   │   └── CombinatorialPlacementMDP.agda
+│   │   ├── CombinatorialPlacementMDP.agda
+│   │   └── StochasticFiniteMDP.agda  # Stochastic EC
 │   ├── Learning/
 │   │   ├── Base.agda                 # Universal learning infrastructure
-│   │   └── FiniteDeterministicMDP.agda
+│   │   ├── FiniteDeterministicMDP.agda
+│   │   └── StochasticFiniteMDP.agda  # Stochastic learning (expected traces)
 │   └── Tasks/
 │       ├── Classic/                  # Pedagogical examples (may use postulate)
 │       │   ├── DelayedGratification.agda
@@ -71,28 +79,34 @@ src/
 │       │   ├── Maze.agda
 │       │   ├── Queens.agda
 │       │   └── Trap.agda
-│       └── Verified/                 # Fully machine-checked (no postulates)
-│           │
-│           │   # Core Tasks
-│           ├── TwoState.agda              # Minimal 2-state MDP
-│           ├── OnePlacement.agda          # Single-slot placement
-│           ├── Queens1.agda               # 1-queen (trivial case)
-│           ├── GridWorld5x5.agda          # 25-state navigation
-│           │
-│           │   # Learning Demos
-│           ├── TwoStateLearning.agda      # Learning on TwoState MDP
-│           ├── CurriedLearnerDemo.agda    # Checkpointing, traces, active learning
-│           ├── ActiveRefinementDemo.agda  # Swap-based ranking updates
-│           ├── DelayedGratificationLearning.agda  # Marshmallow test analysis
-│           │
-│           │   # KeyTreasure Suite (flagship)
-│           ├── KeyTreasure10x10.agda      # 100-state key-door-treasure
-│           ├── KeyTreasureViolations.agda # Machine-verified monotonicity
-│           └── KeyTreasureTests.agda      # Concrete test assertions
+│       ├── Verified/                 # Fully machine-checked (no postulates)
+│       │   │
+│       │   │   # Core Tasks
+│       │   ├── TwoState.agda              # Minimal 2-state MDP
+│       │   ├── OnePlacement.agda          # Single-slot placement
+│       │   ├── Queens1.agda               # 1-queen (trivial case)
+│       │   ├── GridWorld5x5.agda          # 25-state navigation
+│       │   │
+│       │   │   # Learning Demos
+│       │   ├── TwoStateLearning.agda      # Learning on TwoState MDP
+│       │   ├── CurriedLearnerDemo.agda    # Checkpointing, traces, active learning
+│       │   ├── ActiveRefinementDemo.agda  # Swap-based ranking updates
+│       │   ├── DelayedGratificationLearning.agda  # Marshmallow test analysis
+│       │   │
+│       │   │   # KeyTreasure Suite (flagship)
+│       │   ├── KeyTreasure10x10.agda      # 100-state key-door-treasure
+│       │   ├── KeyTreasureViolations.agda # Machine-verified monotonicity
+│       │   └── KeyTreasureTests.agda      # Concrete test assertions
+│       └── Stochastic/                # Stochastic MDPs (Giry monad)
+│           ├── CoinFlip.agda              # 2-state coin flip MDP
+│           ├── GamblersRuin.agda          # Classic absorbing chain
+│           ├── RandomWalk.agda            # 1D symmetric random walk
+│           └── BiasedBandit.agda          # Two-armed bandit with bias
 ├── appendix/
 │   ├── Arithmetic.agda               # Subsumption proof extensions
 │   ├── PreservationEquivalence.agda  # Pedagogical equivalences
-│   └── StreamIsomorphism.agda        # x ≤ₛ y ⟺ ∀n. xₙ ≤ yₙ
+│   ├── StreamIsomorphism.agda        # x ≤ₛ y ⟺ ∀n. xₙ ≤ yₙ
+│   └── StochasticSubsumption.agda    # Stochastic argmax subsumption
 │
 literate/
 ├── CSHRL.lagda.tex                   # Main paper (literate Agda)
@@ -106,12 +120,18 @@ literate/
 - **Core.agda:** Coinductive optimal value, action-value streams, stream dominance `_≤ₛ_`, and `CoindHomo` record
 - **Finder.agda:** Lexicographic trace comparison for symmetry discovery
 
+### Probability & Stochastic Extension
+
+- **Probability/Finite.agda:** Finite distribution monad (Giry monad for discrete probability). Provides `Dist A`, monadic operations (`pure`, `>>=`, `fmap`), expected value computation.
+- **Core/Stochastic.agda:** Lifts the coinductive homomorphism to stochastic environments. Defines `StochasticCoindHomo` where rankings preserve **expected** stream dominance.
+
 ### Environment Classes
 
 Reusable templates bundling structure requirements, finder algorithms, and preservation proof machinery:
 
 - **FiniteDeterministicMDP:** For grid worlds, mazes, navigation tasks
 - **CombinatorialPlacementMDP:** For constraint satisfaction (N-Queens, etc.)
+- **StochasticFiniteMDP:** For stochastic MDPs with probabilistic transitions
 
 ### Learning Infrastructure
 
@@ -134,8 +154,8 @@ Reusable templates bundling structure requirements, finder algorithms, and prese
 
 ## Future Work
 
-- **Stochastic Environments:** Extension via the Giry monad
-- **Continuous State/Action Spaces:** Metric space parameterization
+- **Continuous distributions:** Extend the Giry monad to continuous state/action spaces
+- **Risk-aware objectives:** CVaR, variance-penalized, and distributional RL extensions
 - **Neural Approximations:** DNN-based ranking prediction
 - **Quantum Implementations:** Amplitude amplification for violation detection
 

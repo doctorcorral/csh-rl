@@ -60,23 +60,22 @@ step (PathB n) _ with n <ᵇ 5
 ... | true = PathB (suc n) , 0
 ... | false = PathB (suc n) , 10
 
--- Reward ordering
+-- Use standard library's _≤_ and decidability
+open import Data.Nat using (_≤_)
+open import Data.Nat.Properties using (≤-refl; ≤-decTotalOrder; _≤?_)
+open import Relation.Binary using (DecTotalOrder)
+
+-- Reward ordering (using stdlib ≤)
 _≤ᵣ_ : Reward → Reward → Set
-r₁ ≤ᵣ r₂ = (r₁ ≤ᵇ r₂) ≡ true
+_≤ᵣ_ = _≤_
 
-_≤?_ : Reward → Reward → Bool
-r₁ ≤? r₂ = r₁ ≤ᵇ r₂
+-- Reflexivity
+≤ᵣ-refl : ∀ {r} → r ≤ᵣ r
+≤ᵣ-refl = ≤-refl
 
-≤?-sound : ∀ r₁ r₂ → (r₁ ≤? r₂) ≡ true → r₁ ≤ᵣ r₂
-≤?-sound r₁ r₂ prf = prf
-
-<ᵇ-suc : ∀ n → (n <ᵇ suc n) ≡ true
-<ᵇ-suc zero    = refl
-<ᵇ-suc (suc n) = <ᵇ-suc n
-
-≤?-refl : ∀ r → (r ≤? r) ≡ true
-≤?-refl zero    = refl
-≤?-refl (suc r) = <ᵇ-suc r
+-- Decidable comparison
+_≤?ᵣ_ : (r₁ r₂ : Reward) → Dec (r₁ ≤ᵣ r₂)
+_≤?ᵣ_ = _≤?_
 
 max : Reward → Reward → Reward
 max a b = if a <ᵇ b then b else a
@@ -95,7 +94,7 @@ module L = FDMDPLearning
   step
   _≤ᵣ_ max bottom
   all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤?ᵣ_ ≤ᵣ-refl
   _≟ₐ_
 
 open L
