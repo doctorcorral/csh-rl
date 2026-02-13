@@ -13,6 +13,14 @@
 -- This is the primary learning implementation for grid worlds,
 -- mazes, and similar environments.
 --
+-- Reuses the trace/ranking infrastructure from the EC module
+-- (EnvironmentClass.FiniteDeterministicMDP) and adds:
+--   - Violation detection
+--   - Restricted (unavailability-aware) trace computation
+--   - Learning loop (depth-increase on violation)
+--   - Curried Learner interface (stateful, checkpoint-friendly)
+--   - Active Learner interface (ranking swap + depth-increase)
+--
 -- Uses Dec-based ordering for sound extraction of proofs from decisions.
 ------------------------------------------------------------------------
 
@@ -24,46 +32,57 @@ open import Data.List using (List; []; _∷_; map)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃; ∃-syntax)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (Dec; yes; no)
 
 open import CSHRL.Learning.Base
+open import CSHRL.EnvironmentClass.FiniteDeterministicMDP
 
 ------------------------------------------------------------------------
 -- FiniteDeterministicMDP Learning Module
 ------------------------------------------------------------------------
 
 module FDMDPLearning
-  (State Action Reward : Set)
-  (step        : State → Action → State × Reward)
-  (_≤ᵣ_        : Reward → Reward → Set)
-  (max         : Reward → Reward → Reward)
-  (bottom      : Reward)
+  -- Same parameters as the Environment Class
+  (State : Set)
+  (Action : Set)
+  (Reward : Set)
+  (step : State → Action → State × Reward)
+  (_≤ᵣ_ : Reward → Reward → Set)
+  (_≤?_ : (r s : Reward) → Dec (r ≤ᵣ s))
+  (≤ᵣ-refl : ∀ {r} → r ≤ᵣ r)
+  (max : Reward → Reward → Reward)
+  (bottom : Reward)
   (all-actions : List Action)
-  -- Decidable comparison for rewards (returns proof, not Bool!)
-  (_≤?_        : (r s : Reward) → Dec (r ≤ᵣ s))
-  (≤ᵣ-refl     : ∀ {r} → r ≤ᵣ r)
-  -- Decidable equality for actions
-  (_≟ₐ_        : (a b : Action) → Dec (a ≡ b))
+  (default-action : Action)
+  (horizon : ℕ)
+  -- Additional: decidable equality for actions (needed by Learning.Base)
+  (_≟ₐ_ : (a b : Action) → Dec (a ≡ b))
   where
 
   ------------------------------------------------------------------------
-  -- Import Base and Core
+  -- Import from EC (Trace, _≤ₜᵇ_, trace-action, find-ranking, …)
+  ------------------------------------------------------------------------
+
+  open FiniteDeterministicMDP
+    State Action Reward step
+    _≤ᵣ_ _≤?_ ≤ᵣ-refl max bottom
+    all-actions default-action horizon
+    public
+
+  ------------------------------------------------------------------------
+  -- Import Base (Ranking, Violation, Learner, ActiveLearner, …)
   ------------------------------------------------------------------------
 
   open UniversalLearning State Action _≟ₐ_ public
 
-  open import CSHRL.Core
-  open Core State Action Reward step _≤ᵣ_ max bottom all-actions public
-
   ------------------------------------------------------------------------
-  -- Derive Boolean from Dec for computation
+  -- Boolean Trace Reflexivity
+  --
+  -- The EC defines _≤?ᵇ_ and _≤ₜᵇ_ but their reflexivity proofs
+  -- are not exported. We prove them here.
   ------------------------------------------------------------------------
-
-  _≤?ᵇ_ : Reward → Reward → Bool
-  r ≤?ᵇ s with r ≤? s
-  ... | yes _ = true
-  ... | no  _ = false
 
   -- Soundness: Boolean true implies propositional proof
   ≤?ᵇ-sound : ∀ r s → r ≤?ᵇ s ≡ true → r ≤ᵣ s
@@ -71,62 +90,29 @@ module FDMDPLearning
   ... | yes proof = proof
   ... | no  _     with () ← p
 
-  ------------------------------------------------------------------------
-  -- Trace Type and Comparison
-  ------------------------------------------------------------------------
-
-  Trace : Set
-  Trace = List Reward
-
-  -- Lexicographic trace comparison (Boolean for computation)
-  _≤ₜᵇ_ : Trace → Trace → Bool
-  []       ≤ₜᵇ []       = true
-  []       ≤ₜᵇ (_ ∷ _)  = true
-  (_ ∷ _)  ≤ₜᵇ []       = false
-  (r₁ ∷ t₁) ≤ₜᵇ (r₂ ∷ t₂) =
-    if r₁ ≤?ᵇ r₂ then
-      if r₂ ≤?ᵇ r₁ then (t₁ ≤ₜᵇ t₂)  -- Equal, compare tails
-      else true                        -- r₁ < r₂
-    else false                         -- r₁ > r₂
-
   -- Reflexivity of Boolean trace comparison
   ≤ₜᵇ-refl : ∀ t → t ≤ₜᵇ t ≡ true
   ≤ₜᵇ-refl [] = refl
   ≤ₜᵇ-refl (r ∷ t) with r ≤? r | r ≤? r
   ... | yes _ | yes _ = ≤ₜᵇ-refl t
   ... | yes _ | no ¬p = ⊥-elim (¬p ≤ᵣ-refl)
-    where open import Data.Empty using (⊥-elim)
   ... | no ¬p | _     = ⊥-elim (¬p ≤ᵣ-refl)
-    where open import Data.Empty using (⊥-elim)
 
   -- Equal traces imply ≤ₜᵇ
   eq-implies-≤ₜᵇ : ∀ t₁ t₂ → t₁ ≡ t₂ → t₁ ≤ₜᵇ t₂ ≡ true
   eq-implies-≤ₜᵇ t .t refl = ≤ₜᵇ-refl t
 
   ------------------------------------------------------------------------
-  -- Trace Computation (Deterministic)
+  -- Finder Rankings
   ------------------------------------------------------------------------
 
-  mutual
-    best-trace : State → ℕ → Trace
-    best-trace s zero    = []
-    best-trace s (suc k) = max-trace (map (λ a → trace-action s a k) all-actions)
+  -- Ranking from finder at depth k
+  finder-ranking : ℕ → Ranking
+  finder-ranking k s = list-to-ranking (find-ranking s k)
 
-    trace-action : State → Action → ℕ → Trace
-    trace-action s a k =
-      let (s' , r) = step s a
-      in r ∷ best-trace s' k
-
-    max-trace : List Trace → Trace
-    max-trace []       = []
-    max-trace (t ∷ ts) = max-helper t ts
-
-    max-helper : Trace → List Trace → Trace
-    max-helper current []       = current
-    max-helper current (t ∷ ts) =
-      if current ≤ₜᵇ t
-      then max-helper t ts
-      else max-helper current ts
+  -- Totality of finder rankings
+  finder-ranking-total : ∀ k s → IsTotal (finder-ranking k) s
+  finder-ranking-total k s = list-ranking-total (find-ranking s k) s
 
   ------------------------------------------------------------------------
   -- Restricted Trace Computation (for unavailable actions)
@@ -145,33 +131,6 @@ module FDMDPLearning
       let (s' , r) = step s a
       in r ∷ best-trace-restricted avail s' k
 
-  ------------------------------------------------------------------------
-  -- Sorting and Ranking
-  ------------------------------------------------------------------------
-
-  -- Sort actions by trace quality (insertion sort)
-  insert-scored : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
-  insert-scored x [] = x ∷ []
-  insert-scored (a₁ , t₁) ((a₂ , t₂) ∷ xs) =
-    if t₂ ≤ₜᵇ t₁
-    then (a₁ , t₁) ∷ (a₂ , t₂) ∷ xs
-    else (a₂ , t₂) ∷ insert-scored (a₁ , t₁) xs
-
-  sort-scored : List (Action × Trace) → List (Action × Trace)
-  sort-scored []       = []
-  sort-scored (x ∷ xs) = insert-scored x (sort-scored xs)
-
-  ------------------------------------------------------------------------
-  -- Find Ranking
-  ------------------------------------------------------------------------
-
-  -- Find ranking over all actions at depth k
-  find-ranking : State → ℕ → List Action
-  find-ranking s k =
-    let scored = map (λ a → (a , trace-action s a k)) all-actions
-        sorted = sort-scored scored
-    in map proj₁ sorted
-
   -- Find ranking restricted to available actions
   find-ranking-restricted : Available → State → ℕ → List Action
   find-ranking-restricted avail s k =
@@ -180,25 +139,15 @@ module FDMDPLearning
         sorted = sort-scored scored
     in map proj₁ sorted
 
-  -- Ranking from finder at depth k
-  finder-ranking : ℕ → Ranking
-  finder-ranking k s = list-to-ranking (find-ranking s k)
-
   -- Restricted ranking from finder
   finder-ranking-restricted : Available → ℕ → Ranking
-  finder-ranking-restricted avail k s = 
+  finder-ranking-restricted avail k s =
     list-to-ranking (find-ranking-restricted avail s k)
 
-  ------------------------------------------------------------------------
-  -- Totality of Finder Rankings
-  ------------------------------------------------------------------------
-
-  finder-ranking-total : ∀ k s → IsTotal (finder-ranking k) s
-  finder-ranking-total k s = list-ranking-total (find-ranking s k) s
-
-  finder-ranking-restricted-total : ∀ avail k s → 
+  -- Totality of restricted finder rankings
+  finder-ranking-restricted-total : ∀ avail k s →
     IsTotal (finder-ranking-restricted avail k) s
-  finder-ranking-restricted-total avail k s = 
+  finder-ranking-restricted-total avail k s =
     list-ranking-total (find-ranking-restricted avail s k) s
 
   ------------------------------------------------------------------------
@@ -207,7 +156,9 @@ module FDMDPLearning
 
   -- Test a pair for violation at given depth
   test-pair : ℕ → Sample → Maybe Violation
-  test-pair k (sample s a b) with finder-ranking k s a b | trace-action s a k ≤ₜᵇ trace-action s b k
+  test-pair k (sample s a b)
+    with finder-ranking k s a b
+       | trace-action s a k ≤ₜᵇ trace-action s b k
   ... | true  | false = just (violation s b a k)
   ... | _     | _     = nothing
 
@@ -222,7 +173,8 @@ module FDMDPLearning
   learn-loop = default-learn-loop test-pair
 
   learned-ranking : ℕ → List Sample → Ranking
-  learned-ranking initial-depth samples = finder-ranking (learn-loop initial-depth samples)
+  learned-ranking initial-depth samples =
+    finder-ranking (learn-loop initial-depth samples)
 
   ------------------------------------------------------------------------
   -- Adaptation to Unavailability
@@ -255,8 +207,8 @@ module FDMDPLearning
 
   -- Type of finder soundness
   FinderSound : ℕ → Set
-  FinderSound k = ∀ s a b → 
-    finder-ranking k s a b ≡ true → 
+  FinderSound k = ∀ s a b →
+    finder-ranking k s a b ≡ true →
     trace-action s a k ≤ₜᵇ trace-action s b k ≡ true ⊎
     trace-action s a k ≡ trace-action s b k
 
@@ -266,22 +218,28 @@ module FDMDPLearning
     avail a ≡ true →
     avail b ≡ true →
     finder-ranking-restricted avail k s a b ≡ true →
-    trace-action-restricted avail s a k ≤ₜᵇ trace-action-restricted avail s b k ≡ true
+    trace-action-restricted avail s a k ≤ₜᵇ
+      trace-action-restricted avail s b k ≡ true
 
   -- Restricted finder soundness type
   RestrictedFinderSound : Available → ℕ → Set
   RestrictedFinderSound avail k = ∀ s a b →
     finder-ranking-restricted avail k s a b ≡ true →
-    trace-action-restricted avail s a k ≤ₜᵇ trace-action-restricted avail s b k ≡ true ⊎
-    trace-action-restricted avail s a k ≡ trace-action-restricted avail s b k
+    trace-action-restricted avail s a k ≤ₜᵇ
+      trace-action-restricted avail s b k ≡ true ⊎
+    trace-action-restricted avail s a k ≡
+      trace-action-restricted avail s b k
 
-  -- Adaptation soundness: given restricted finder soundness, we get restricted preserves
+  -- Adaptation soundness: given restricted finder soundness, restricted preserves
   adaptation-sound : ∀ avail k →
     RestrictedFinderSound avail k →
     RestrictedPreserves avail k
-  adaptation-sound avail k sound a b s avail-a avail-b rank-ab with sound s a b rank-ab
+  adaptation-sound avail k sound a b s avail-a avail-b rank-ab
+    with sound s a b rank-ab
   ... | inj₁ p = p
-  ... | inj₂ q = eq-implies-≤ₜᵇ (trace-action-restricted avail s a k) (trace-action-restricted avail s b k) q
+  ... | inj₂ q = eq-implies-≤ₜᵇ
+    (trace-action-restricted avail s a k)
+    (trace-action-restricted avail s b k) q
 
   ------------------------------------------------------------------------
   -- Curried Learner Interface for FDMDP
@@ -312,12 +270,14 @@ module FDMDPLearning
 
   -- Get current ranking with unavailability
   current-ranking-restricted : LearnerState → Available → State → List Action
-  current-ranking-restricted ls avail s = find-ranking-restricted avail s (get-depth ls)
+  current-ranking-restricted ls avail s =
+    find-ranking-restricted avail s (get-depth ls)
 
   -- Train until no violations for N samples (or max iterations)
   train-until-stable : LearnerState → ℕ → ℕ → List Sample → LearnerState
-  train-until-stable ls window max-iter samples = 
-    learn-until fdmdp-learner (λ ls' → has-stabilized ls' window) max-iter ls samples
+  train-until-stable ls window max-iter samples =
+    learn-until fdmdp-learner (λ ls' → has-stabilized ls' window)
+      max-iter ls samples
 
   -- Get full training trace (for analysis/plotting)
   training-trace : LearnerState → List Sample → List LearnerState
@@ -372,3 +332,29 @@ module FDMDPLearning
   active-violation-count : ActiveLearnerState → ℕ
   active-violation-count = get-active-violations
 
+  ------------------------------------------------------------------------
+  -- Policy Materialization
+  --
+  -- Build a PolicyTable by following the optimal path from an initial
+  -- state.  Each step calls find-ranking once and stores the result.
+  -- The resulting table is the learned policy: a concrete mapping from
+  -- visited states to their optimal action rankings.
+  ------------------------------------------------------------------------
+
+  private
+    head-action : List Action → Action
+    head-action []      = default-action
+    head-action (a ∷ _) = a
+
+  -- Materialize rankings along the optimal path
+  materialize-on-path : State → ℕ → ℕ → PolicyTable
+  materialize-on-path _ _ zero = []
+  materialize-on-path s depth (suc n) =
+    let ranking = find-ranking s depth
+        a = head-action ranking
+        s' = proj₁ (step s a)
+    in (s , ranking) ∷ materialize-on-path s' depth n
+
+  -- Materialize at explicitly listed states
+  materialize-at : List State → ℕ → PolicyTable
+  materialize-at states depth = build-table (λ s → find-ranking s depth) states
