@@ -19,8 +19,8 @@
 module CSHRL.Tasks.Verified.GridWorld5x5 where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_; _∨_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s; _+_; _∸_; _≤ᵇ_; _<ᵇ_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _<_; z≤n; s≤s; _+_; _∸_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat.Properties using (≤-refl; _≤?_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (Dec; yes; no)
@@ -115,19 +115,6 @@ Reward = ℕ
 _≤ᵣ_ : Reward → Reward → Set
 n ≤ᵣ m = n ≤ m
 
-_≤?_ : Reward → Reward → Bool
-zero  ≤? _     = true
-suc n ≤? zero  = false
-suc n ≤? suc m = n ≤? m
-
-≤?-sound : ∀ r s → r ≤? s ≡ true → r ≤ᵣ s
-≤?-sound zero    _       _  = z≤n
-≤?-sound (suc r) (suc s) p  = s≤s (≤?-sound r s p)
-
-≤?-refl : ∀ r → r ≤? r ≡ true
-≤?-refl zero    = refl
-≤?-refl (suc r) = ≤?-refl r
-
 ------------------------------------------------------------------------
 -- Transition Function
 --
@@ -154,6 +141,12 @@ reward s = if at-goal s then 10 else 0
 step : State → Action → State × Reward
 step s a = let s' = move s a in (s' , reward s')
 
+default-action : Action
+default-action = Up
+
+horizon : ℕ
+horizon = 10
+
 ------------------------------------------------------------------------
 -- Instantiate Learning Module
 ------------------------------------------------------------------------
@@ -162,8 +155,8 @@ open import CSHRL.Learning.FiniteDeterministicMDP
 
 open FDMDPLearning 
   State Action Reward step
-  _≤ᵣ_ (λ a b → if a ≤? b then b else a) 0 all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟ₐ_
 
 ------------------------------------------------------------------------

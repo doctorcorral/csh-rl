@@ -14,7 +14,7 @@ module CSHRL.Tasks.Verified.TwoStateLearning where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat.Properties using (≤-refl; _≤?_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (Dec; yes; no)
@@ -39,19 +39,6 @@ Reward = ℕ
 _≤ᵣ_ : Reward → Reward → Set
 n ≤ᵣ m = n ≤ m
 
-_≤?_ : Reward → Reward → Bool
-zero  ≤? _     = true
-suc n ≤? zero  = false
-suc n ≤? suc m = n ≤? m
-
-≤?-sound : ∀ r s → r ≤? s ≡ true → r ≤ᵣ s
-≤?-sound zero    _       _  = z≤n
-≤?-sound (suc r) (suc s) p  = s≤s (≤?-sound r s p)
-
-≤?-refl : ∀ r → r ≤? r ≡ true
-≤?-refl zero    = refl
-≤?-refl (suc r) = ≤?-refl r
-
 -- Decidable equality for actions
 _≟ₐ_ : (a b : Action) → Dec (a ≡ b)
 Go   ≟ₐ Go   = yes refl
@@ -74,6 +61,12 @@ step s a = (move s a , reward-fn (move s a))
 all-actions : List Action
 all-actions = Go ∷ Stay ∷ []
 
+default-action : Action
+default-action = Go
+
+horizon : ℕ
+horizon = 2
+
 ------------------------------------------------------------------------
 -- Instantiate Learning Module
 ------------------------------------------------------------------------
@@ -82,8 +75,8 @@ open import CSHRL.Learning.FiniteDeterministicMDP
 
 open FDMDPLearning 
   State Action Reward step
-  _≤ᵣ_ _⊔_ 0 all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟ₐ_
 
 ------------------------------------------------------------------------
@@ -117,7 +110,7 @@ test-trace-stay : trace-action Start Stay 1 ≡ 0 ∷ 1 ∷ []
 test-trace-stay = refl
 
 -- Go's trace dominates Stay's trace
-test-trace-comparison : (trace-action Start Stay 1 ≤ₜ trace-action Start Go 1) ≡ true
+test-trace-comparison : (trace-action Start Stay 1 ≤ₜᵇ trace-action Start Go 1) ≡ true
 test-trace-comparison = refl
 
 ------------------------------------------------------------------------

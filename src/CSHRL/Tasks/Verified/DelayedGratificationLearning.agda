@@ -18,8 +18,8 @@
 module CSHRL.Tasks.Verified.DelayedGratificationLearning where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s; _+_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; z≤n; s≤s; _+_)
+open import Data.Nat.Properties using (≤-refl; _≤?_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (Dec; yes; no)
@@ -46,19 +46,6 @@ Reward = ℕ
 _≤ᵣ_ : Reward → Reward → Set
 n ≤ᵣ m = n ≤ m
 
-_≤?_ : Reward → Reward → Bool
-zero  ≤? _     = true
-suc n ≤? zero  = false
-suc n ≤? suc m = n ≤? m
-
-≤?-sound : ∀ r s → r ≤? s ≡ true → r ≤ᵣ s
-≤?-sound zero    _       _  = z≤n
-≤?-sound (suc r) (suc s) p  = s≤s (≤?-sound r s p)
-
-≤?-refl : ∀ r → r ≤? r ≡ true
-≤?-refl zero    = refl
-≤?-refl (suc r) = ≤?-refl r
-
 -- Decidable equality for actions
 _≟ₐ_ : (a b : Action) → Dec (a ≡ b)
 GoA ≟ₐ GoA = yes refl
@@ -83,6 +70,12 @@ step End   _   = (End   , 1)   -- Absorbing with reward 1
 all-actions : List Action
 all-actions = GoA ∷ GoB ∷ []
 
+default-action : Action
+default-action = GoA
+
+horizon : ℕ
+horizon = 3
+
 ------------------------------------------------------------------------
 -- Instantiate Learning Module
 ------------------------------------------------------------------------
@@ -91,8 +84,8 @@ open import CSHRL.Learning.FiniteDeterministicMDP
 
 open FDMDPLearning 
   State Action Reward step
-  _≤ᵣ_ (λ a b → if a ≤? b then b else a) 0 all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟ₐ_
 
 ------------------------------------------------------------------------
@@ -158,7 +151,7 @@ test-ranking-2 = refl
 -- Helper: check if a pair is a violation
 is-violation : ℕ → State → Action → Action → Bool
 is-violation k s a b = 
-  finder-ranking k s a b ∧ not (trace-action s a k ≤ₜ trace-action s b k)
+  finder-ranking k s a b ∧ not (trace-action s a k ≤ₜᵇ trace-action s b k)
 
 -- At depth 0, check pair (GoA, GoB):
 -- rank GoA GoB = is GoA dominated by GoB in [GoB, GoA]?
@@ -293,11 +286,18 @@ S4 ≟ₛ S2 = no (λ ())
 S4 ≟ₛ S3 = no (λ ())
 S4 ≟ₛ S4 = yes refl
 
+-- Default action and horizon for deep variant
+default-action-deep : Action
+default-action-deep = GoA
+
+horizon-deep : ℕ
+horizon-deep = 5
+
 -- Instantiate learning for deep state using a module
 module DeepLearning = FDMDPLearning 
   DeepState Action Reward step-deep
-  _≤ᵣ_ (λ a b → if a ≤? b then b else a) 0 all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action-deep horizon-deep
   _≟ₐ_
 
 -- Aliases for deep learning functions
@@ -308,7 +308,7 @@ finder-ranking-deep = DeepLearning.finder-ranking
 -- Helper for deep version
 is-violation-deep : ℕ → DeepState → Action → Action → Bool
 is-violation-deep k s a b = 
-  finder-ranking-deep k s a b ∧ not (trace-deep s a k DeepLearning.≤ₜ trace-deep s b k)
+  finder-ranking-deep k s a b ∧ not (trace-deep s a k DeepLearning.≤ₜᵇ trace-deep s b k)
 
 -- At depth 1 and 2, both paths still show 0
 test-deep-trace-GoA-2 : trace-deep S0 GoA 2 ≡ 0 ∷ 0 ∷ 0 ∷ []

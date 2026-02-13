@@ -125,8 +125,8 @@ preserves-head : ∀ s a b →
   s ranks a ≤ b →
   head (action-value s a) ≤ᵣ head (action-value s b)
 preserves-head s a b p = 
-  trace-≤ₜ-head (proj₂ (step s a)) (best-trace (proj₁ (step s a)) horizon)
-                (proj₂ (step s b)) (best-trace (proj₁ (step s b)) horizon) p
+  trace-≤ₜ-head (proj₂ (step s a)) (best-trace (proj₁ (step s a)) (suc horizon))
+                (proj₂ (step s b)) (best-trace (proj₁ (step s b)) (suc horizon)) p
 
 ------------------------------------------------------------------------
 -- Preservation Proof
