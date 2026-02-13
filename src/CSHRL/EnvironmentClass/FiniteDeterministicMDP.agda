@@ -178,36 +178,10 @@ module FiniteDeterministicMDP
   -- This is done via the bridge-lemma parameter that instances provide.
   ------------------------------------------------------------------------
 
-  module WithBridgeLemma 
-    -- The key bridge lemma: trace ordering implies tail stream ordering
-    -- This handles both cases:
-    --   1. When heads are strictly ordered (ra < rb), need to show value sa' ≤ₛ value sb'
-    --   2. When heads are equal, tail traces determine tail streams
-    -- Instances provide the domain-specific proof
-    (tail-value-≤ₛ : ∀ s a b → 
-                     s ranks a ≤ b →
-                     value (proj₁ (step s a)) ≤ₛ value (proj₁ (step s b)))
-    where
-    
-    -- With the bridge lemma, preservation follows directly
-    preserves : ∀ a b s → 
-                s ranks a ≤ b → 
-                action-value s a ≤ₛ action-value s b
-    head≤ (preserves a b s p) = preserves-head s a b p
-    tail≤ (preserves a b s p) = tail-value-≤ₛ s a b p
-
-    -- The verified CoindHomo instance
-    instance
-      FiniteMDPHomo : CoindHomo
-      FiniteMDPHomo = record
-        { _≤ₐ_ = _ranks_≤_
-        ; preserves = preserves
-        }
-
   ------------------------------------------------------------------------
-  -- 4. Alternative: Direct Preservation Instance
+  -- 3. Preservation Proof Instance
   --
-  -- For simple cases, instances can provide the full preservation directly.
+  -- Instances provide the full preservation proof directly.
   ------------------------------------------------------------------------
 
   module WithDirectPreservation
