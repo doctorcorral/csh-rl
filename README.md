@@ -1,6 +1,6 @@
 # Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL)
 
-[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)](VERSION)
+[![Version 0.5.0](https://img.shields.io/badge/version-0.5.0-blue.svg)](VERSION)
 
 A novel foundational framework for reinforcement learning that redefines optimality as **structure preservation** rather than scalar maximization.
 
@@ -25,6 +25,7 @@ This produces:
 2. **Monotonic Learning:** Ranking updates via violation-correction converge in at most |S| × C(|A|,2) swaps
 3. **Instant Adaptation:** When actions become unavailable, the next-best action is O(1) lookup
 4. **Stochastic Extension:** Rankings preserve expected stream dominance via the Giry monad
+5. **Scalable EC-based Verification:** The CombinatorialPlacementMDP environment class provides a fully automatic trace-to-stream bridge, demonstrated with a full `CoindHomo` for the 8-Queens problem (8⁸ search space, zero postulates, `--safe`)
 
 ## Description
 
@@ -36,6 +37,7 @@ This structural approach:
 - Enables O(1) adaptation when actions become unavailable
 - Provides monotonic convergence guarantees
 - Extends naturally to stochastic environments via the Giry monad
+- Scales to non-trivial combinatorial problems (8-Queens verified with zero postulates)
 
 ## Installation
 
@@ -66,10 +68,11 @@ src/
 │   ├── EnvironmentClass/
 │   │   ├── FiniteDeterministicMDP.agda
 │   │   ├── CombinatorialPlacementMDP.agda
-│   │   └── StochasticFiniteMDP.agda  # Stochastic EC
+│   │   └── StochasticFiniteMDP.agda
 │   ├── Learning/
 │   │   ├── Base.agda                 # Universal learning infrastructure
-│   │   ├── FiniteDeterministicMDP.agda
+│   │   ├── FiniteDeterministicMDP.agda  # Reuses EC, adds learning loop
+│   │   ├── CombinatorialPlacementMDP.agda  # Placement learning (short-circuit traces)
 │   │   └── StochasticFiniteMDP.agda  # Stochastic learning (expected traces)
 │   └── Tasks/
 │       ├── Classic/                  # Pedagogical examples (may use postulate)
@@ -85,6 +88,7 @@ src/
 │       │   ├── TwoState.agda              # Minimal 2-state MDP
 │       │   ├── OnePlacement.agda          # Single-slot placement
 │       │   ├── Queens1.agda               # 1-queen (trivial case)
+│       │   ├── Queens8.agda               # Full 8-Queens CoindHomo (--safe)
 │       │   ├── GridWorld5x5.agda          # 25-state navigation
 │       │   │
 │       │   │   # Learning Demos
@@ -130,11 +134,19 @@ literate/
 Reusable templates bundling structure requirements, finder algorithms, and preservation proof machinery:
 
 - **FiniteDeterministicMDP:** For grid worlds, mazes, navigation tasks
-- **CombinatorialPlacementMDP:** For constraint satisfaction (N-Queens, etc.)
+- **CombinatorialPlacementMDP:** For constraint satisfaction (N-Queens, etc.). Provides automatic trace-to-stream bridge via `WithTraceBridge`
 - **StochasticFiniteMDP:** For stochastic MDPs with probabilistic transitions
 
 ### Learning Infrastructure
 
+Each Learning module imports and re-exports its corresponding Environment Class, then layers learning-specific infrastructure on top:
+
+- **Base.agda:** EC-independent definitions: `Ranking`, `Violation`, `LearnerState`, swap-based updates, convergence theorem
+- **FiniteDeterministicMDP.agda:** Violation detection and learning loop for deterministic MDPs
+- **CombinatorialPlacementMDP.agda:** Placement learning with short-circuit traces for absorbing states (Dead/Solved)
+- **StochasticFiniteMDP.agda:** Stochastic learning using expected trace comparison
+
+All learning modules provide:
 - **Passive learning:** Increase depth on violation detection
 - **Active refinement:** Swap rankings directly for faster convergence
 - **Curried interface:** Checkpointing, incremental training, training traces
