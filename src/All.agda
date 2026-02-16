@@ -26,6 +26,7 @@ import CSHRL.EnvironmentClass.StochasticFiniteMDP
 import CSHRL.Learning.Base
 import CSHRL.Learning.FiniteDeterministicMDP
 import CSHRL.Learning.StochasticFiniteMDP
+import CSHRL.Learning.CombinatorialPlacementMDP
 
 -- Classic Task Implementations (pedagogical, may use postulates)
 import CSHRL.Tasks.Classic.DelayedGratification
