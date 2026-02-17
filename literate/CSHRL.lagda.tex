@@ -592,7 +592,9 @@ Preference-based RL (PbRL) \cite{Wirth2017} learns from pairwise comparisons rat
 \item CSHRL's Core module is parameterized by \texttt{\_≤ᵣ\_ : Reward → Reward → Set}---any partial order suffices. Human preference orderings are a valid instantiation.
 \end{itemize}
 
-\noindent Deep Ordinal Reinforcement Learning \cite{Zap2019} modifies Q-learning for ordinal rewards via thresholded updates, mitigating overestimation in DQN. However, it retains discounts and bootstrapping, unlike CSHRL's coinductive elimination of $\gamma$.
+\noindent Direct Preference Optimization (DPO) \cite{Rafailov2023} is a prominent recent instance of this pattern: it bypasses explicit reward modelling by deriving an implicit scalar reward from pairwise preferences via the Bradley-Terry model, then optimizes a policy to maximize it.  The pairwise structure of the input is discarded once the implicit reward is extracted.  In CSHRL, by contrast, the pairwise ordering \emph{is} the optimality criterion---preserved coinductively, not collapsed into a scalar.
+
+Deep Ordinal Reinforcement Learning \cite{Zap2019} modifies Q-learning for ordinal rewards via thresholded updates, mitigating overestimation in DQN. However, it retains discounts and bootstrapping, unlike CSHRL's coinductive elimination of $\gamma$.
 
 Recent extensions in RLHF, such as Ordinal Probabilistic Reward Models \cite{Anonymous2025}, treat rewards as ordinal distributions for human feedback alignment. These are empirical and lack CSHRL's formal guarantees (monotonic convergence, $O(1)$ adaptation).
 
@@ -1937,6 +1939,11 @@ Learning ordinal probabilistic reward from preferences.
 Lesage, B. and Ong, C.~H.~L. (2020).
 CertRL: Formalizing convergence proofs for value and policy iteration in Coq.
 \textit{arXiv preprint arXiv:2009.11403}.
+
+\bibitem{Rafailov2023}
+Rafailov, R., Sharma, A., Mitchell, E., Ermon, S., Manning, C.~D., and Finn, C. (2023).
+Direct preference optimization: Your language model is secretly a reward model.
+In \textit{Advances in Neural Information Processing Systems (NeurIPS)}.
 
 \end{thebibliography}
 
