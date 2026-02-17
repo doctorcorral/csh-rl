@@ -41,9 +41,10 @@ import CSHRL.Tasks.Verified.TwoState
 import CSHRL.Tasks.Verified.TwoStateLearning
 import CSHRL.Tasks.Verified.OnePlacement
 import CSHRL.Tasks.Verified.Queens1
-import CSHRL.Tasks.Verified.Queens8
--- Queens8Learning omitted: ~4 min compile (full game-tree search)
--- Run separately: agda src/CSHRL/Tasks/Verified/Queens8Learning.agda
+-- Queens8 and Queens8Learning omitted: full game-tree search (~4 min each).
+-- Verified in a separate parallel CI job; run locally with:
+--   agda src/CSHRL/Tasks/Verified/Queens8.agda
+--   agda src/CSHRL/Tasks/Verified/Queens8Learning.agda
 
 -- Stochastic Task Implementations
 import CSHRL.Tasks.Stochastic.CoinFlip

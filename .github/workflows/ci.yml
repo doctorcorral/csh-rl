@@ -20,6 +20,41 @@ jobs:
         agda-version: '2.6.4'
         agda-stdlib-version: '2.0'
 
-    - name: Compile library
+    - name: Cache Agda interface files
+      uses: actions/cache@v4
+      with:
+        path: |
+          _build
+          src/**/*.agdai
+        key: agdai-${{ runner.os }}-${{ hashFiles('src/**/*.agda') }}
+        restore-keys: |
+          agdai-${{ runner.os }}-
+
+    - name: Compile library (excluding heavy modules)
       run: agda src/All.agda
+
+  queens8:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Agda
+      uses: wenkokke/setup-agda@v2
+      with:
+        agda-version: '2.6.4'
+        agda-stdlib-version: '2.0'
+
+    - name: Cache Agda interface files
+      uses: actions/cache@v4
+      with:
+        path: |
+          _build
+          src/**/*.agdai
+        key: agdai-${{ runner.os }}-${{ hashFiles('src/**/*.agda') }}
+        restore-keys: |
+          agdai-${{ runner.os }}-
+
+    - name: Compile Queens8 (full game-tree verification)
+      run: agda src/CSHRL/Tasks/Verified/Queens8.agda
 
