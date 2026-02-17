@@ -10,7 +10,7 @@
 
 module CSHRL.Tasks.Verified.ActiveRefinementDemo where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _+_; _≤ᵇ_; _<ᵇ_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; length; map)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -60,28 +60,17 @@ step (PathB n) _ with n <ᵇ 5
 ... | true = PathB (suc n) , 0
 ... | false = PathB (suc n) , 10
 
--- Use standard library's _≤_ and decidability
-open import Data.Nat using (_≤_)
-open import Data.Nat.Properties using (≤-refl; ≤-decTotalOrder; _≤?_)
-open import Relation.Binary using (DecTotalOrder)
+open import Data.Nat.Properties using (≤-refl; _≤?_)
 
 -- Reward ordering (using stdlib ≤)
 _≤ᵣ_ : Reward → Reward → Set
 _≤ᵣ_ = _≤_
 
--- Reflexivity
-≤ᵣ-refl : ∀ {r} → r ≤ᵣ r
-≤ᵣ-refl = ≤-refl
+default-action : Action
+default-action = GoA
 
--- Decidable comparison
-_≤?ᵣ_ : (r₁ r₂ : Reward) → Dec (r₁ ≤ᵣ r₂)
-_≤?ᵣ_ = _≤?_
-
-max : Reward → Reward → Reward
-max a b = if a <ᵇ b then b else a
-
-bottom : Reward
-bottom = 0
+horizon : ℕ
+horizon = 8
 
 -- =============================================================================
 -- Import Learning Infrastructure
@@ -92,9 +81,8 @@ open import CSHRL.Learning.FiniteDeterministicMDP
 module L = FDMDPLearning
   State Action Reward
   step
-  _≤ᵣ_ max bottom
-  all-actions
-  _≤?ᵣ_ ≤ᵣ-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟ₐ_
 
 open L

@@ -20,14 +20,14 @@
 
 module CSHRL.Tasks.Verified.KeyTreasure10x10 where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _≡ᵇ_)
-open import Data.Nat.Properties using (<-cmp)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _+_; _∸_; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat.Properties using (<-cmp; ≤-refl; _≤?_)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_; not)
 open import Data.List using (List; []; _∷_; length; map; filter; foldr)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (Dec; yes; no)
 open import Relation.Binary using (tri<; tri≈; tri>)
 
 -- =============================================================================
@@ -140,17 +140,7 @@ step s a with hasTreasure s
 -- =============================================================================
 
 _≤ᵣ_ : Reward → Reward → Set
-r₁ ≤ᵣ r₂ = (r₁ <ᵇ r₂) ∨ (r₁ ≡ᵇ r₂) ≡ true
-
-_≤?_ : Reward → Reward → Bool
-r₁ ≤? r₂ = (r₁ <ᵇ r₂) ∨ (r₁ ≡ᵇ r₂)
-
-≤?-sound : ∀ r₁ r₂ → r₁ ≤? r₂ ≡ true → r₁ ≤ᵣ r₂
-≤?-sound r₁ r₂ prf = prf
-
-≤?-refl : ∀ r → r ≤? r ≡ true
-≤?-refl zero = refl
-≤?-refl (suc n) = ≤?-refl n
+r₁ ≤ᵣ r₂ = r₁ ≤ r₂
 
 -- =============================================================================
 -- Horizon and Finder Setup
@@ -161,22 +151,14 @@ r₁ ≤? r₂ = (r₁ <ᵇ r₂) ∨ (r₁ ≡ᵇ r₂)
 horizon : ℕ
 horizon = 25
 
--- Bottom reward
-bottom : Reward
-bottom = 0
-
--- Max function
-max : Reward → Reward → Reward
-max a b = if a <ᵇ b then b else a
+default-action : Action
+default-action = Up
 
 -- =============================================================================
 -- Import Learning Infrastructure
 -- =============================================================================
 
 open import CSHRL.Learning.FiniteDeterministicMDP
-
--- Action decidable equality as Dec type
-open import Relation.Nullary using (Dec; yes; no)
 
 _≟Action_ : (a b : Action) → Dec (a ≡ b)
 Up    ≟Action Up    = yes refl
@@ -199,9 +181,8 @@ Right ≟Action Right = yes refl
 open FDMDPLearning
   State Action Reward
   step
-  _≤ᵣ_ max bottom
-  all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟Action_
   public
 

@@ -17,7 +17,7 @@
 
 module CSHRL.Tasks.Verified.CurriedLearnerDemo where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _+_; _≤ᵇ_; _<ᵇ_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; length; map)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -79,33 +79,17 @@ step (PathB n) _ with n <ᵇ threshold
 ... | true  = PathB (suc n) , 0
 ... | false = PathB (suc n) , 2  -- Better reward after threshold
 
+open import Data.Nat.Properties using (≤-refl; _≤?_)
+
 -- Reward ordering
 _≤ᵣ_ : Reward → Reward → Set
-r₁ ≤ᵣ r₂ = (r₁ ≤ᵇ r₂) ≡ true
+r₁ ≤ᵣ r₂ = r₁ ≤ r₂
 
-_≤?_ : Reward → Reward → Bool
-r₁ ≤? r₂ = r₁ ≤ᵇ r₂
+default-action : Action
+default-action = GoA
 
-≤?-sound : ∀ r₁ r₂ → (r₁ ≤? r₂) ≡ true → r₁ ≤ᵣ r₂
-≤?-sound r₁ r₂ prf = prf
-
--- Helper: n <ᵇ suc n ≡ true for all n  
--- (needed because suc m ≤ᵇ n = m <ᵇ n in stdlib)
-<ᵇ-suc : ∀ n → (n <ᵇ suc n) ≡ true
-<ᵇ-suc zero    = refl
-<ᵇ-suc (suc n) = <ᵇ-suc n
-
--- Proof of reflexivity using the stdlib definition
--- suc m ≤ᵇ n = m <ᵇ n
-≤?-refl : ∀ r → (r ≤? r) ≡ true
-≤?-refl zero    = refl
-≤?-refl (suc r) = <ᵇ-suc r  -- suc r ≤ᵇ suc r = r <ᵇ suc r
-
-max : Reward → Reward → Reward
-max a b = if a <ᵇ b then b else a
-
-bottom : Reward
-bottom = 0
+horizon : ℕ
+horizon = 5
 
 -- =============================================================================
 -- Import the Learning Infrastructure
@@ -116,9 +100,8 @@ open import CSHRL.Learning.FiniteDeterministicMDP
 module L = FDMDPLearning
   State Action Reward
   step
-  _≤ᵣ_ max bottom
-  all-actions
-  _≤?_ ≤?-sound ≤?-refl
+  _≤ᵣ_ _≤?_ ≤-refl _⊔_ 0
+  all-actions default-action horizon
   _≟ₐ_
 
 open L

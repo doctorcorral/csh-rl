@@ -10,8 +10,16 @@
 --   - Traces are EXPECTED traces (weighted average over branches)
 --   - Comparison uses expected lexicographic ordering
 --
--- The learning loop is identical in structure—only the trace computation
--- differs. This demonstrates the modularity of the CSHRL learning framework.
+-- Reuses the trace/ranking infrastructure from the EC module
+-- (EnvironmentClass.StochasticFiniteMDP) and adds:
+--   - Violation detection (on expected traces)
+--   - Learning loop (depth-increase on violation)
+--   - Curried Learner interface (stateful, checkpoint-friendly)
+--   - Active Learner interface (ranking swap + depth-increase)
+--
+-- The learning loop is identical in structure to the deterministic
+-- case—only the trace computation differs. This demonstrates the
+-- modularity of the CSHRL learning framework.
 ------------------------------------------------------------------------
 
 module CSHRL.Learning.StochasticFiniteMDP where
@@ -22,51 +30,62 @@ open import Data.List using (List; []; _∷_; map; foldr)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃; ∃-syntax)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (Dec; yes; no)
 
 open import CSHRL.Learning.Base
-open import CSHRL.Probability.Finite using (Dist; pure; _>>=_; fmap; scale)
+open import CSHRL.Probability.Finite using (Dist)
+open import CSHRL.EnvironmentClass.StochasticFiniteMDP
 
 ------------------------------------------------------------------------
 -- StochasticFiniteMDP Learning Module
 ------------------------------------------------------------------------
 
 module StochasticFDMDPLearning
-  (State Action Reward : Set)
-  -- Stochastic step function
+  -- Same parameters as the Environment Class
+  (State : Set)
+  (Action : Set)
+  (Reward : Set)
   (step : State → Action → Dist (State × Reward))
-  -- Reward ordering and operations
-  (_≤ᵣ_    : Reward → Reward → Set)
-  (max     : Reward → Reward → Reward)
-  (bottom  : Reward)
-  -- Reward arithmetic (for expected values)
-  (_+ᵣ_    : Reward → Reward → Reward)
-  (_*ᵣ_    : ℕ → Reward → Reward)
-  (zeroᵣ   : Reward)
-  -- Finiteness
-  (all-actions : List Action)
-  -- Decidable comparison
-  (_≤?_    : (r s : Reward) → Dec (r ≤ᵣ s))
+  (_≤ᵣ_ : Reward → Reward → Set)
+  (_≤?_ : (r s : Reward) → Dec (r ≤ᵣ s))
   (≤ᵣ-refl : ∀ {r} → r ≤ᵣ r)
-  -- Decidable equality for actions
-  (_≟ₐ_    : (a b : Action) → Dec (a ≡ b))
+  (max : Reward → Reward → Reward)
+  (bottom : Reward)
+  (_+ᵣ_ : Reward → Reward → Reward)
+  (_*ᵣ_ : ℕ → Reward → Reward)
+  (zeroᵣ : Reward)
+  (all-actions : List Action)
+  (default-action : Action)
+  (horizon : ℕ)
+  -- Additional: decidable equality for actions (needed by Learning.Base)
+  (_≟ₐ_ : (a b : Action) → Dec (a ≡ b))
   where
 
   ------------------------------------------------------------------------
-  -- Import Base
+  -- Import from EC (expected-trace-action, find-ranking, _≤ₜᵇ_, …)
+  ------------------------------------------------------------------------
+
+  open StochasticFiniteMDP
+    State Action Reward step
+    _≤ᵣ_ _≤?_ ≤ᵣ-refl max bottom
+    _+ᵣ_ _*ᵣ_ zeroᵣ
+    all-actions default-action horizon
+    public
+
+  ------------------------------------------------------------------------
+  -- Import Base (Ranking, Violation, Learner, ActiveLearner, …)
   ------------------------------------------------------------------------
 
   open UniversalLearning State Action _≟ₐ_ public
 
   ------------------------------------------------------------------------
-  -- Derive Boolean from Dec for computation
+  -- Boolean Trace Reflexivity
+  --
+  -- The EC defines _≤?ᵇ_ and _≤ₜᵇ_ but their reflexivity proofs
+  -- are not exported. We prove them here.
   ------------------------------------------------------------------------
-
-  _≤?ᵇ_ : Reward → Reward → Bool
-  r ≤?ᵇ s with r ≤? s
-  ... | yes _ = true
-  ... | no  _ = false
 
   -- Soundness: Boolean true implies propositional proof
   ≤?ᵇ-sound : ∀ r s → r ≤?ᵇ s ≡ true → r ≤ᵣ s
@@ -74,127 +93,34 @@ module StochasticFDMDPLearning
   ... | yes proof = proof
   ... | no  _     with () ← p
 
-  ------------------------------------------------------------------------
-  -- Expected Value Computation
-  ------------------------------------------------------------------------
-
-  -- Weighted sum of rewards (unnormalized expected value)
-  𝔼ᵣ : Dist Reward → Reward
-  𝔼ᵣ = foldr (λ { (r , w) acc → (w *ᵣ r) +ᵣ acc }) zeroᵣ
-
-  -- Expected immediate reward from a distribution
-  expected-reward : Dist (State × Reward) → Reward
-  expected-reward d = 𝔼ᵣ (fmap proj₂ d)
-
-  ------------------------------------------------------------------------
-  -- Trace Type and Comparison (Same as Deterministic)
-  ------------------------------------------------------------------------
-
-  Trace : Set
-  Trace = List Reward
-
-  -- Lexicographic trace comparison (Boolean for computation)
-  _≤ₜᵇ_ : Trace → Trace → Bool
-  []       ≤ₜᵇ []       = true
-  []       ≤ₜᵇ (_ ∷ _)  = true
-  (_ ∷ _)  ≤ₜᵇ []       = false
-  (r₁ ∷ t₁) ≤ₜᵇ (r₂ ∷ t₂) =
-    if r₁ ≤?ᵇ r₂ then
-      if r₂ ≤?ᵇ r₁ then (t₁ ≤ₜᵇ t₂)  -- Equal, compare tails
-      else true                        -- r₁ < r₂
-    else false                         -- r₁ > r₂
-
   -- Reflexivity of Boolean trace comparison
   ≤ₜᵇ-refl : ∀ t → t ≤ₜᵇ t ≡ true
   ≤ₜᵇ-refl [] = refl
   ≤ₜᵇ-refl (r ∷ t) with r ≤? r | r ≤? r
   ... | yes _ | yes _ = ≤ₜᵇ-refl t
   ... | yes _ | no ¬p = ⊥-elim (¬p ≤ᵣ-refl)
-    where open import Data.Empty using (⊥-elim)
   ... | no ¬p | _     = ⊥-elim (¬p ≤ᵣ-refl)
-    where open import Data.Empty using (⊥-elim)
 
   -- Equal traces imply ≤ₜᵇ
   eq-implies-≤ₜᵇ : ∀ t₁ t₂ → t₁ ≡ t₂ → t₁ ≤ₜᵇ t₂ ≡ true
   eq-implies-≤ₜᵇ t .t refl = ≤ₜᵇ-refl t
 
   ------------------------------------------------------------------------
-  -- Expected Trace Computation (Stochastic)
+  -- Trace type alias (for convenience)
   ------------------------------------------------------------------------
 
-  -- Helper: max over a list of rewards
-  max-list : List Reward → Reward
-  max-list = foldr max bottom
-
-  mutual
-    -- Best expected trace from a state at depth k
-    best-expected-trace : State → ℕ → Reward
-    best-expected-trace s zero = zeroᵣ
-    best-expected-trace s (suc k) = 
-      max-list (map (λ a → expected-reward (step s a) +ᵣ 
-                           expected-continuation s a k) all-actions)
-    
-    -- Expected value of continuing from action a at state s
-    expected-continuation : State → Action → ℕ → Reward
-    expected-continuation s a k = 
-      𝔼ᵣ (fmap (λ { (s' , _) → best-expected-trace s' k }) (step s a))
-
-  -- Expected trace for a specific action (as list of expected rewards)
-  expected-trace-action : State → Action → ℕ → List Reward
-  expected-trace-action s a zero = []
-  expected-trace-action s a (suc k) = 
-    expected-reward (step s a) ∷ 
-    map (λ n → expected-continuation s a n) (countdown k)
-    where
-      countdown : ℕ → List ℕ
-      countdown zero = []
-      countdown (suc n) = n ∷ countdown n
-
-  -- Max trace over a list
-  max-trace : List Trace → Trace
-  max-trace []       = []
-  max-trace (t ∷ ts) = max-helper t ts
-    where
-      max-helper : Trace → List Trace → Trace
-      max-helper current []       = current
-      max-helper current (t ∷ ts) =
-        if current ≤ₜᵇ t
-        then max-helper t ts
-        else max-helper current ts
+  Trace : Set
+  Trace = List Reward
 
   ------------------------------------------------------------------------
-  -- Sorting and Ranking (Same Structure)
+  -- Finder Rankings
   ------------------------------------------------------------------------
-
-  insert-scored : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
-  insert-scored x [] = x ∷ []
-  insert-scored (a₁ , t₁) ((a₂ , t₂) ∷ xs) =
-    if t₂ ≤ₜᵇ t₁
-    then (a₁ , t₁) ∷ (a₂ , t₂) ∷ xs
-    else (a₂ , t₂) ∷ insert-scored (a₁ , t₁) xs
-
-  sort-scored : List (Action × Trace) → List (Action × Trace)
-  sort-scored []       = []
-  sort-scored (x ∷ xs) = insert-scored x (sort-scored xs)
-
-  ------------------------------------------------------------------------
-  -- Find Ranking (Using Expected Traces)
-  ------------------------------------------------------------------------
-
-  find-ranking : State → ℕ → List Action
-  find-ranking s k =
-    let scored = map (λ a → (a , expected-trace-action s a k)) all-actions
-        sorted = sort-scored scored
-    in map proj₁ sorted
 
   -- Ranking from finder at depth k
   finder-ranking : ℕ → Ranking
   finder-ranking k s = list-to-ranking (find-ranking s k)
 
-  ------------------------------------------------------------------------
-  -- Totality of Finder Rankings
-  ------------------------------------------------------------------------
-
+  -- Totality of finder rankings
   finder-ranking-total : ∀ k s → IsTotal (finder-ranking k) s
   finder-ranking-total k s = list-ranking-total (find-ranking s k) s
 
@@ -203,8 +129,9 @@ module StochasticFDMDPLearning
   ------------------------------------------------------------------------
 
   test-pair : ℕ → Sample → Maybe Violation
-  test-pair k (sample s a b) with finder-ranking k s a b | 
-                                  expected-trace-action s a k ≤ₜᵇ expected-trace-action s b k
+  test-pair k (sample s a b)
+    with finder-ranking k s a b
+       | expected-trace-action s a k ≤ₜᵇ expected-trace-action s b k
   ... | true  | false = just (violation s b a k)
   ... | _     | _     = nothing
 
@@ -219,7 +146,8 @@ module StochasticFDMDPLearning
   learn-loop = default-learn-loop test-pair
 
   learned-ranking : ℕ → List Sample → Ranking
-  learned-ranking initial-depth samples = finder-ranking (learn-loop initial-depth samples)
+  learned-ranking initial-depth samples =
+    finder-ranking (learn-loop initial-depth samples)
 
   ------------------------------------------------------------------------
   -- Convergence
@@ -248,8 +176,9 @@ module StochasticFDMDPLearning
   current-ranking ls s = find-ranking s (get-depth ls)
 
   train-until-stable : LearnerState → ℕ → ℕ → List Sample → LearnerState
-  train-until-stable ls window max-iter samples = 
-    learn-until stochastic-learner (λ ls' → has-stabilized ls' window) max-iter ls samples
+  train-until-stable ls window max-iter samples =
+    learn-until stochastic-learner (λ ls' → has-stabilized ls' window)
+      max-iter ls samples
 
   training-trace : LearnerState → List Sample → List LearnerState
   training-trace = learn-with-trace stochastic-learner
@@ -289,6 +218,20 @@ module StochasticFDMDPLearning
 
   active-violation-count : ActiveLearnerState → ℕ
   active-violation-count = get-active-violations
+
+  ------------------------------------------------------------------------
+  -- Policy Materialization
+  --
+  -- Build a PolicyTable by evaluating find-ranking at listed states.
+  -- For stochastic environments, path-following is not directly
+  -- applicable (step returns a distribution), so the caller provides
+  -- the list of states to materialize (e.g., via BFS over the
+  -- distribution support).
+  ------------------------------------------------------------------------
+
+  -- Materialize at explicitly listed states
+  materialize-at : List State → ℕ → PolicyTable
+  materialize-at states depth = build-table (λ s → find-ranking s depth) states
 
   ------------------------------------------------------------------------
   -- Comparison with Deterministic Learning

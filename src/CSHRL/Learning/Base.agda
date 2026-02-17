@@ -414,6 +414,49 @@
     get-active-violations = ActiveLearnerState.violations-seen
 
     ------------------------------------------------------------------------
+    -- Policy Table: Materialized Rankings
+    --
+    -- A PolicyTable stores precomputed rankings for specific states.
+    -- After training, the table IS the learned policy — the verified
+    -- analogue of trained weights in a DNN:
+    --   • Training:   compute find-ranking for each state, store results
+    --   • Deployment:  look up the stored ranking — no recomputation
+    --
+    -- The table type is generic (just a list of pairs).
+    -- Lookup requires decidable state equality (in PolicyLookup below).
+    ------------------------------------------------------------------------
+
+    PolicyTable : Set
+    PolicyTable = List (State × List Action)
+
+    -- Build a table by evaluating a ranking function at each state
+    build-table : ExplicitRanking → List State → PolicyTable
+    build-table _ [] = []
+    build-table ranking (s ∷ ss) = (s , ranking s) ∷ build-table ranking ss
+
+    -- Table-backed lookup (requires decidable state equality)
+    module PolicyLookup (_≟ₛ_ : (s₁ s₂ : State) → Dec (s₁ ≡ s₂)) where
+
+      -- Look up a state in the table
+      lookup : PolicyTable → State → Maybe (List Action)
+      lookup [] _ = nothing
+      lookup ((s' , r) ∷ rest) s with s ≟ₛ s'
+      ... | yes _ = just r
+      ... | no  _ = lookup rest s
+
+      -- Convert a table + fallback into an ExplicitRanking
+      -- On hit → return stored ranking; on miss → use fallback
+      table-ranking : PolicyTable → ExplicitRanking → ExplicitRanking
+      table-ranking table fallback s with lookup table s
+      ... | just r  = r
+      ... | nothing = fallback s
+
+      -- Create an active learner backed by a materialized table
+      materialized-learner : PolicyTable → ActiveLearnerState
+      materialized-learner table =
+        init-active-learner (table-ranking table (λ _ → []))
+
+    ------------------------------------------------------------------------
     -- Monotonicity Proofs: Learning Never Increases Violations
     --
     -- Key property: each learning step that detects a violation and swaps

@@ -1,35 +1,35 @@
 {-# OPTIONS --safe --guardedness #-}
 
 ------------------------------------------------------------------------
--- CSHRL.Learning.FiniteDeterministicMDP
+-- CSHRL.Learning.CombinatorialPlacementMDP
 --
--- Learning implementation for Finite Deterministic MDPs.
+-- Learning implementation for Combinatorial Placement MDPs.
 --
 -- Key properties:
---   - Deterministic transitions: step s a = (s', r) uniquely
---   - Finite horizon: traces stabilize at depth ≥ horizon
---   - Trace-based comparison: lexicographic ordering
---
--- This is the primary learning implementation for grid worlds,
--- mazes, and similar environments.
+--   - States are Ongoing/Dead/Solved (placement structure)
+--   - Binary rewards: 0 or solved-reward
+--   - Short-circuit traces for absorbing states (Dead/Solved)
+--   - Horizon-bounded search
 --
 -- Reuses the trace/ranking infrastructure from the EC module
--- (EnvironmentClass.FiniteDeterministicMDP) and adds:
+-- (EnvironmentClass.CombinatorialPlacementMDP) and adds:
 --   - Violation detection
 --   - Restricted (unavailability-aware) trace computation
 --   - Learning loop (depth-increase on violation)
 --   - Curried Learner interface (stateful, checkpoint-friendly)
 --   - Active Learner interface (ranking swap + depth-increase)
 --
--- Uses Dec-based ordering for sound extraction of proofs from decisions.
+-- This parallels Learning.FiniteDeterministicMDP but specialised
+-- for the placement structure.
 ------------------------------------------------------------------------
 
-module CSHRL.Learning.FiniteDeterministicMDP where
+module CSHRL.Learning.CombinatorialPlacementMDP where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃; ∃-syntax)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Empty using (⊥-elim)
@@ -37,24 +37,21 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Relation.Nullary using (Dec; yes; no)
 
 open import CSHRL.Learning.Base
-open import CSHRL.EnvironmentClass.FiniteDeterministicMDP
+open import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
 
 ------------------------------------------------------------------------
--- FiniteDeterministicMDP Learning Module
+-- CombinatorialPlacementMDP Learning Module
 ------------------------------------------------------------------------
 
-module FDMDPLearning
+module CPMDPLearning
   -- Same parameters as the Environment Class
-  (State : Set)
+  (Config : Set)
   (Action : Set)
-  (Reward : Set)
-  (step : State → Action → State × Reward)
-  (_≤ᵣ_ : Reward → Reward → Set)
-  (_≤?_ : (r s : Reward) → Dec (r ≤ᵣ s))
-  (≤ᵣ-refl : ∀ {r} → r ≤ᵣ r)
-  (max : Reward → Reward → Reward)
-  (bottom : Reward)
-  (all-actions : List Action)
+  (is-dead    : Config → Bool)
+  (is-solved  : Config → Bool)
+  (place      : Config → Action → Config)
+  (solved-reward : ℕ)
+  (all-actions    : List Action)
   (default-action : Action)
   (horizon : ℕ)
   -- Additional: decidable equality for actions (needed by Learning.Base)
@@ -62,13 +59,13 @@ module FDMDPLearning
   where
 
   ------------------------------------------------------------------------
-  -- Import from EC (Trace, _≤ₜᵇ_, trace-action, find-ranking, …)
+  -- Import from EC (State, step, Trace, trace-action, find-ranking, …)
   ------------------------------------------------------------------------
 
-  open FiniteDeterministicMDP
-    State Action Reward step
-    _≤ᵣ_ _≤?_ ≤ᵣ-refl max bottom
-    all-actions default-action horizon
+  open CombinatorialPlacementMDP
+    Config Action is-dead is-solved
+    place solved-reward all-actions default-action
+    horizon
     public
 
   ------------------------------------------------------------------------
@@ -80,25 +77,19 @@ module FDMDPLearning
   ------------------------------------------------------------------------
   -- Boolean Trace Reflexivity
   --
-  -- The EC defines _≤?ᵇ_ and _≤ₜᵇ_ but their reflexivity proofs
-  -- are not exported. We prove them here.
+  -- The EC defines _≤?ᵇ_ and _≤ₜᵇ_ but their reflexivity proofs live
+  -- inside WithTraceBridge (which requires extra parameters).
+  -- We prove them here unconditionally.
   ------------------------------------------------------------------------
 
-  -- Soundness: Boolean true implies propositional proof
-  ≤?ᵇ-sound : ∀ r s → r ≤?ᵇ s ≡ true → r ≤ᵣ s
-  ≤?ᵇ-sound r s p with r ≤? s
-  ... | yes proof = proof
-  ... | no  _     with () ← p
+  ≤?ᵇ-refl : ∀ n → n ≤?ᵇ n ≡ true
+  ≤?ᵇ-refl zero    = refl
+  ≤?ᵇ-refl (suc n) = ≤?ᵇ-refl n
 
-  -- Reflexivity of Boolean trace comparison
   ≤ₜᵇ-refl : ∀ t → t ≤ₜᵇ t ≡ true
-  ≤ₜᵇ-refl [] = refl
-  ≤ₜᵇ-refl (r ∷ t) with r ≤? r | r ≤? r
-  ... | yes _ | yes _ = ≤ₜᵇ-refl t
-  ... | yes _ | no ¬p = ⊥-elim (¬p ≤ᵣ-refl)
-  ... | no ¬p | _     = ⊥-elim (¬p ≤ᵣ-refl)
+  ≤ₜᵇ-refl []      = refl
+  ≤ₜᵇ-refl (r ∷ t) rewrite ≤?ᵇ-refl r = ≤ₜᵇ-refl t
 
-  -- Equal traces imply ≤ₜᵇ
   eq-implies-≤ₜᵇ : ∀ t₁ t₂ → t₁ ≡ t₂ → t₁ ≤ₜᵇ t₂ ≡ true
   eq-implies-≤ₜᵇ t .t refl = ≤ₜᵇ-refl t
 
@@ -116,14 +107,19 @@ module FDMDPLearning
 
   ------------------------------------------------------------------------
   -- Restricted Trace Computation (for unavailable actions)
+  --
+  -- Uses the same short-circuit for Dead/Solved as the unrestricted
+  -- version, but only considers available actions for Ongoing states.
   ------------------------------------------------------------------------
 
   mutual
     best-trace-restricted : Available → State → ℕ → Trace
-    best-trace-restricted avail s zero = []
-    best-trace-restricted avail s (suc k) =
+    best-trace-restricted avail _          zero    = []
+    best-trace-restricted avail Dead       (suc k) = 0 ∷ dead-trace k
+    best-trace-restricted avail (Solved c) (suc k) = solved-reward ∷ solved-trace k
+    best-trace-restricted avail (Ongoing c) (suc k) =
       let available = filter-available avail all-actions
-          traces = map (λ a → trace-action-restricted avail s a k) available
+          traces = map (λ a → trace-action-restricted avail (Ongoing c) a k) available
       in max-trace traces
 
     trace-action-restricted : Available → State → Action → ℕ → Trace
@@ -242,27 +238,27 @@ module FDMDPLearning
     (trace-action-restricted avail s b k) q
 
   ------------------------------------------------------------------------
-  -- Curried Learner Interface for FDMDP
+  -- Curried Learner Interface for CombinatorialPlacementMDP
   --
   -- Provides a stateful, checkpoint-friendly learning interface.
-  -- Uses the universal LearnerState from Base with FDMDP-specific test.
+  -- Uses the universal LearnerState from Base with placement-specific test.
   ------------------------------------------------------------------------
 
-  -- Create an FDMDP learner with the FDMDP-specific test function
-  fdmdp-learner : Learner
-  fdmdp-learner = make-learner test-pair
+  -- Create a CPMDP learner with the placement-specific test function
+  cpmdp-learner : Learner
+  cpmdp-learner = make-learner test-pair
 
   -- Initialize a fresh learner state
-  new-fdmdp-learner : LearnerState
-  new-fdmdp-learner = init-learner
+  new-cpmdp-learner : LearnerState
+  new-cpmdp-learner = init-learner
 
   -- Train on a single sample
   train-step : LearnerState → Sample → LearnerState
-  train-step = fdmdp-learner
+  train-step = cpmdp-learner
 
   -- Train on multiple samples
   train-batch : LearnerState → List Sample → LearnerState
-  train-batch = learn-many fdmdp-learner
+  train-batch = learn-many cpmdp-learner
 
   -- Get current ranking at learner's depth
   current-ranking : LearnerState → State → List Action
@@ -276,12 +272,12 @@ module FDMDPLearning
   -- Train until no violations for N samples (or max iterations)
   train-until-stable : LearnerState → ℕ → ℕ → List Sample → LearnerState
   train-until-stable ls window max-iter samples =
-    learn-until fdmdp-learner (λ ls' → has-stabilized ls' window)
+    learn-until cpmdp-learner (λ ls' → has-stabilized ls' window)
       max-iter ls samples
 
   -- Get full training trace (for analysis/plotting)
   training-trace : LearnerState → List Sample → List LearnerState
-  training-trace = learn-with-trace fdmdp-learner
+  training-trace = learn-with-trace cpmdp-learner
 
   -- Extract depth history from trace (for plotting)
   depth-history : List LearnerState → List ℕ
@@ -294,31 +290,31 @@ module FDMDPLearning
   violation-history (ls ∷ rest) = get-violations ls ∷ violation-history rest
 
   ------------------------------------------------------------------------
-  -- Active Learner for FDMDP
+  -- Active Learner for CombinatorialPlacementMDP
   --
   -- Uses active refinement: on violation, BOTH increase depth AND swap
   -- the violated pair in the explicit ranking.
   ------------------------------------------------------------------------
 
-  -- Create an active FDMDP learner with the global swap updater
-  fdmdp-active-learner : ActiveLearner
-  fdmdp-active-learner = make-active-learner test-pair global-swap-updater
+  -- Create an active CPMDP learner with the global swap updater
+  cpmdp-active-learner : ActiveLearner
+  cpmdp-active-learner = make-active-learner test-pair global-swap-updater
 
   -- Initialize active learner with Finder's ranking at depth 0
-  new-fdmdp-active-learner : ActiveLearnerState
-  new-fdmdp-active-learner = init-active-learner (λ s → find-ranking s 0)
+  new-cpmdp-active-learner : ActiveLearnerState
+  new-cpmdp-active-learner = init-active-learner (λ s → find-ranking s 0)
 
   -- Initialize with a specific initial depth
-  new-fdmdp-active-learner-at : ℕ → ActiveLearnerState
-  new-fdmdp-active-learner-at k = init-active-learner (λ s → find-ranking s k)
+  new-cpmdp-active-learner-at : ℕ → ActiveLearnerState
+  new-cpmdp-active-learner-at k = init-active-learner (λ s → find-ranking s k)
 
   -- Active training step
   active-train-step : ActiveLearnerState → Sample → ActiveLearnerState
-  active-train-step = fdmdp-active-learner
+  active-train-step = cpmdp-active-learner
 
   -- Active batch training
   active-batch : ActiveLearnerState → List Sample → ActiveLearnerState
-  active-batch = active-train-batch fdmdp-active-learner
+  active-batch = active-train-batch cpmdp-active-learner
 
   -- Get the current refined ranking for a state
   current-active-ranking : ActiveLearnerState → State → List Action
@@ -339,6 +335,9 @@ module FDMDPLearning
   -- state.  Each step calls find-ranking once and stores the result.
   -- The resulting table is the learned policy: a concrete mapping from
   -- visited states to their optimal action rankings.
+  --
+  -- After materialization, the table can be used for instant lookups
+  -- via PolicyLookup (requires decidable state equality from caller).
   ------------------------------------------------------------------------
 
   private
@@ -347,6 +346,7 @@ module FDMDPLearning
     head-action (a ∷ _) = a
 
   -- Materialize rankings along the optimal path
+  -- Calls find-ranking once per step, stores (state, ranking) pairs
   materialize-on-path : State → ℕ → ℕ → PolicyTable
   materialize-on-path _ _ zero = []
   materialize-on-path s depth (suc n) =
