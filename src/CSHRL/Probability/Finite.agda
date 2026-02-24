@@ -1,4 +1,4 @@
-{-# OPTIONS --safe #-}
+{-# OPTIONS --safe --guardedness #-}
 
 ------------------------------------------------------------------------
 -- CSHRL.Probability.Finite
