@@ -264,6 +264,92 @@ module StochasticFiniteMDP
     _≤ₛ-pointwise_.tail≤ (pw-preserves a b s p) = tail-pw-≤ s a b p
 
   ------------------------------------------------------------------------
+  -- 5. Memoized Stochastic Finder (Dynamic Programming)
+  --
+  -- The recursive Finder has exponential complexity: each
+  -- best-expected-trace(s, k) reexpands |A| × |outcomes| subtrees.
+  -- This module builds a value table layer by layer:
+  --
+  --   bet[0][s] = 0
+  --   bet[k+1][s] = max_a (E[r | s,a] + Σ w_i × bet[k][s'_i])
+  --
+  -- Total cost: O(depth × numStates × |A| × |outcomes|)
+  --
+  -- Usage:
+  --   module Memo = StochasticFiniteMDP.MemoizedStochastic 16 id id 10
+  --   policy = Memo.fast-policy s
+  ------------------------------------------------------------------------
+
+  module MemoizedStochastic
+    (numStates : ℕ)
+    (stateIndex : State → ℕ)
+    (indexState : ℕ → State)
+    (memo-depth : ℕ)
+    where
+
+    private
+      nth-rew : List Reward → ℕ → Reward
+      nth-rew []       _       = zeroᵣ
+      nth-rew (r ∷ _)  zero    = r
+      nth-rew (_ ∷ rs) (suc n) = nth-rew rs n
+
+      tab-rew : ℕ → (ℕ → Reward) → List Reward
+      tab-rew zero    _ = []
+      tab-rew (suc n) f = f 0 ∷ tab-rew n (λ k → f (suc k))
+
+      -- Expected continuation using a memoized table
+      ec-memo : State → Action → List Reward → Reward
+      ec-memo s a prev =
+        𝔼ᵣ (fmap (λ { (s' , _) → nth-rew prev (stateIndex s') }) (step s a))
+
+      -- Build one DP level from the previous level
+      build-level : List Reward → List Reward
+      build-level prev = tab-rew numStates (λ i →
+        let s = indexState i
+        in max-list (map (λ a →
+             expected-reward (step s a) +ᵣ ec-memo s a prev) all-actions))
+
+      -- Bottom-up DP: O(depth) iterations of build-level
+      dp : ℕ → List Reward
+      dp zero    = tab-rew numStates (λ _ → zeroᵣ)
+      dp (suc k) = build-level (dp k)
+
+    value-table : List Reward
+    value-table = dp memo-depth
+
+    private
+      action-score : State → Action → Reward
+      action-score s a =
+        expected-reward (step s a) +ᵣ ec-memo s a value-table
+
+      nth-action : List Action → ℕ → Action
+      nth-action []       _       = default-action
+      nth-action (a ∷ _)  zero    = a
+      nth-action (_ ∷ as) (suc n) = nth-action as n
+
+      tab-act : ℕ → (ℕ → Action) → List Action
+      tab-act zero    _ = []
+      tab-act (suc n) f = f 0 ∷ tab-act n (λ k → f (suc k))
+
+    -- Policy via singleton-trace sort (reuses existing sort-scored)
+    policy : State → Action
+    policy s =
+      let scored = map (λ a → (a , action-score s a ∷ [])) all-actions
+          sorted = sort-scored scored
+      in case sorted of λ where
+           []            → default-action
+           ((a , _) ∷ _) → a
+      where
+        case_of_ : ∀ {ℓ₁ ℓ₂} {A : Set ℓ₁} {B : Set ℓ₂} → A → (A → B) → B
+        case x of f = f x
+
+    policy-table : List Action
+    policy-table = tab-act numStates (λ i → policy (indexState i))
+
+    fast-policy : State → Action
+    fast-policy s = nth-action policy-table (stateIndex s)
+
+  ------------------------------------------------------------------------
   -- Risk-Aware Extensions (Future Work)
   --
   -- Beyond expected value, stochastic settings support:

@@ -18,15 +18,15 @@
 module CSHRL.Synthesis.FiniteDeterministicMDP where
 
 open import Data.List using (List; []; _∷_; map; length)
-open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; z≤n; s≤s; _+_; _*_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 open import Data.Unit using (⊤; tt)
 open import Codata.Guarded.Stream using (Stream; head; tail; tabulate)
-open import Function using (_∘_)
+open import Function using (_∘_; case_of_)
 open import Relation.Nullary using (Dec; yes; no)
 
 import CSHRL.Synthesis.Core as SynthCore
@@ -244,6 +244,130 @@ module FDMDPSynthesis
       ... | []      = nothing
       ... | (p ∷ _) = just p
 
+      -- Greedy OR synthesis: builds a disjunction of atomic predicates.
+      -- Each step finds an atom with zero false positives and at least
+      -- one true positive, removes covered TPs, and recurses.
+      -- Handles scattered state sets that no single predicate captures.
+      private
+        has-fp : PredProg → List PredObs → Bool
+        has-fp _ [] = false
+        has-fp p ((c , false) ∷ obs) =
+          if eval p c then true else has-fp p obs
+        has-fp p (_ ∷ obs) = has-fp p obs
+
+        has-tp : PredProg → List PredObs → Bool
+        has-tp _ [] = false
+        has-tp p ((c , true) ∷ obs) =
+          if eval p c then true else has-tp p obs
+        has-tp p (_ ∷ obs) = has-tp p obs
+
+        is-useful : PredProg → List PredObs → Bool
+        is-useful p obs = not (has-fp p obs) ∧ has-tp p obs
+
+        find-useful : List PredProg → List PredObs → Maybe PredProg
+        find-useful [] _ = nothing
+        find-useful (p ∷ ps) obs =
+          if is-useful p obs then just p
+          else find-useful ps obs
+
+        remove-covered : PredProg → List PredObs → List PredObs
+        remove-covered _ [] = []
+        remove-covered p ((c , true) ∷ obs) =
+          if eval p c then remove-covered p obs
+          else (c , true) ∷ remove-covered p obs
+        remove-covered p (ob ∷ obs) = ob ∷ remove-covered p obs
+
+      synth-greedy-or : ℕ → List PredObs → PredProg
+      synth-greedy-or zero _ = falsep
+      synth-greedy-or (suc fuel) obs with find-useful atoms obs
+      ... | nothing = falsep
+      ... | just p  = p ∨p synth-greedy-or fuel (remove-covered p obs)
+
+      synth-greedy-or-from : List PredProg → ℕ → List PredObs → PredProg
+      synth-greedy-or-from _ zero _ = falsep
+      synth-greedy-or-from pool (suc fuel) obs with find-useful pool obs
+      ... | nothing = falsep
+      ... | just p  = p ∨p synth-greedy-or-from pool fuel (remove-covered p obs)
+
+      ------------------------------------------------------------------
+      -- Decision-tree synthesis: builds an if-then-else tree by
+      -- greedily splitting on the feature that minimizes Gini
+      -- impurity (TP*FP + FN*TN). Handles deep decision boundaries
+      -- that flat disjunctions cannot express.
+      --
+      -- Result encoding: if f then p_true else p_false
+      --   = (f ∧p p_true) ∨p (¬p f ∧p p_false)
+      ------------------------------------------------------------------
+      private
+        count-pos : List PredObs → ℕ
+        count-pos [] = 0
+        count-pos ((_ , true)  ∷ obs) = suc (count-pos obs)
+        count-pos ((_ , false) ∷ obs) = count-pos obs
+
+        count-neg : List PredObs → ℕ
+        count-neg [] = 0
+        count-neg ((_ , false) ∷ obs) = suc (count-neg obs)
+        count-neg ((_ , true)  ∷ obs) = count-neg obs
+
+        is-pure : List PredObs → Bool
+        is-pure obs = (count-pos obs * count-neg obs) <ᵇ 1
+
+        gini : PredProg → List PredObs → ℕ
+        gini _ [] = 0
+        gini p obs = tp * fp + fn * tn
+          where
+            go : List PredObs → ℕ × ℕ × ℕ × ℕ
+            go [] = (0 , 0 , 0 , 0)
+            go ((c , b) ∷ rest) with eval p c | b | go rest
+            ... | true  | true  | (a , b' , c' , d) = (suc a , b' , c' , d)
+            ... | true  | false | (a , b' , c' , d) = (a , suc b' , c' , d)
+            ... | false | true  | (a , b' , c' , d) = (a , b' , suc c' , d)
+            ... | false | false | (a , b' , c' , d) = (a , b' , c' , suc d)
+            tp = proj₁ (go obs)
+            fp = proj₁ (proj₂ (go obs))
+            fn = proj₁ (proj₂ (proj₂ (go obs)))
+            tn = proj₂ (proj₂ (proj₂ (go obs)))
+
+        split-true : PredProg → List PredObs → List PredObs
+        split-true _ [] = []
+        split-true p ((c , b) ∷ obs) =
+          if eval p c then (c , b) ∷ split-true p obs
+          else split-true p obs
+
+        split-false : PredProg → List PredObs → List PredObs
+        split-false _ [] = []
+        split-false p ((c , b) ∷ obs) =
+          if eval p c then split-false p obs
+          else (c , b) ∷ split-false p obs
+
+        find-best : List PredProg → List PredObs
+                  → Maybe PredProg → ℕ → Maybe PredProg
+        find-best [] _ best _ = best
+        find-best (p ∷ ps) obs best best-score =
+          let s = gini p obs
+          in if s <ᵇ best-score
+             then find-best ps obs (just p) s
+             else find-best ps obs best best-score
+
+      synth-decision-tree : List PredProg → ℕ → List PredObs → PredProg
+      synth-decision-tree _ zero obs =
+        if count-neg obs <ᵇ count-pos obs then truep else falsep
+      synth-decision-tree _ (suc _) [] = falsep
+      synth-decision-tree pool (suc fuel) obs =
+        if is-pure obs then
+          (if count-pos obs <ᵇ 1 then falsep else truep)
+        else
+          let baseline = count-pos obs * count-neg obs
+          in case find-best pool obs nothing baseline of λ where
+            nothing → if count-neg obs <ᵇ count-pos obs
+                      then truep else falsep
+            (just f) →
+              let obs-t = split-true f obs
+                  obs-f = split-false f obs
+                  p-t   = synth-decision-tree pool fuel obs-t
+                  p-f   = synth-decision-tree pool fuel obs-f
+              in (f ∧p p-t) ∨p (¬p f ∧p p-f)
+
       -- Remaining version space size for a ranking predicate
       rank-vs-size : ℕ → List PredObs → ℕ
       rank-vs-size depth obs = length (cegis-loop (initial-vs depth) obs)
@@ -373,10 +497,6 @@ module FDMDPSynthesis
                 case (a' ≟ₐ a , b' ≟ₐ b) of λ where
                   (yes _ , yes _) → p
                   _               → RankModel.prefer m a' b' })
-            where
-              case_of_ : ∀ {ℓ₁ ℓ₂} {A : Set ℓ₁} {B : Set ℓ₂} →
-                A → (A → B) → B
-              case x of f = f x
 
       -- VS size for a specific pair (for monitoring convergence)
       pair-vs-size : SynthLearnerState → Action → Action → ℕ

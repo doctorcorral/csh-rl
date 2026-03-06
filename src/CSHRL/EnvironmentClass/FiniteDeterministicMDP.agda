@@ -197,4 +197,82 @@ module FiniteDeterministicMDP
         ; preserves = preserves-direct
         }
 
+  ------------------------------------------------------------------------
+  -- 4. Memoized Finder (Dynamic Programming)
+  --
+  -- The recursive Finder has O(|A|^depth) complexity per state.
+  -- This module builds a DP table layer by layer, achieving
+  -- O(depth × numStates × |A|) total — exponential → polynomial.
+  --
+  -- Usage:
+  --   module Memo = Finder.Memoized 24 id id 7
+  --   finder-map = map (λ s → (s , Memo.find-policy s)) states
+  ------------------------------------------------------------------------
+
+  module Memoized
+    (numStates : ℕ)
+    (stateIndex : State → ℕ)
+    (indexState : ℕ → State)
+    (depth : ℕ)
+    where
+
+    private
+      tab : ℕ → (ℕ → Trace) → List Trace
+      tab zero    _ = []
+      tab (suc n) f = f 0 ∷ tab n (λ k → f (suc k))
+
+      nth : List Trace → ℕ → Trace
+      nth []       _       = []
+      nth (t ∷ _)  zero    = t
+      nth (_ ∷ ts) (suc n) = nth ts n
+
+      build-layer : List Trace → List Trace
+      build-layer prev = tab numStates (λ i →
+        let s = indexState i
+        in max-trace (map (λ a →
+             let (s' , r) = step s a
+             in r ∷ nth prev (stateIndex s')) all-actions))
+
+      dp : ℕ → List Trace
+      dp zero    = tab numStates (λ _ → [])
+      dp (suc k) = build-layer (dp k)
+
+    table : List Trace
+    table = dp depth
+
+    private
+      pick-best : List (Action × Trace) → Action
+      pick-best []            = default-action
+      pick-best ((a , _) ∷ _) = a
+
+    policy : State → Action
+    policy s =
+      let scored = map (λ a →
+            let (s' , r) = step s a
+            in (a , r ∷ nth table (stateIndex s'))) all-actions
+      in pick-best (sort-scored scored)
+
+    private
+      nth-action : List Action → ℕ → Action
+      nth-action []       _       = default-action
+      nth-action (a ∷ _)  zero    = a
+      nth-action (_ ∷ as) (suc n) = nth-action as n
+
+      tab-act : ℕ → (ℕ → Action) → List Action
+      tab-act zero    _ = []
+      tab-act (suc n) f = f 0 ∷ tab-act n (λ k → f (suc k))
+
+      build-policy-table : List Trace → List Action
+      build-policy-table tbl = tab-act numStates (λ i →
+        let s = indexState i
+            scored = map (λ a →
+              let (s' , r) = step s a
+              in (a , r ∷ nth tbl (stateIndex s'))) all-actions
+        in pick-best (sort-scored scored))
+
+    policy-table : List Action
+    policy-table = build-policy-table table
+
+    fast-policy : State → Action
+    fast-policy s = nth-action policy-table (stateIndex s)
 
