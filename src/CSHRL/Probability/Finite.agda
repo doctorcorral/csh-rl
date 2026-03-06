@@ -17,7 +17,8 @@ module CSHRL.Probability.Finite where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 open import Data.Nat.Properties using (+-identityʳ; +-assoc; *-distribˡ-+)
-open import Data.List using (List; []; _∷_; map; foldr; concatMap; length)
+open import Data.List using (List; []; _∷_; map; foldr; concatMap; length; _++_)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans)
@@ -68,14 +69,23 @@ pure a = (a , 1) ∷ []
 return : ∀ {A} → A → Dist A
 return = pure
 
--- Bind: compose distributions (Kleisli extension)
--- For each outcome a with weight w, run f a and scale by w
-_>>=_ : ∀ {A B} → Dist A → (A → Dist B) → Dist B
-d >>= f = concatMap (λ { (a , w) → scale w (f a) }) d
-
--- Join: flatten nested distributions
+-- Join: flatten nested distributions (defined first to avoid [] >>= f inference)
 join : ∀ {A} → Dist (Dist A) → Dist A
-join dd = dd >>= id
+join [] = []
+join ((d , w) ∷ dd) = scale w d ++ join dd
+
+-- Kleisli map: (a,w) ↦ (f a, w)
+mapK : ∀ {A B} → (A → Dist B) → Dist A → Dist (Dist B)
+mapK f = map (λ { (a , w) → f a , w })
+
+-- Bind: d >>= f = join (mapK f d)
+_>>=_ : ∀ {A B} → Dist A → (A → Dist B) → Dist B
+d >>= f = join (mapK f d)
+
+-- Bind of singleton: ((x , w) ∷ []) >>= f ≡ scale w (f x)
+>>=-singleton : ∀ {A B} (x : A) (w : ℕ) (f : A → Dist B) →
+  ((x , w) ∷ []) >>= f ≡ scale w (f x)
+>>=-singleton x w f = ++-identityʳ (scale w (f x))
 
 -- Map (functor)
 fmap : ∀ {A B} → (A → B) → Dist A → Dist B
