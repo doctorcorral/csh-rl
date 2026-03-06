@@ -27,16 +27,21 @@
 module CSHRL.Tasks.Stochastic.BiasedBanditFOSD where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl)
-open import Data.List using (List; []; _∷_)
+open import Data.Nat.Properties using (≤-refl; +-comm; +-identityʳ)
+open import Data.List using (List; []; _∷_; _++_)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; trans; sym; cong; cong₂; subst)
+
+open import Data.Unit using (⊤; tt)
+open import Data.Empty using (⊥)
 
 open import CSHRL.Probability.Finite
-  using (Dist; bernoulli; total-weight; weighted-sum)
+  using (Dist; bernoulli; total-weight; weighted-sum; scale)
 open import CSHRL.Probability.FOSD
   using (_FOSD≤_; FOSD-refl; cdf-weight; fosd→ev; AllBelow;
-         bandit-fosd; bandit-ev; armA; armB)
+         bandit-fosd; bandit-ev; armA; armB;
+         cdf-weight-scale; cdf-weight-++)
 
 ------------------------------------------------------------------------
 -- BiasedBandit MDP
@@ -147,32 +152,69 @@ test-BB-step0 = FOSD-refl (immediate-reward-dist Playing ArmB)
 -- for the BiasedBandit: ArmA strictly dominates ArmB.
 
 ------------------------------------------------------------------------
--- SUMMARY
+-- Full Pointwise FOSD (all depths)
 --
--- FOSD infrastructure demonstrated on BiasedBandit:
+-- At depth 0: ArmA dominates ArmB (step0-fosd above).
 --
---   1. CDF computation: verified by refl at depths 0 and 1
---   2. Immediate FOSD: ArmA dominates ArmB at step 0
---      CDF(ArmA, 0) = 1 < 2 = CDF(ArmB, 0)
---   3. Depth 1: CDFs are equal (both actions → Playing → ArmB)
---   4. FOSD ⟹ E[X]: bridge theorem gives 1 ≤ 2
+-- At depth suc n: both actions return to Playing and follow
+-- default-action (ArmB). The marginals are permutations:
+--   ArmA: scale 2 d ++ (scale 1 d ++ [])
+--   ArmB: scale 1 d ++ (scale 2 d ++ [])
+-- where d = marginal-reward Playing ArmB n.
 --
--- Identified proof obligations for full PointwiseFOSD:
---   • CDF distributes over monadic bind:
---     cdf-weight (d >>= f) r = Σ_{(a,w) ∈ d} w * cdf-weight (f a) r
---   • CDF distributes over scale:
---     cdf-weight (scale k d) r = k * cdf-weight d r
---   These lemmas would enable proving pointwise FOSD at ALL
---   depths for stateless environments like BiasedBandit.
---
--- For the Stochastic Isomorphism Conjecture (ICLP 2027):
---   The conjecture concerns environments where the marginal
---   distributions CHANGE across timesteps. BiasedBandit has
---   identical marginals at all depths (after depth 0), making
---   the conjecture trivially satisfied. The interesting case
---   is environments with state-dependent rewards (e.g.,
---   GamblersRuin), where conditional tail distributions
---   introduce non-trivial correlations.
---
--- All --safe, no postulates.
+-- By cdf-weight-++ and cdf-weight-scale, both have the same CDF:
+--   2 * cdf(d,r) + 1 * cdf(d,r) = 1 * cdf(d,r) + 2 * cdf(d,r)
+-- so FOSD holds by reflexivity.
 ------------------------------------------------------------------------
+
+private
+  cdf-decompose : ∀ (d : Dist ℕ) (k₁ k₂ : ℕ) r →
+    cdf-weight (scale k₁ d ++ (scale k₂ d ++ [])) r ≡
+    k₁ * cdf-weight d r + k₂ * cdf-weight d r
+  cdf-decompose d k₁ k₂ r =
+    trans (cdf-weight-++ (scale k₁ d) (scale k₂ d ++ []) r)
+    (cong₂ _+_ (cdf-weight-scale d r k₁)
+      (trans (cdf-weight-++ (scale k₂ d) [] r)
+             (trans (+-identityʳ (cdf-weight (scale k₂ d) r))
+                    (cdf-weight-scale d r k₂))))
+
+bandit-cdf-suc-eq : ∀ n r →
+  cdf-weight (marginal-reward Playing ArmA (suc n)) r ≡
+  cdf-weight (marginal-reward Playing ArmB (suc n)) r
+bandit-cdf-suc-eq n r =
+  trans (cdf-decompose d 2 1 r)
+  (trans (+-comm (2 * cdf-weight d r) (1 * cdf-weight d r))
+         (sym (cdf-decompose d 1 2 r)))
+  where d = marginal-reward Playing ArmB n
+
+full-fosd : ∀ n → marginal-reward Playing ArmB n FOSD≤
+                   marginal-reward Playing ArmA n
+full-fosd zero    = step0-fosd
+full-fosd (suc n) r =
+  subst (cdf-weight (marginal-reward Playing ArmA (suc n)) r ≤_)
+    (bandit-cdf-suc-eq n r) ≤-refl
+
+------------------------------------------------------------------------
+-- FOSDCoindHomo: ArmA dominates ArmB at ALL depths
+------------------------------------------------------------------------
+
+bandit-pointwise-fosd : PointwiseFOSD Playing ArmA ArmB
+bandit-pointwise-fosd = full-fosd
+
+bandit-≤ₐ : State → Action → Action → Set
+bandit-≤ₐ _ ArmB ArmA = ⊤
+bandit-≤ₐ _ ArmA ArmA = ⊤
+bandit-≤ₐ _ ArmB ArmB = ⊤
+bandit-≤ₐ _ ArmA ArmB = ⊥
+
+bandit-preserves : ∀ a b s → bandit-≤ₐ s a b → PointwiseFOSD s b a
+bandit-preserves ArmB ArmA Playing _ = bandit-pointwise-fosd
+bandit-preserves ArmA ArmA Playing _ = pw-fosd-refl Playing ArmA
+bandit-preserves ArmB ArmB Playing _ = pw-fosd-refl Playing ArmB
+bandit-preserves ArmA ArmB Playing ()
+
+bandit-fosd-homo : FOSDCoindHomo
+bandit-fosd-homo = record
+  { _≤ₐ_          = bandit-≤ₐ
+  ; preserves-fosd = bandit-preserves
+  }

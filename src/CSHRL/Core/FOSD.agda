@@ -268,6 +268,84 @@ module FOSDCore
         (tw-eq s b a n) (pw-fosd n)
 
   --------------------------------------------------------------------
+  -- FOSD ⟹ Lexicographic EV-Stream Dominance
+  --
+  -- Lifts pointwise EV dominance to coinductive lexicographic
+  -- dominance on the stream of expected marginal rewards.
+  --
+  -- This is the formal FOSD → lex bridge: any FOSDCoindHomo
+  -- (ranking that preserves FOSD) also preserves lexicographic
+  -- expected-value stream ordering.
+  --
+  -- marginal-ev-stream s a = ⟨ E[marginal(s,a,0)],
+  --                            E[marginal(s,a,1)], ... ⟩
+  --
+  -- PointwiseFOSD s a b ⟹ marginal-ev-stream s b ≤ₛ-ev
+  --                         marginal-ev-stream s a
+  --------------------------------------------------------------------
+
+  module FOSDToLexStream
+    (all-below : ∀ s a n → AllBelow (marginal-reward s a n) 1)
+    (tw-eq : ∀ s a b n → total-weight (marginal-reward s a n) ≡
+                          total-weight (marginal-reward s b n))
+    where
+
+    open FOSDImpliesLex all-below tw-eq
+
+    marginal-ev : State → Action → ℕ → ℕ
+    marginal-ev s a n = weighted-sum (marginal-reward s a n)
+
+    marginal-ev-stream : State → Action → Stream ℕ
+    marginal-ev-stream s a = tabulate (marginal-ev s a)
+
+    record _≤ₛ-ev_ (x y : Stream ℕ) : Set where
+      coinductive
+      field
+        hd≤ : head x ≤ head y
+        tl≤ : head x ≡ head y → tail x ≤ₛ-ev tail y
+
+    open _≤ₛ-ev_ public
+
+    ≤ₛ-ev-refl : ∀ (s : Stream ℕ) → s ≤ₛ-ev s
+    hd≤ (≤ₛ-ev-refl s) = ≤-refl
+    tl≤ (≤ₛ-ev-refl s) _ = ≤ₛ-ev-refl (tail s)
+
+    private
+      iter-ℕ : ℕ → Stream ℕ → ℕ
+      iter-ℕ zero    s = head s
+      iter-ℕ (suc n) s = iter-ℕ n (tail s)
+
+      iter-tab : ∀ (f : ℕ → ℕ) n → iter-ℕ n (tabulate f) ≡ f n
+      iter-tab f zero    = refl
+      iter-tab f (suc n) = iter-tab (f ∘ suc) n
+
+    pw→lex : ∀ {x y : Stream ℕ} →
+      (∀ n → iter-ℕ n x ≤ iter-ℕ n y) →
+      x ≤ₛ-ev y
+    hd≤ (pw→lex pw) = pw zero
+    tl≤ (pw→lex pw) _ = pw→lex (λ n → pw (suc n))
+
+    fosd→lex-stream : ∀ s a b →
+      PointwiseFOSD s a b →
+      marginal-ev-stream s b ≤ₛ-ev marginal-ev-stream s a
+    fosd→lex-stream s a b pw = pw→lex (λ n →
+      subst₂ _≤_
+        (sym (iter-tab (marginal-ev s b) n))
+        (sym (iter-tab (marginal-ev s a) n))
+        (pointwise-ev s a b pw n))
+      where
+        subst₂ : ∀ {A B : Set} (P : A → B → Set) {x x' y y'} →
+          x ≡ x' → y ≡ y' → P x y → P x' y'
+        subst₂ P refl refl p = p
+
+    fosd-homo→ev-lex : (homo : FOSDCoindHomo) →
+      ∀ a b s → FOSDCoindHomo._≤ₐ_ homo s a b →
+        marginal-ev-stream s a ≤ₛ-ev marginal-ev-stream s b
+    fosd-homo→ev-lex homo a b s p =
+      fosd→lex-stream s b a
+        (FOSDCoindHomo.preserves-fosd homo a b s p)
+
+  --------------------------------------------------------------------
   -- Synthesis Observation Layer for FOSD
   --
   -- Instead of comparing expected traces (as in ≤ₛ-lex synthesis),

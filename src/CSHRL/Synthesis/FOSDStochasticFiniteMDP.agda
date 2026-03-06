@@ -32,7 +32,7 @@ open import Function using (_∘_)
 open import Relation.Nullary using (Dec; yes; no)
 
 open import CSHRL.Probability.Finite using (Dist; _>>=_; fmap)
-open import CSHRL.Probability.FOSD using (fosd?)
+open import CSHRL.Probability.FOSD using (fosd?; fosd?-complete)
 
 import CSHRL.Synthesis.Core as SynthCore
 
@@ -286,3 +286,58 @@ module SFDMDPSynthesisFOSD
           ≤-trans : ∀ {a b c : ℕ} → a ≤ b → b ≤ c → a ≤ c
           ≤-trans z≤n     _       = z≤n
           ≤-trans (s≤s p) (s≤s q) = s≤s (≤-trans p q)
+
+      ------------------------------------------------------------------
+      -- FOSD Learning Convergence
+      --
+      -- Connects ModelPreservesFOSD to the learning loop.
+      --
+      -- Key results:
+      --   1. fosd-obs-sound: if ModelPreservesFOSD m and the model
+      --      says a ≤ b, then fosd-compare agrees at every depth.
+      --   2. model-obs-consistent: the correct predicate's ranking-
+      --      positive observations are always CEGIS-consistent.
+      --   3. fosd-convergence: VS monotonicity + observation soundness.
+      --
+      -- Together these formalize: FOSD observations drive the learner
+      -- toward the correct ranking. The version space monotonically
+      -- shrinks, and the correct predicate is never eliminated by
+      -- observations at states where the ranking holds.
+      ------------------------------------------------------------------
+
+      module FOSDConvergence
+        (m : RankModel)
+        (preserves : ModelPreservesFOSD m)
+        where
+
+        -- When the model says a ≤ b (b preferred), the FOSD comparison
+        -- at every depth agrees: a is FOSD-dominated by b.
+        fosd-obs-sound : ∀ a b s k →
+          RankHolds m s a b →
+          fosd-compare s a b k ≡ true
+        fosd-obs-sound a b s k rank-holds =
+          fosd?-complete
+            (marginal-reward s a k) (marginal-reward s b k)
+            (preserves a b s rank-holds k)
+
+        -- The FOSD observation at a ranking-positive state is
+        -- consistent with the model's predicate for prefer(a,b).
+        model-obs-consistent : ∀ a b s k →
+          RankHolds m s a b →
+          consistent (RankModel.prefer m a b)
+                     (s , fosd-compare s a b k) ≡ true
+        model-obs-consistent a b s k rank-holds =
+          consistent-correct (RankModel.prefer m a b) s
+            (fosd-compare s a b k)
+            (trans rank-holds (sym (fosd-obs-sound a b s k rank-holds)))
+
+        -- Combined convergence guarantee:
+        --   (1) VS sizes monotonically decrease (CombinedConvergence)
+        --   (2) FOSD observations agree with the model at positive states
+        FOSDConvergenceGuarantee : Set
+        FOSDConvergenceGuarantee =
+          CombinedConvergence ×
+          (∀ a b s k → RankHolds m s a b → fosd-compare s a b k ≡ true)
+
+        fosd-convergence : FOSDConvergenceGuarantee
+        fosd-convergence = combined-convergence , fosd-obs-sound

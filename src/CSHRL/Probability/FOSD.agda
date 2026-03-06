@@ -28,7 +28,7 @@ open import Data.Nat.Properties
          m+n∸n≡m; m∸n≤m; ∸-mono;
          ≤ᵇ⇒≤; ≤⇒≤ᵇ; n≤1+n; m≤n⇒m≤1+n; m≤m⊔n; m≤n⊔m; n≤m⊔n; ≰⇒≥; ≰⇒>; ≤-antisym;
          *-distribˡ-+; *-zeroʳ; *-identityˡ)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -111,6 +111,25 @@ total-weight-scale ((a , w) ∷ d) k
 max-support-scale : ∀ (d : Dist ℕ) k → max-support (scale k d) ≡ max-support d
 max-support-scale [] _ = refl
 max-support-scale ((v , w) ∷ d) k = cong (v ⊔_) (max-support-scale d k)
+
+------------------------------------------------------------------------
+-- CDF distributes over list concatenation
+------------------------------------------------------------------------
+
+cdf-weight-++ : ∀ (d₁ d₂ : Dist ℕ) r →
+  cdf-weight (d₁ ++ d₂) r ≡ cdf-weight d₁ r + cdf-weight d₂ r
+cdf-weight-++ [] d₂ r = refl
+cdf-weight-++ ((v , w) ∷ d₁) d₂ r with v ≤? r
+... | yes _ = trans (cong (w +_) (cdf-weight-++ d₁ d₂ r))
+                    (sym (+-assoc w (cdf-weight d₁ r) (cdf-weight d₂ r)))
+... | no  _ = cdf-weight-++ d₁ d₂ r
+
+total-weight-++ : ∀ (d₁ d₂ : Dist ℕ) →
+  total-weight (d₁ ++ d₂) ≡ total-weight d₁ + total-weight d₂
+total-weight-++ [] d₂ = refl
+total-weight-++ ((_ , w) ∷ d₁) d₂ =
+  trans (cong (w +_) (total-weight-++ d₁ d₂))
+        (sym (+-assoc w (total-weight d₁) (total-weight d₂)))
 
 ------------------------------------------------------------------------
 -- FOSD Ordering and Preorder
@@ -234,6 +253,47 @@ fosd?-scale μ ν k eq 1≤k
       (T-to-≡ (≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ (total-weight ν) (total-weight μ) (subst T (sym (∧-project₁ eq)) tt))
           (n≤k*n (total-weight μ) k 1≤k))))
       (fosd?-go-scale μ ν (max-support μ ⊔ max-support ν) k (∧-project₂ eq) 1≤k)
+
+------------------------------------------------------------------------
+-- fosd?-complete: μ FOSD≤ ν → fosd? μ ν ≡ true
+--
+-- The converse of fosd?-sound. Together they establish that fosd?
+-- is a decision procedure: fosd? μ ν ≡ true ⟺ μ FOSD≤ ν.
+------------------------------------------------------------------------
+
+fosd?-go-complete : ∀ μ ν r →
+  (∀ r' → r' ≤ r → cdf-weight ν r' ≤ cdf-weight μ r') →
+  fosd?-go μ ν r ≡ true
+fosd?-go-complete μ ν zero pf =
+  T-to-≡ (≤⇒≤ᵇ (pf 0 z≤n))
+fosd?-go-complete μ ν (suc r) pf =
+  cong₂ _∧_
+    (T-to-≡ (≤⇒≤ᵇ (pf (suc r) ≤-refl)))
+    (fosd?-go-complete μ ν r (λ r' r'≤r → pf r' (m≤n⇒m≤1+n r'≤r)))
+
+private
+  n≤m⊔n′ : ∀ m n → n ≤ m ⊔ n
+  n≤m⊔n′ zero    n       = ≤-refl
+  n≤m⊔n′ (suc m) zero    = z≤n
+  n≤m⊔n′ (suc m) (suc n) = s≤s (n≤m⊔n′ m n)
+
+  fosd→tw : ∀ (μ ν : Dist ℕ) → μ FOSD≤ ν → total-weight ν ≤ total-weight μ
+  fosd→tw μ ν fosd
+    rewrite sym (cdf-max ν (max-support μ ⊔ max-support ν)
+                  (n≤m⊔n′ (max-support μ) (max-support ν)))
+    | sym (cdf-max μ (max-support μ ⊔ max-support ν)
+                  (m≤m⊔n (max-support μ) (max-support ν)))
+    = fosd (max-support μ ⊔ max-support ν)
+
+fosd?-complete : ∀ μ ν → μ FOSD≤ ν → fosd? μ ν ≡ true
+fosd?-complete μ ν fosd = cong₂ _∧_ tw-part go-part
+  where
+    tw-part : (total-weight ν ≤ᵇ total-weight μ) ≡ true
+    tw-part = T-to-≡ (≤⇒≤ᵇ (fosd→tw μ ν fosd))
+
+    go-part : fosd?-go μ ν (max-support μ ⊔ max-support ν) ≡ true
+    go-part = fosd?-go-complete μ ν (max-support μ ⊔ max-support ν)
+      (λ r' _ → fosd r')
 
 ------------------------------------------------------------------------
 -- FOSD ⟹ Complement Dominance
