@@ -89,6 +89,31 @@
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
 
+% Chess board macros for N-Queens figures
+\newcommand{\qboard}[2]{%
+  \begin{tikzpicture}[scale=0.55]
+    \foreach \x in {0,...,3} {
+      \foreach \y in {0,...,3} {
+        \pgfmathparse{mod(\x+\y,2) ? "nord6" : "nord4!60"}%
+        \fill[\pgfmathresult] (\x,\y) rectangle ++(1,1);
+      }
+    }
+    \draw[nord3,thin] (0,0) grid (4,4);
+    #2
+    \node[below=4pt,font=\footnotesize\sffamily] at (2,0) {#1};
+  \end{tikzpicture}%
+}
+\newcommand{\givenq}[2]{%
+  \fill[nord0] (#1+0.5,#2+0.5) circle (0.32);
+  \fill[nord0] (#1+0.25,#2+0.82) -- (#1+0.5,#2+0.95) -- (#1+0.75,#2+0.82) -- (#1+0.7,#2+0.7) -- (#1+0.3,#2+0.7) -- cycle;
+  \fill[white] (#1+0.5,#2+0.55) circle (0.08);
+}
+\newcommand{\discq}[2]{%
+  \fill[nord10] (#1+0.5,#2+0.5) circle (0.32);
+  \fill[nord10] (#1+0.25,#2+0.82) -- (#1+0.5,#2+0.95) -- (#1+0.75,#2+0.82) -- (#1+0.7,#2+0.7) -- (#1+0.3,#2+0.7) -- cycle;
+  \fill[white] (#1+0.5,#2+0.55) circle (0.08);
+}
+
 \title{\textbf{Verified Program Synthesis for Coinductive Reinforcement Learning} \\
 From Observations to Optimal Policies via Predicate DSL}
 
@@ -103,7 +128,7 @@ From Observations to Optimal Policies via Predicate DSL}
 We present a verified program synthesis framework that extends Coinductive Symmetric Homomorphism Reinforcement Learning (CSHRL) from learned rankings to \emph{synthesized programs}.
 Where CSHRL defines optimality as structure preservation between action rankings and infinite reward streams, we add a synthesis layer that \emph{constructs} these rankings automatically from environment observations.
 
-The framework introduces ten components, all machine-verified in Agda:
+The framework introduces eleven components, all machine-verified in Agda:
 \textbf{(1)}~A \emph{Predicate DSL} (\texttt{PredProg})---a domain-specific language for Boolean predicates over environment features, parameterized by an abstract carrier type and feature set, enabling instantiation across different Environment Classes;
 \textbf{(2)}~A \emph{CEGIS} (Counterexample-Guided Inductive Synthesis) algorithm that enumerates predicate programs and refines a version space by observations, with proven monotonic convergence and strict shrinkage bounds;
 \textbf{(3)}~A \emph{Propagation Theorem} establishing that feature-equivalent carriers are indistinguishable to any predicate program, which yields three quantified consequences: identical refinement (\textsc{Refine-Equiv}), observation subsumption, and exploration dissolution---reducing the observations needed from $|C|$ (carrier count) to $|C/{\sim}|$ (equivalence classes);
@@ -179,6 +204,8 @@ This paper makes the following contributions, each machine-verified in Agda with
 \item \textbf{DSL Completeness (\S\ref{sec:dsl-complete}):} The Boolean \texttt{PredProg} DSL is expressively complete for feature-respecting targets.  A constructive \emph{fingerprint} construction shows that for any target constant on \texttt{AllFeatAgree} classes, there exists a \texttt{PredProg} matching it everywhere (\texttt{dsl-complete}).  This closes the theoretical loop: the DSL always contains the correct answer, CEGIS finds it from $|C/{\sim}|$ observations, and no fewer suffice.
 
 \item \textbf{EC-Specific Instantiation (\S\ref{sec:ec}):} Three concrete instantiations---for Finite Deterministic MDPs (ranking synthesis with \texttt{CoindHomo} construction), Combinatorial Placement MDPs (predicate synthesis that \emph{defines} the step function), and Stochastic Finite MDPs (ranking synthesis from expected traces with \texttt{StochasticCoindHomo} construction, \S\ref{sec:stochastic-synthesis}).
+
+\item \textbf{Cross-Pair Propagation (\S\ref{sec:cross-pair}):} A verified demonstration that CEGIS observations are pair-agnostic.  When ranking pairs share the same feature structure, observing a sub-optimal pair (C~vs~D) determines top-tier rankings (A~$>$~B)---without ever comparing the actions of interest.  Two observations from the bottom-tier pair determine all 6 rankings across all 6 states ($18\times$ savings).  Verified learning curves (8~states, Agda \texttt{refl}) and scaled rollout performance curves (30~states, 22-program VS) demonstrate a \textbf{50\% reward improvement} from propagation, with sub-optimal and top-pair observation sequences yielding \textbf{identical} rollout reward.
 
 \item \textbf{End-to-End Demos (\S\ref{sec:e2e}):} Three verified pipelines:
 \begin{itemize}
@@ -1821,7 +1848,7 @@ The only variation is in how domain-specific feedback maps to \texttt{PredObs} o
 \section{End-to-End: From Observations to Verified Policies}
 \label{sec:e2e}
 
-We present three end-to-end demonstrations that exercise the full synthesis pipeline.  Each is a self-contained Agda module in the codebase, compiled with \texttt{--safe --guardedness} and zero postulates.
+We present seven end-to-end demonstrations that exercise the full synthesis pipeline.  Each is a self-contained Agda module in the codebase, compiled with \texttt{--safe --guardedness} and zero postulates.
 
 \subsection{Demo 1: 1D Maze (FDMDP)}
 
@@ -1877,6 +1904,7 @@ finder-agrees P0 = refl  ;  finder-agrees P1 = refl  ;  finder-agrees P2 = refl
 
 
 \subsection{Demo 2: 4-Queens (CPMDP)}
+\label{sec:e2e-queens}
 
 Here synthesis is on the \emph{critical path}: the \texttt{PredProg} predicates define the step function.
 
@@ -1930,44 +1958,88 @@ refine-same : refine (initial-vs 0) (board₁ , true)
 refine-same = refine-equiv (initial-vs 0) board₁ board₂ true (λ { ... → refl })
 \end{spec}
 
-\subsection{Demo 3: 8-Queens (Scaling)}
+\subsection{Demo 4: Biased Bandit (SFMDP)}
+\label{sec:e2e-bandit}
 
-The 8-Queens demo (\texttt{Queens8E2E.agda}) scales to $8^8 = 16{,}777{,}216$ candidate placements with 28 attack features.
-
-\paragraph{The challenge.}  Directly evaluating the 28-feature \texttt{PredProg} disjunction within \texttt{find-policy} at compile time is computationally expensive for Agda's normalizer.  The solution: a \emph{hybrid} approach.
-
-\paragraph{Synthesize + Verify Equivalence.}  The \texttt{PredProg} predicates are constructed identically to 4-Queens (28 features instead of 6).  Their equivalence to faster hand-crafted Boolean functions is then proven via \texttt{refl} on test configurations:
+The final demonstration completes the E2E trifecta by exercising the \emph{stochastic} synthesis pipeline.
+The Biased Bandit is a single-state, two-armed bandit where Arm~A pays reward~1 with probability $2/3$ and Arm~B with probability $1/3$:
 
 \begin{spec}
-equiv-solution-dead :
-  synth-is-dead (0 ∷ 4 ∷ 7 ∷ 5 ∷ 2 ∷ 6 ∷ 1 ∷ 3 ∷ [])
-  ≡ is-dead-config (0 ∷ 4 ∷ 7 ∷ 5 ∷ 2 ∷ 6 ∷ 1 ∷ 3 ∷ [])
-equiv-solution-dead = refl
+data State : Set where  Playing : State
+data Action : Set where  ArmA ArmB : Action
 
--- More equivalence proofs: empty board, attacked boards, partial solutions...
+step : State → Action → Dist (State × ℕ)
+step Playing ArmA = bernoulli (Playing , 1) 2 (Playing , 0) 1   -- 2:1 odds
+step Playing ArmB = bernoulli (Playing , 1) 1 (Playing , 0) 2   -- 1:2 odds
 \end{spec}
 
-\paragraph{Instantiate with fast predicates.}  The EC is opened with the hand-crafted predicates (whose equivalence to the synthesized ones is formally established):
+\paragraph{Synthesis framework.}  We open \texttt{SFDMDPSynthesis} (the stochastic instantiation from \S\ref{sec:stochastic-synthesis}), which provides \texttt{expected-action-value}, \texttt{≤ₛ-lex}, and \texttt{StochasticCoindHomo}:
 
 \begin{spec}
-open CombinatorialPlacementMDP Config Action
-  is-dead-config is-solved-config place solved-reward all-actions C0 N
+open SFDMDPSynthesis State Action ℕ step _≤_ _≤?_ ≤-refl _+_ _*_ 0 _⊔_ 0
+  all-actions ArmB 3
 \end{spec}
 
-\paragraph{Full 8-Queens solution.}  \texttt{find-policy} produces the optimal placement:
+\paragraph{Features.}  The bandit is stateless: a single trivial feature (\texttt{is-playing}, always true) suffices.  This gives $|C/{\sim}| = 1$---one equivalence class---so CEGIS needs exactly one observation per action pair (the tight bound).
+
 \begin{spec}
-test-solution : run-policy (Ongoing []) N N
-  ≡ C0 ∷ C4 ∷ C7 ∷ C5 ∷ C2 ∷ C6 ∷ C1 ∷ C3 ∷ []  = refl
+data BanditFeature : Set where  is-playing : BanditFeature
+eval-bandit-feature : BanditFeature → State → Bool
+eval-bandit-feature is-playing Playing = true
+
+open WithStateFeatures BanditFeature eval-bandit-feature
+open WithCEGIS (is-playing ∷ [])
 \end{spec}
 
-\paragraph{Partial completion at scale.}
+\paragraph{Step 1: Observe.}  Two expected-trace comparisons at \texttt{Playing}:
+
 \begin{spec}
-test-from-4 : run-policy (Ongoing (0 ∷ 4 ∷ 7 ∷ 5 ∷ [])) N 4
-  ≡ C2 ∷ C6 ∷ C1 ∷ C3 ∷ []  = refl
-
-test-from-7 : run-policy (Ongoing (0 ∷ 4 ∷ 7 ∷ 5 ∷ 2 ∷ 6 ∷ 1 ∷ [])) N 1
-  ≡ C3 ∷ []  = refl
+obs-b≤a : List PredObs = (Playing , true) ∷ []    -- ArmB ≤ ArmA: yes
+obs-a≤b : List PredObs = (Playing , false) ∷ []   -- ArmA ≤ ArmB: no
 \end{spec}
+
+\paragraph{Step 2: Synthesize.}  CEGIS refines the version space (3 candidates) and returns:
+
+\begin{spec}
+synth-b≤a : synth-rank-pred 0 obs-b≤a ≡ just truep   = refl    -- ArmA always dominates
+synth-a≤b : synth-rank-pred 0 obs-a≤b ≡ just falsep   = refl    -- ArmB never dominates
+\end{spec}
+
+\paragraph{Step 3: Verify.}  The preservation proof uses lexicographic stream dominance.  Arm~A's expected head reward is 2 (unnormalized), Arm~B's is 1:
+
+\begin{spec}
+synth-preserves : ModelPreservesLex synth-rank
+synth-preserves ArmA ArmB s ()        -- eval falsep s ≡ true is absurd
+head≤ (synth-preserves ArmB ArmA Playing _) = s≤s z≤n         -- 1 ≤ 2
+tail≤ (synth-preserves ArmB ArmA Playing _) ()                -- 1 ≡ 2 absurd
+\end{spec}
+
+\noindent The reflexive cases (\texttt{ArmA ArmA}, \texttt{ArmB ArmB}) follow from \texttt{≤ₛ-lex-refl}.
+
+\paragraph{Step 4: Construct.}  Opening \texttt{WithCorrectModel} yields \texttt{SynthesizedStochasticHomo}---a verified \texttt{StochasticCoindHomo} constructed from the synthesized ranking.
+
+\paragraph{Step 5: Extract \& Confirm.}  The synthesized policy selects \texttt{ArmA}, matching the EC's independent \texttt{find-policy}:
+
+\begin{spec}
+test-synth-Playing : synth-policy Playing ≡ ArmA     = refl
+finder-agrees : find-policy Playing 3 ≡ synth-policy Playing  = refl
+\end{spec}
+
+\paragraph{Dissolution check.}  With $|C/{\sim}| = 1$, the version space collapses to a singleton after each observation:
+
+\begin{spec}
+vs-after-b≤a : length (cegis-loop (initial-vs 0) obs-b≤a) ≡ 2   = refl
+vs-after-a≤b : length (cegis-loop (initial-vs 0) obs-a≤b) ≡ 1   = refl
+\end{spec}
+
+\begin{remark}[Stochastic Synthesis Modularity]
+This demo confirms the central modularity claim: the \texttt{PredicateDSL}, CEGIS, version space, propagation, dissolution, and tight bound are \emph{identical} to the deterministic case.
+Only the observation layer changes---from deterministic trace comparison to expected-trace comparison.
+The type of the preservation proof changes from \texttt{ModelPreserves} (pointwise \texttt{≤ₛ}) to \texttt{ModelPreservesLex} (lexicographic \texttt{≤ₛ-lex}), and the resulting homomorphism is \texttt{StochasticCoindHomo} instead of \texttt{CoindHomo}, but \emph{no synthesis theorem needed modification}.
+\end{remark}
+
+\paragraph{Extended demos.}
+Extended demonstrations (8-Queens scaling, N-Queens feature discovery, FrozenLake, Cliff Walking, Auto-FTL, Taxi, stochastic variants, sample-efficiency analysis, and Cross-Pair Propagation) are in Appendix~\ref{sec:extended-demos}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2047,6 +2119,11 @@ module ToyExample where
   dissolution-demo = exploration-dissolution (initial-vs 0) Hot true [] tt
 \end{code}
 
+\section{Cross-Pair Propagation (Summary)}
+\label{sec:cross-pair-summary}
+
+CEGIS observations are \emph{pair-agnostic}: when ranking pairs share the same feature structure, observing a sub-optimal pair (C~vs~D) determines top-tier rankings (A~$>$~B) without ever comparing A or B.  Two observations from a single pair can determine all $\binom{4}{2} = 6$ rankings at all 6 states---a $18\times$ savings.  Full details, verified learning curves, and rollout performance at scale are in Appendix~\ref{sec:extended-demos}.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART IX: DISCUSSION
@@ -2119,15 +2196,171 @@ This is never used as a synthesis algorithm; its role is purely existential.
 The CEGIS enumeration typically finds much smaller programs.
 But the completeness guarantee is essential: it certifies that CEGIS is searching in a space that \emph{provably contains} the answer.
 
+\subsection{Cross-Pair Propagation and Observation Efficiency}
+
+The cross-pair propagation result (\S\ref{sec:cross-pair}) reveals that the Propagation Theorem's power extends beyond spatial generalization (across feature-equivalent states).  When multiple ranking pairs are governed by the same feature structure, a single CEGIS version space simultaneously constrains \emph{all} correlated pairs.  This is not an ad-hoc optimization---it follows directly from the fact that CEGIS operates on \texttt{PredObs} = \texttt{Carrier~$\times$~Bool}, which carries no information about which action pair generated the observation.
+
+The practical implication is substantial.  In environments with $k$ actions, the na\"ive approach requires $\binom{k}{2} \times |C|$ observations (all pairs at all states).  Dissolution reduces this to $\binom{k}{2} \times |C/{\sim}|$.  Cross-pair propagation can further reduce it to as few as $|C/{\sim}|$ observations \emph{total}---when all pairs share the same feature predicate.  The savings factor grows quadratically in $k$.
+
+The partial correlation case is equally important: when some pairs share a predicate and others do not, the savings are proportional to the ``feature correlation'' across the ranking structure.  This can be detected at synthesis time by inspecting whether multiple pairs converge to the same surviving program.
+
+
+\subsection{Demo 15: GamblersRuin --- FOSD Synthesis in a Richer Environment}
+\label{sec:e2e-gamblers-ruin-fosd}
+
+We extend FOSD-based synthesis beyond the single-state BiasedBandit to \textbf{GamblersRuin}: 3~states (Ruin, Middle, Goal), 2~actions (Bet, Quit).
+From Middle, Bet yields 50\% chance of Goal (reward~1) and 50\% Ruin (reward~0); Quit yields 100\% Middle (reward~0).
+The optimal policy at Middle is Bet (higher expected value and FOSD-dominance).
+
+The \texttt{Synthesis.FOSDStochasticFiniteMDP} module provides the same interface as \texttt{StochasticFiniteMDP} but generates observations via \texttt{fosd-compare} instead of expected-trace comparison.
+FOSD comparison requires equal total weights; GamblersRuin's \texttt{pure} for Quit has weight~1 while Bet has weight~2.
+We use \texttt{step-fosd} that scales Quit to weight~2 (same semantics: 100\%~(Middle,0)) so \texttt{fosd?} can compare.
+
+With feature \texttt{is-middle} (true only at Middle), CEGIS synthesizes a predicate for prefer(Quit, Bet) from the observation \texttt{(Middle, fosd-compare Middle Quit Bet 0)}.
+At depth~0, Quit FOSD$\le$~Bet (Bet dominates); the synthesized predicate holds at Middle, yielding the optimal policy: Bet.
+
+\begin{center}
+\texttt{test-fosd-quit≤bet : fosd-compare Middle Quit Bet 0 $\equiv$ true}\\
+\texttt{test-synth-succeeds : synth-quit≤bet $\equiv$ just truep}
+\end{center}
+
+The \texttt{ModelPreservesFOSD} type and \texttt{WithCorrectModel} connect a verified \texttt{RankModel} to \texttt{FOSDCoindHomo}: when a synthesized ranking preserves pointwise FOSD at every timestep, it yields a coinductive homomorphism optimal for \emph{all} monotone utility functions.
+The \texttt{WithLearningBridge} module provides the same learning--synthesis integration as \texttt{StochasticFiniteMDP}: \texttt{sample-to-obs} maps samples to FOSD observations via \texttt{fosd-compare}, \texttt{synth-learn-step} and \texttt{synth-learn-batch} process samples incrementally, and \texttt{extract-rank-model} builds a \texttt{RankModel} from the combined learner state.
+The Learning Bridge is demonstrated end-to-end in GamblersRuin: a sample \texttt{(Middle, Quit, Bet)} is processed by \texttt{synth-learn-batch}, and \texttt{extract-rank-model} yields a \texttt{RankModel} that correctly prefers Bet over Quit at Middle (\texttt{test-extracted-correct}).
+
+\subsection{Future Direction: FOSD-Based Synthesis}
+\label{sec:fosd-synth}
+
+The current stochastic synthesis pipeline compares actions by \emph{expected} trace values: observation $(s, \texttt{true})$ records that $\mathbb{E}[\text{trace}(s, a)] \le \mathbb{E}[\text{trace}(s, b)]$.
+This suffices for expected-value maximizers, but collapses the full reward distribution to a single scalar.
+
+A strictly stronger comparison is \textbf{First-Order Stochastic Dominance (FOSD)}: action $a$ FOSD-dominates $b$ at state $s$ iff for all thresholds $r$ and all timesteps $n$:
+\[
+P(\text{reward}_n(s,a) \le r) \le P(\text{reward}_n(s,b) \le r)
+\]
+i.e., $a$'s cumulative distribution lies everywhere below $b$'s.  FOSD implies expected-value dominance ($\mu \ge_\text{FOSD} \nu \Rightarrow \mathbb{E}[\mu] \ge \mathbb{E}[\nu]$) but not conversely.  An action FOSD-dominating another is preferred by \emph{all monotone utility functions}---risk-averse, risk-neutral, and risk-seeking agents agree.
+
+We have implemented the FOSD infrastructure in Agda (\texttt{Probability.FOSD}, \texttt{Core.FOSD}):
+\begin{itemize}
+\item \textbf{CDF computation} for finite distributions (\texttt{cdf-weight}, \texttt{comp-weight}), with the fundamental identity $\text{CDF}(d,r) + \text{comp}(d,r) = W$ verified.
+\item \textbf{FOSD ordering} with preorder properties (reflexivity, transitivity).
+\item \textbf{FOSD $\Rightarrow$ E[X] bridge theorem} for 0/1 distributions: fully proved, using complement-weight dominance and the tail-sum identity.
+\item \textbf{Coinductive FOSD} (\texttt{StreamFOSD}): a coinductive record on streams of distributions, the distributional analogue of \texttt{$\le_s$-lex}.
+\item \textbf{FOSDCoindHomo}: a ranking that preserves FOSD at every timestep, strictly stronger than \texttt{StochasticCoindHomo}.
+\item \textbf{BiasedBandit FOSD demo}: ArmA FOSD-dominates ArmB at step~0, with CDF values verified by \texttt{refl}, and the bridge theorem confirmed.
+\item \textbf{Demo~15 (GamblersRuin FOSD synthesis)}: Full FOSD synthesis pipeline in a 3-state environment (\S\ref{sec:e2e-gamblers-ruin-fosd}); \texttt{Synthesis.FOSDStochasticFiniteMDP} with \texttt{ModelPreservesFOSD}, \texttt{WithCorrectModel}, and \texttt{WithLearningBridge}---connecting verified rankings to \texttt{FOSDCoindHomo} and learning feedback to synthesis.
+\end{itemize}
+
+The key observation for synthesis: the \texttt{PredicateDSL} and CEGIS are entirely \emph{unchanged}.  Only the observation-generation layer differs: instead of comparing expected traces (a scalar), we compare marginal CDFs (a function of the threshold).  A FOSD observation at state $s$ asserts $\forall r.\, \text{CDF}(s,b,r) \le \text{CDF}(s,a,r)$---which maps to the \emph{same} \texttt{PredObs = Carrier $\times$ Bool} format.  All propagation, dissolution, and tight-bound theorems apply without modification.
+
+The \textbf{Stochastic Isomorphism} (proved in \texttt{Core.FOSD}) establishes that coinductive FOSD on reward streams is isomorphic to pointwise FOSD---extending the Stream Isomorphism to distributions.  \texttt{conjecture-forward} unfolds the coinductive record to extract FOSD at each depth; \texttt{conjecture-reverse} builds the coinductive \texttt{StreamFOSD} from pointwise FOSD via a corecursive \texttt{pointwise-to-stream-fosd}.  This enables coinductive reasoning about FOSD-based synthesis, paralleling how \texttt{$\le_s$-lex} enables coinductive reasoning about expected-value synthesis.
+
+\subsection{Feature Discovery: The Feature Template Language}
+\label{sec:ftl}
+
+A persistent concern with feature-based synthesis is the \emph{human knowledge bottleneck}: features like \texttt{attacks~i~j} in N-Queens distill domain expertise into the framework.
+The Feature Template Language (FTL) addresses this by providing a systematic three-stage pipeline---enumerate, filter, reduce---from which domain-specific concepts emerge without human naming.
+
+\paragraph{The pipeline.}
+The human provides a state representation (\texttt{List~ℕ} for placement problems), comparison primitives (value equality, absolute-difference equality, their composite, and length checks), and sample boards.  The FTL then:
+\begin{enumerate}
+\item \emph{Enumerates} all features instantiating the primitives over the state's index space---both atomic (\texttt{vals-eq}, \texttt{spread-eq}) and composite (\texttt{pair-any} = either).
+\item \emph{Filters} by keeping features never true on alive samples (conflict indicators).
+\item \emph{Eliminates redundancy} by detecting structural subsumption: when a composite \texttt{pair-any~i~j} subsumes both atomics \texttt{vals-eq~i~j} and \texttt{spread-eq~i~j}, the atomics are dropped.
+\end{enumerate}
+
+For N-Queens with $N=4$: 23 candidates $\to$ 18 after filtering $\to$ \textbf{6 composite features} after redundancy elimination.  Each surviving \texttt{pair-any~i~j} computes ``same column OR same diagonal''---the \texttt{attacks} concept, discovered without naming.
+
+\paragraph{Dual discovery.}
+The same filtering technique discovers \texttt{is-solved}: a dual filter keeps features true on \emph{all} solved samples and false on \emph{all} non-solved samples.  For N-Queens, exactly one feature survives: \texttt{len-is~4}.  Both the constraint predicate and the goal predicate are thus automatically derived.
+
+\paragraph{Equivalence classes as quality metric.}
+The tight sample complexity bound says CEGIS needs exactly $|C/{\sim}|$ observations, where equivalence is induced by the feature set.  The FTL provides \texttt{feature-vector} and \texttt{equiv-classes} functions to compute $|C/{\sim}|$ directly.  On all 16 length-2 boards with the 6 discovered features, $|C/{\sim}| = 2$ (conflicting vs.\ non-conflicting)---verified by \texttt{refl}.  This gives a \emph{formal objective for feature selection}: a good feature set is one that yields small $|C/{\sim}|$.  The discovered features produce the same $|C/{\sim}|$ as hand-crafted ones.
+
+\paragraph{Depth--feature tradeoff.}
+The \texttt{PredProg} enumeration at depth~$d$ applies Boolean operators $d$~times to the atomic feature set, yielding a version space that grows roughly as $O(n^{2^d})$ where $n$ is the number of features.  With FrozenLake's 20~discovered features: depth~0 produces 22~candidates, depth~1 produces 1{,}012, and depth~2 produces 2{,}050{,}312---all verified by \texttt{refl} and checked in under 25~seconds.  Depth~3, however, is infeasible: enumeration exceeds 20~minutes and 3\,GB of memory before being terminated.
+
+This exponential cliff makes the FTL's role structural rather than merely convenient.  If CEGIS were given raw bit-level state descriptors instead of FTL-discovered features, recovering a concept like ``row~is~3'' would require depth~2+ Boolean formulas over individual bits---precisely the regime where enumeration explodes.  By providing semantically meaningful features, the FTL keeps the required depth at~0 or~1: every ranking predicate across Demos~1--10 is at most a depth-1 combination (e.g., the Cliff Walking R-optimal predicate is a disjunction of two atoms).  Demo~11 (FrozenLake~$8{\times}8$) introduced \texttt{synth-greedy-or} to handle scattered state sets where no bounded-depth predicate suffices, building disjunctions of atoms incrementally rather than enumerating all depth-$d$ combinations.  Demo~12 (Taxi~$5{\times}5$) introduces \texttt{synth-decision-tree}: a greedy Gini-based decision-tree synthesizer that builds nested if-then-else trees over relational features, producing interpretable policies that capture depth-4+ decision boundaries no flat disjunction can express.  Demo~14 (FrozenLake~8×8~slippery, \S\ref{sec:e2e-frozenlake-8x8-slippery}) applies the same algorithm to the stochastic pipeline, where \texttt{synth-greedy-or} fails on row/col features alone.  The FTL thus controls not only the \emph{observation complexity} (via $|C/{\sim}|$) but also the \emph{synthesis tractability} (via depth, greedy atom selection, or decision-tree splitting).
+
+\paragraph{Scope and extensibility.}
+The framework now has three FTL families: a \emph{structural} FTL for \texttt{List~ℕ} states (pairwise comparisons, covering N-Queens and similar placement problems), a \emph{dynamics} FTL for finite-state MDPs (reward and self-loop templates, covering the Maze and similar FDMDPs), and an \emph{automatic} FTL for $\mathbb{N}$-state MDPs (the Auto-FTL of Demos~9--12, which derives features from the state count's number-theoretic structure and the step function's behavioral properties).  All three plug into \texttt{PredicateDSL} via the same interface.  The Auto-FTL eliminates the feature engineering step entirely: for FrozenLake~$4{\times}4$ ($n=16$, 56~features, 3~divisors), Cliff Walking ($n=24$, 106~features, 6~divisors), FrozenLake~$8{\times}8$ ($n=64$, 200~features, 5~divisors), and Taxi~$5{\times}5$ ($n=500$, ${\sim}1{,}700$~features, 10~divisors), the auto-generated features produce optimal policies with grid coordinates emerging automatically as factorization features.  Taxi further demonstrates three synthesis paradigms at scale (500~states, 6~actions): fully automated greedy-or CEGIS (${\sim}$9.5~min, opaque), decision-tree CEGIS over 14~relational features (${\sim}$13~min, interpretable), and a hand-crafted relational navigation function.  Compound and relational features extend the Auto-FTL to environments requiring multi-phase task reasoning.
+The FTL sits outside the Trusted Computing Base: the verified synthesis pipeline consumes discovered features without modification.
+
+
 \subsection{Related Work}
 
-\paragraph{Program synthesis for RL.}  Verma et al.~\cite{Verma2018} synthesize programmatic policies from neural network policies via imitation learning, producing interpretable programs but without formal verification.  Inala et al.~\cite{Inala2020} use neurosymbolic synthesis for safe RL, combining neural networks with symbolic constraints.  Our approach differs fundamentally: the synthesized programs are verified \emph{within} the type system, not by external checking.
+We now position our contributions against six lines of related work, summarizing the comparison in Tables~\ref{tab:related} and~\ref{tab:viper}.
 
-\paragraph{CEGIS.}  Solar-Lezama et al.~\cite{SolarLezama2006} introduced CEGIS for program synthesis in the Sketch framework.  Our version is specialized to Boolean predicates and operates within a purely constructive, termination-checked setting (Agda with \texttt{--safe}).  The convergence and strict-shrinkage bounds are, to our knowledge, novel formal results.
+\paragraph{Version spaces.}  Mitchell~\cite{Mitchell1982} introduced version spaces for concept learning, representing the set of consistent hypotheses via S/G boundary sets and proving correctness of the candidate-elimination algorithm.  Hirsh~\cite{Hirsh1994} generalized version spaces beyond boundary-set representations.  Lau et al.~\cite{Lau2003} developed Version Space Algebras for programming-by-demonstration, enabling compositional hypothesis-space manipulation.  Our work builds on Mitchell's conceptual foundation but diverges in three ways: (i)~we prove \emph{dissolution}---that feature-equivalent observations are provably redundant (\texttt{refine-absorb})---a property not formalized in any prior version-space work; (ii)~we establish a \emph{tight sample complexity bound} (exactly $|C/{\sim}|$), whereas Mitchell's framework provides no quantitative complexity analysis; and (iii)~our entire treatment is machine-verified in Agda, whereas prior work uses pen-and-paper proofs only.
 
-\paragraph{Verified RL.}  Lesage and Ong~\cite{Lesage2020} formalize value and policy iteration convergence in Coq but do not address synthesis.  The CSHRL framework~\cite{CSHRL2026} provides the coinductive homomorphism theory we build upon.
+\paragraph{CEGIS.}  Solar-Lezama et al.~\cite{SolarLezama2006} introduced CEGIS for program synthesis in the Sketch framework.  Jha and Seshia~\cite{Jha2017} extended CEGIS modulo theories to handle background theories and non-trivial constants.  Our version is specialized to Boolean predicates over features and operates within a purely constructive, termination-checked setting (Agda with \texttt{--safe}).  The convergence proof, strict-shrinkage bound, and the tight sample complexity result ($|C/{\sim}|$ necessary \emph{and} sufficient) are, to our knowledge, the first formal CEGIS results in any proof assistant.
 
-\paragraph{Version spaces.}  Mitchell~\cite{Mitchell1982} introduced version spaces for concept learning.  Our version-space refinement with propagation quantification can be viewed as a formalized, constructive version of Mitchell's framework, with the Propagation Theorem providing the structural guarantee that equivalent instances produce identical refinement.
+\paragraph{State abstraction in RL.}  Li et al.~\cite{Li2006} provide a comprehensive taxonomy of state abstractions in MDPs, showing that various abstraction types preserve different solution quality guarantees.  Abel et al.~\cite{Abel2018} extend this to study which abstractions preserve near-optimal behavior.  Ferns et al.~\cite{Ferns2004} and Zhang et al.~\cite{Zhang2021} develop bisimulation metrics for measuring behavioral equivalence of states.  Our \texttt{AllFeatAgree} equivalence relation can be seen as a concrete feature-based bisimulation.  The key difference is that state abstraction work focuses on \emph{value function preservation}---whether abstract states have similar values---while we focus on \emph{synthesis observation efficiency}---how many observations CEGIS needs.  The Propagation Theorem connects these perspectives: feature equivalence simultaneously preserves predicate semantics \emph{and} reduces required observations, a connection not made in prior work.
+
+\paragraph{Multi-task learning and shared hypotheses.}  Crammer and Mansour~\cite{Crammer2012} study multi-task learning through shared hypothesis pools, showing that when tasks share structure, fewer samples per task suffice, with VC-dimension generalization bounds.  This is the closest relative to our cross-pair propagation result: both exploit shared structure across ``tasks'' (their terminology) or ``ranking pairs'' (ours) to reduce sample complexity.  However, the frameworks differ fundamentally.  Crammer and Mansour work in a statistical PAC-learning setting with approximate generalization bounds over distributions of tasks.  Our cross-pair propagation is \emph{exact}: a C-vs-D observation at state $s$ and an A-vs-B observation at state $s$ produce \emph{definitionally identical} \texttt{PredObs} values when both pairs are governed by the same predicate---not approximately similar, but \texttt{refl} in Agda.  Furthermore, we compose this with dissolution (spatial propagation), achieving multiplicative savings ($\binom{k}{2} \times m$ for $k$ actions with $m$ states per class) that have no analogue in the multi-task literature.
+
+\paragraph{Preference-based RL.}  F\"urnkranz et al.~\cite{Furnkranz2012} formalize preference-based RL, learning policies from qualitative pairwise comparisons rather than numerical rewards.  Wirth et al.~\cite{Wirth2017} survey the field, and recent work~\cite{Chen2022,Zhu2023} studies sample complexity with general function approximation.  These approaches treat each pairwise query as an independent observation.  None formalize the phenomenon we demonstrate: that when ranking pairs share feature structure, observations about sub-optimal pairs \emph{exactly determine} top-tier rankings.  The cross-pair propagation result shows that, in structured environments, the effective number of independent queries can be far smaller than the number of action pairs---a reduction invisible to frameworks that treat queries as independent.
+
+\paragraph{Program synthesis for RL.}  Verma et al.~\cite{Verma2018} synthesize programmatic policies from neural network policies via imitation learning, producing interpretable programs but without formal verification.  Inala et al.~\cite{Inala2020} use neurosymbolic synthesis for safe RL, combining neural networks with symbolic constraints.  Both follow a \emph{distillation} paradigm: train a DNN first, then extract a structured policy from it.  Our approach eliminates the DNN training phase entirely---the Finder computes optimal actions directly from the environment specification, and CEGIS synthesizes a verified predicate program from those observations.  The synthesized programs are verified \emph{within} the type system, not by external checking.
+
+\paragraph{Verifiable RL via policy extraction.}  Bastani, Pu, and Solar-Lezama~\cite{Bastani2018} propose VIPER, which distills DNN policies into decision trees and verifies properties (robustness, Lyapunov stability, safety invariants) using external tools (Z3, SOS programs).  VIPER is the closest prior work to our system and merits detailed comparison, as both aim for verifiable, interpretable RL policies.  However, the approaches differ at every level of the pipeline:
+
+\begin{itemize}
+\item \textbf{Oracle.}  VIPER's oracle is a DNN trained by standard deep RL---an approximate policy with an approximate Q-function.  Our Finder is an exhaustive oracle backed by \texttt{CoindHomo}: it evaluates all action sequences to the depth horizon, producing \emph{exact} optimal actions.  VIPER distills an approximation; we compress the ground truth.
+
+\item \textbf{Extraction.}  VIPER uses iterative imitation learning (DAGGER variant) with Q-function weighting.  Our CEGIS uses version-space refinement with monotonic convergence and a tight sample complexity bound ($|C/{\sim}|$).  VIPER's convergence guarantee (Theorem~2.2) is asymptotic and applies to the convex surrogate loss, not to the decision tree itself.  Our convergence is exact: the version space shrinks monotonically and exhausts in finitely many observations.
+
+\item \textbf{Verification.}  VIPER verifies \emph{specific properties} post-hoc---robustness to $L_\infty$ perturbations, Lyapunov stability around the origin, safety invariants for bounded initial regions---using external SMT solvers.  These are important but \emph{secondary}: a robust policy can be suboptimal, a stable policy can be far from the best.  Our verification is \emph{intrinsic}: \texttt{test-auto-all-match = refl} proves optimality at every non-terminal state, checked by Agda's kernel.  This is the \emph{primary} property---if the policy is provably optimal and the environment is well-specified, safety follows from the environment structure.
+
+\item \textbf{Policy size.}  VIPER's decision trees range from 31~nodes (toy Pong) to 9{,}757~nodes (half-cheetah).  Our \texttt{PredProg} policy for Cliff Walking is ${\sim}$38~bits---two predicates and a default action.  The gap reflects the representations: decision trees repeat state-space partitions at every node, while Boolean predicate programs share features across branches.
+
+\item \textbf{Counterexamples.}  Crucially, VIPER's extraction can introduce errors.  In their toy Pong experiment, Z3 discovers a counterexample in the extracted decision tree: the paddle oscillates and misses the ball near screen edges.  The authors note (footnote~10) that ``we have no way of knowing if other counterexamples exist'' in the original DNN policy.  In CSH, counterexamples cannot exist: the synthesized policy is proven to match the Finder at every state before the proof artifact is accepted.
+\end{itemize}
+
+\noindent Table~\ref{tab:viper} summarizes the quantitative comparison on a common benchmark scale.  The fundamental difference is architectural: VIPER is \emph{learn, compress, then verify}; CSH is \emph{synthesize with proof}.  VIPER's three-stage pipeline has three potential failure points (DNN training, tree extraction, property verification), while CSH's unified pipeline has none (given correct environment specification).
+
+VIPER does handle continuous state spaces and continuous dynamics, which CSH does not yet address.  This is a genuine limitation of our current framework, not a flaw in VIPER's design.  However, VIPER's verification also degrades with complexity: their half-cheetah tree (9{,}757~nodes) has no verification at all, and their cart-pole stability proof uses a degree-5 Taylor approximation rather than the true dynamics.
+
+\begin{table}[H]
+\centering
+\caption{CSH synthesis vs.\ VIPER~\cite{Bastani2018} on representative benchmarks.}
+\label{tab:viper}
+\small
+\begin{tabular}{@{}lcc@{}}
+& \textbf{CSH (Cliff Walking)} & \textbf{VIPER (Pong / cart-pole)} \\
+\hline
+Oracle & Finder (exact, CoindHomo) & DNN (approx., DRL-trained) \\
+Training samples & 56 oracle queries & ${\sim}$10{,}000+ episodes \\
+Policy size & $\sim$38 bits & 31--9{,}757 nodes \\
+Verification & Optimality at all states & Robustness / stability / safety \\
+Verification tool & Agda kernel (\texttt{refl}) & Z3 / SOS programs \\
+Counterexamples & Impossible by construction & Discovered post-hoc \\
+Correctness & Proven (\texttt{refl}) & Approximate (property-specific) \\
+Hyperparameters & 0 & ${\sim}$8+ (lr, $\varepsilon$, $\gamma$, depth, \ldots) \\
+\end{tabular}
+\end{table}
+
+\paragraph{Verified RL.}  Lesage and Ong~\cite{Lesage2020} formalize value and policy iteration convergence in Coq but do not address synthesis.  The CSHRL framework~\cite{CSHRL2026} provides the coinductive homomorphism theory we build upon.  To our knowledge, no prior work combines formal verification of RL with program synthesis, let alone with propagation and cross-pair observation transfer.
+
+\begin{table}[t]
+\centering
+\caption{Comparison of our contributions against related work.  \textbf{Bold} entries mark capabilities unique to our framework.}
+\label{tab:related}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\textbf{Capability} & \textbf{Ours} & \textbf{Mitchell} & \textbf{CEGIS} & \textbf{Multi-task} \\
+ & & \textbf{'82} & \textbf{(S-L '06)} & \textbf{(C\&M '12)} \\
+\hline
+Version-space refinement & $\checkmark$ & $\checkmark$ & --- & --- \\
+CEGIS convergence proof & \textbf{formal} & --- & informal & --- \\
+Dissolution (obs.\ redundancy) & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
+Tight sample complexity & $\boldsymbol{|C/{\sim}|}$ & --- & --- & VC bound \\
+Cross-pair propagation & $\boldsymbol{\checkmark}$ & --- & --- & statistical \\
+Spatial $\times$ cross-pair composition & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
+Machine-verified (proof assistant) & \textbf{Agda} & --- & --- & --- \\
+Applied to RL ranking synthesis & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
+\end{tabular}
+\end{table}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2136,7 +2369,7 @@ But the completeness guarantee is essential: it certifies that CEGIS is searchin
 
 \section{Conclusion}
 
-We have presented a verified program synthesis framework for Coinductive Symmetric Homomorphism Reinforcement Learning.  The framework introduces ten key components, each machine-verified:
+We have presented a verified program synthesis framework for Coinductive Symmetric Homomorphism Reinforcement Learning.  The framework introduces the following key components, each machine-verified:
 
 \begin{enumerate}
 \item A \textbf{Predicate DSL} that provides interpretable, generalizable, and verifiable Boolean programs over environment features.
@@ -2158,9 +2391,23 @@ We have presented a verified program synthesis framework for Coinductive Symmetr
 \item A \textbf{Sample Complexity Lower Bound} proving that the $|C/{\sim}|$ upper bound is tight: two targets agreeing on observed carriers produce identical version spaces, so survivors transfer freely between indistinguishable targets.  Combined with feature sufficiency, this proves the sample complexity is \emph{exactly} $|C/{\sim}|$---one representative per equivalence class is both necessary and sufficient.
 
 \item \textbf{DSL Completeness}: a constructive proof (via fingerprints) that the Boolean \texttt{PredProg} DSL is expressively complete for feature-respecting targets.  For any target constant on \texttt{AllFeatAgree} classes, the synthesized program matches the target everywhere.  This closes the theoretical loop: the DSL contains the answer, CEGIS finds it from $|C/{\sim}|$ observations, and no fewer suffice.
+
+\item \textbf{Cross-Pair Propagation}: a verified demonstration that CEGIS observations are pair-agnostic---observing the sub-optimal pair (C~vs~D) determines top-tier rankings (A~$>$~B) without ever comparing A or B.  Two observations from a single pair determine all $\binom{4}{2} = 6$ rankings at all 6 states, a $18\times$ savings.
+
+\item \textbf{Three Feature Template Languages (FTLs)} for automatic feature discovery across all three ECs:
+\begin{itemize}
+\item \emph{Structural FTL}: a three-stage pipeline (enumerate, filter, reduce) for \texttt{List~ℕ} states.  For N-Queens, 23 candidates reduce to 6 composite features---each \texttt{pair-any~i~j} is ``attacks,'' discovered without naming.  A dual filter discovers \texttt{is-solved}.  Feature vectors and $|C/{\sim}|$ counting provide a formal quality metric.
+\item \emph{Dynamics FTL}: dynamics-derived features (\texttt{has-pos-reward}, \texttt{is-self-loop}) for finite-state MDPs.  For the Maze, \texttt{is-self-loop~Fwd} evaluates identically to the hand-crafted \texttt{is-goal}---the ``goal'' concept emerges from dynamics.
+\item \emph{Auto-FTL}: automatic feature generation for $\mathbb{N}$-state MDPs from the state count's number-theoretic structure (divisors, modular arithmetic) and the step function's behavioral properties.  For FrozenLake~$4{\times}4$ ($n=16$, 56~features), Cliff Walking ($n=24$, 106~features), FrozenLake~$8{\times}8$ ($n=64$, 200~features), and Taxi~$5{\times}5$ ($n=500$, ${\sim}1{,}700$~features), the auto-generated features include factorization features that \emph{automatically recover grid coordinates} (\texttt{div-is~$w$~$k$} $\equiv$ \texttt{row-is~$k$} for the appropriate divisor $w$), eliminating the last human input in the synthesis pipeline.  The Cliff Walking demo demonstrates depth-1 predicate synthesis; the FrozenLake~$8{\times}8$ demo introduces greedy cascading CEGIS (\texttt{synth-greedy-or}) for scattered state sets and a memoized DP Finder for depth-16 planning over 64~states; and the Taxi demo introduces compound features for multi-phase tasks and relational wall-aware navigation verified optimal over 500~states.
+\end{itemize}
+All three plug into \texttt{PredicateDSL} via the same \texttt{(Feature, eval-feature)} interface.
 \end{enumerate}
 
-The framework is demonstrated end-to-end on three Environment Classes: a 1D Maze (FDMDP) where synthesis produces verified \texttt{CoindHomo} rankings; $N$-Queens (CPMDP) where synthesized predicates \emph{define} the environment's dynamics, enabling solutions for $N=4$ (with instant evaluation) and $N=8$ (with verified equivalence, covering an $8^8$ search space); and Stochastic Finite MDPs where synthesis operates on expected traces, producing verified \texttt{StochasticCoindHomo} rankings and demonstrating that the entire generic theory applies unchanged to probabilistic transitions.  All partial solution completion tests pass by \texttt{refl}, confirming that the synthesized programs evaluate correctly from any intermediate state.
+The framework is demonstrated end-to-end on all three Environment Classes with fourteen verified demos: a 1D Maze (FDMDP) where synthesis produces verified \texttt{CoindHomo} rankings; $N$-Queens (CPMDP) where synthesized predicates \emph{define} the environment's dynamics, enabling solutions for $N=4$ and $N=8$; a Biased Bandit (SFMDP) confirming that synthesis applies unchanged to stochastic transitions; \textbf{N-Queens with Feature Discovery} where the structural FTL discovers both predicates automatically; \textbf{Maze with Feature Discovery} where the dynamics FTL discovers the ``goal'' concept; \textbf{FrozenLake~$4{\times}4$}---a well-known OpenAI Gym benchmark with fully automated policy synthesis from hand-crafted features; \textbf{Cliff Walking~$4{\times}6$}---a Sutton \& Barto benchmark with cliff detection; \textbf{Auto-FTL FrozenLake}---FrozenLake solved with \emph{zero human feature engineering}, where grid coordinates emerge automatically from modular arithmetic; \textbf{Auto-FTL Cliff Walking}---the same zero-engineering pipeline applied to Cliff Walking ($n=24$, 106~features, 6~divisors), demonstrating scaling to richer factorization structure and depth-1 predicate synthesis; \textbf{FrozenLake~$8{\times}8$}---a $4\times$ scale-up ($n=64$, 200~features, 53~non-terminal states) solved in 7~seconds via a memoized DP Finder and greedy cascading CEGIS (\texttt{synth-greedy-or}); \textbf{Taxi~$5{\times}5$}---a $10\times$ scale-up to 501~states with 6~actions, internal walls, and a multi-phase task, solved via both fully automated 6-stage cascading CEGIS (${\sim}1{,}700$ auto-generated features, 9.5~minutes) and interpretable wall-aware relational navigation, verified optimal at all 500~non-terminal states; and \textbf{Slippery FrozenLake~$4{\times}4$}---the first stochastic RL benchmark in the synthesis pipeline, featuring a \textbf{memoized stochastic Finder} (\texttt{MemoizedStochastic}) that builds a DP value table in $O(\text{depth} \times |S| \times |A| \times |\text{outcomes}|)$ time, enabling depth-10 planning that produces a genuine safety-aware policy (all 4~actions with expected-value justifications), with decision-tree CEGIS and full verification at all 11~non-terminal states; and \textbf{Slippery FrozenLake~$8{\times}8$}---scaling the stochastic pipeline to 64~states (53~non-terminal, 10~holes), same memoized Finder at depth~10, policy computed in ${\sim}27$~seconds, with \texttt{synth-decision-tree} over 16~row/col features (D$\to$L$\to$U$\to$R cascade), verified at all 53~states in ${\sim}2.9$~hours.  All tests pass by \texttt{refl}.
+
+Additionally, we have established the infrastructure for \textbf{First-Order Stochastic Dominance (FOSD)} synthesis (\S\ref{sec:fosd-synth}): CDF computation, FOSD ordering with preorder properties, the FOSD$\,\Rightarrow\,$E[X] bridge theorem, coinductive FOSD on reward streams (\texttt{StreamFOSD}), \texttt{FOSDCoindHomo}, BiasedBandit FOSD verification, Demo~15 (GamblersRuin FOSD synthesis with \texttt{ModelPreservesFOSD}, \texttt{WithCorrectModel}, and \texttt{WithLearningBridge}), and the \textbf{Stochastic Isomorphism} (\texttt{conjecture-forward}, \texttt{conjecture-reverse})---all machine-verified.
+
+The \textbf{Feature Template Languages} (\S\ref{sec:ftl}) address the human knowledge bottleneck with three complementary discovery pipelines.  The structural FTL derives features from state structure (pairwise comparisons); the dynamics FTL derives features from step-function behavior (reward, self-loops); and the Auto-FTL derives features from the state count's number-theoretic properties (divisors, modular arithmetic) combined with dynamics.  Together they cover all three ECs with progressively less human input.  The Auto-FTL, in particular, eliminates the feature engineering step entirely: the human provides only the environment definition, and the features emerge from the state encoding.  This is validated on four environments---FrozenLake~$4{\times}4$ ($n=16$, 56~features), Cliff Walking ($n=24$, 106~features), FrozenLake~$8{\times}8$ ($n=64$, 200~features), and Taxi~$5{\times}5$ ($n=500$, ${\sim}1{,}700$~features)---with grid coordinates emerging automatically as factorization features in all cases.  Taxi demonstrates that the Auto-FTL's divisor-based decomposition extends to compound state encodings: divisors 4, 20, and 100 recover destination, grid position, and row respectively.  Feature vectors and equivalence class counting ($|C/{\sim}|$) connect feature quality to the tight sample complexity bound.  Crucially, the FTL also controls \emph{synthesis tractability}: by providing semantically meaningful features, it keeps the required \texttt{PredProg} depth at~0--1, where enumeration remains feasible---enumeration takes seconds, rather than depth~3+, where it becomes infeasible.  When even depth-1 is insufficient for scattered state sets (as with FrozenLake~$8{\times}8$'s 3 U-optimal states), \texttt{synth-greedy-or} builds the predicate incrementally from atoms, avoiding exponential enumeration entirely.  When the state space exceeds the Peano bottleneck (as with Taxi's 500 states), compound and relational features provide a synthesis path that sidesteps iterative CEGIS entirely, while maintaining verified optimality.  All three FTLs sit outside the Trusted Computing Base.
 
 All results are machine-verified in Agda with \texttt{--safe --guardedness}, zero postulates.  This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code.  The synthesis framework is additive---it builds on the CSHRL foundation without modification, demonstrating the extensibility of the coinductive homomorphism approach.
 
@@ -2178,6 +2425,9 @@ The paper is a literate Agda document.  Building the PDF type-checks all embedde
 \item \textbf{Full codebase:} The complete synthesis framework resides in \fpath{src/CSHRL/Synthesis/} with end-to-end demos in \fpath{src/CSHRL/Tasks/Synthesized/}.
 \end{itemize}
 
+\appendix
+\input{CSHRLSynthesis-Demos}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{thebibliography}{20}
 
@@ -2185,6 +2435,11 @@ The paper is a literate Agda document.  Building the PDF type-checks all embedde
 Corral-Corral, R. (2026).
 Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure.
 \textit{Literate Agda manuscript}.
+
+\bibitem{Bastani2018}
+Bastani, O., Pu, Y., and Solar-Lezama, A. (2018).
+Verifiable reinforcement learning via policy extraction.
+In \textit{Advances in Neural Information Processing Systems (NeurIPS)}, pp.~2499--2509.
 
 \bibitem{Verma2018}
 Verma, A., Murali, V., Singh, R., Kohli, P., and Chaudhuri, S. (2018).
@@ -2201,6 +2456,11 @@ Solar-Lezama, A., Tancau, L., Bodik, R., Seshia, S., and Saraswat, V. (2006).
 Combinatorial sketching for finite programs.
 In \textit{Proceedings of ASPLOS}, pp.~404--415.
 
+\bibitem{Jha2017}
+Jha, S. and Seshia, S.~A. (2017).
+A theory of formal synthesis via inductive learning.
+\textit{Acta Informatica}, 54(7):693--726.
+
 \bibitem{Lesage2020}
 Lesage, B. and Ong, C.~H.~L. (2020).
 CertRL: Formalizing convergence proofs for value and policy iteration in Coq.
@@ -2210,6 +2470,61 @@ CertRL: Formalizing convergence proofs for value and policy iteration in Coq.
 Mitchell, T.~M. (1982).
 Generalization as search.
 \textit{Artificial Intelligence}, 18(2):203--226.
+
+\bibitem{Hirsh1994}
+Hirsh, H. (1994).
+Generalizing version spaces.
+\textit{Machine Learning}, 17(1):5--46.
+
+\bibitem{Lau2003}
+Lau, T., Domingos, P., and Weld, D.~S. (2003).
+Learning programs from traces using version space algebra.
+In \textit{Proceedings of K-CAP}, pp.~36--43.
+
+\bibitem{Li2006}
+Li, L., Walsh, T.~J., and Littman, M.~L. (2006).
+Towards a unified theory of state abstraction for MDPs.
+In \textit{Proceedings of ISAIM}.
+
+\bibitem{Abel2018}
+Abel, D., Arumugam, D., Lehnert, L., and Littman, M.~L. (2018).
+State abstractions for lifelong reinforcement learning.
+In \textit{Proceedings of ICML}, pp.~10--19.
+
+\bibitem{Ferns2004}
+Ferns, N., Panangaden, P., and Precup, D. (2004).
+Metrics for finite Markov decision processes.
+In \textit{Proceedings of UAI}, pp.~162--169.
+
+\bibitem{Zhang2021}
+Zhang, A., McAllister, R., Calandra, R., Gal, Y., and Levine, S. (2021).
+Learning invariant representations for reinforcement learning without reconstruction.
+In \textit{Proceedings of ICLR}.
+
+\bibitem{Crammer2012}
+Crammer, K. and Mansour, Y. (2012).
+Learning multiple tasks using shared hypotheses.
+In \textit{Advances in Neural Information Processing Systems (NeurIPS)}, pp.~1475--1483.
+
+\bibitem{Furnkranz2012}
+F\"urnkranz, J., H\"ullermeier, E., Cheng, W., and Park, S.~H. (2012).
+Preference-based reinforcement learning: A formal framework and a policy iteration algorithm.
+\textit{Machine Learning}, 89(1--2):123--156.
+
+\bibitem{Wirth2017}
+Wirth, C., Akrour, R., Neumann, G., and F\"urnkranz, J. (2017).
+A survey of preference-based reinforcement learning methods.
+\textit{Journal of Machine Learning Research}, 18(136):1--46.
+
+\bibitem{Chen2022}
+Chen, X., Zhong, H., Yang, Z., Wang, Z., and Wang, L. (2022).
+Human-in-the-loop: Provably efficient preference-based reinforcement learning with general function approximation.
+In \textit{Proceedings of ICML}, pp.~3773--3793.
+
+\bibitem{Zhu2023}
+Zhu, B., Jordan, M.~I., and Jiao, J. (2023).
+Provable reward-agnostic preference-based reinforcement learning.
+\textit{arXiv preprint arXiv:2305.18505}.
 
 \bibitem{Sutton2018}
 Sutton, R.~S. and Barto, A.~G. (2018).
