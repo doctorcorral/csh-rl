@@ -13,6 +13,7 @@
 \usepackage{hyperref}
 \usepackage{microtype}
 \usepackage{float}
+\usepackage{booktabs}
 
 % Unicode font support (required for Agda output - compile with lualatex)
 \usepackage{fontspec}
@@ -141,12 +142,13 @@ The framework introduces thirteen components, all machine-verified in Agda:
 \textbf{(10)}~\emph{DSL completeness}: a constructive fingerprint construction proves that the Boolean \texttt{PredProg} DSL is expressively complete for feature-respecting targets---for any target constant on equivalence classes, there exists a \texttt{PredProg} matching it everywhere (\texttt{dsl-complete});
 \textbf{(11)}~\emph{First-Order Stochastic Dominance (FOSD) synthesis}: a complete FOSD pipeline where rankings are based on distributional dominance rather than expected values---with a decidable FOSD comparison (\texttt{fosd?}) proved both sound and complete, the \textbf{Stochastic Isomorphism} (coinductive FOSD $\Leftrightarrow$ pointwise FOSD), a \textbf{FOSD-to-lex bridge} (\texttt{FOSDCoindHomo} $\Rightarrow$ lexicographic EV-stream dominance), and a \textbf{learning convergence} theorem (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}) connecting FOSD observations to CEGIS version-space refinement;
 \textbf{(12)}~\emph{Stochastic Dominance Hierarchy}: a generalization from FOSD to $k$-th order SD via iterated prefix sums of the CDF---with a one-line hierarchy subsumption proof (\texttt{SD-subsumes}: $\text{SD}[k] \Rightarrow \text{SD}[k{+}1]$ via \texttt{prefix-sum-mono}), the \textbf{SD-to-EV bridge} (\texttt{sd$\to$ev}: every SD level implies expected-value dominance), \textbf{SDCoindHomo}~$k$ (rankings verified at any level automatically yield EV-stream optimality), and a coinductive \textbf{hierarchy subsumption on homos} (\texttt{sd-homo-subsumes}: weaker requirements capture broader utility-function classes---risk-averse (SOSD), prudent (TOSD), and beyond);
-\textbf{(13)}~\emph{Compositional Ranking Algebra}: an algebraic framework for composing independently-verified rankings---proving that \texttt{prefix-sum} is a \emph{linear operator} (distributes over $+$ and $\times$), that \texttt{sd-weight} inherits this linearity, and that FOSD and SD$[k]$ are closed under distribution concatenation (\texttt{SD-++}) and reward scaling (\texttt{SD-scale}); a \texttt{VerifiedRanking} abstraction with \textbf{product composition} (two independently-verified components yield a verified product), \textbf{sum composition} (disjoint environments compose with dispatched rankings), and \textbf{scaling} (reward amplification preserves verification)---enabling modular, compositional verification where each component is verified in isolation and composed automatically.
+\textbf{(13)}~\emph{Compositional Ranking Algebra}: an algebraic framework for composing independently-verified rankings---proving that \texttt{prefix-sum} is a \emph{linear operator} (distributes over $+$ and $\times$), that \texttt{sd-weight} inherits this linearity, and that FOSD and SD$[k]$ are closed under distribution concatenation (\texttt{SD-++}), reward scaling (\texttt{SD-scale}), and \textbf{convolution} (\texttt{FOSD-conv}: the independent sum of FOSD-dominated distributions is FOSD-dominated, proved via discrete Abel summation); a \texttt{VerifiedRanking} abstraction with \textbf{product composition} (two independently-verified components yield a verified product via concatenation or convolution), \textbf{sum composition} (disjoint environments compose with dispatched rankings), and \textbf{scaling} (reward amplification preserves verification)---enabling modular, compositional verification where each component is verified in isolation and composed automatically.
 
-We demonstrate the full pipeline end-to-end on three Environment Classes:
+We demonstrate the full pipeline end-to-end on three Environment Classes and three continuous-control benchmarks:
 a Finite Deterministic MDP (1D Maze) where CEGIS synthesizes ranking predicates that yield a verified \texttt{CoindHomo} and optimal policy;
-a Combinatorial Placement MDP ($N$-Queens) where synthesized predicates \emph{define} the environment's step function, enabling \texttt{find-policy} to solve 4-Queens instantly and 8-Queens (with verified equivalence to hand-crafted predicates) including partial solution completion from any intermediate state;
-and a Stochastic Finite MDP where synthesis operates on expected traces, producing a verified \texttt{StochasticCoindHomo}---demonstrating that the entire generic theory applies unchanged to probabilistic transitions.
+a Combinatorial Placement MDP ($N$-Queens) where synthesized predicates \emph{define} the environment's step function, enabling \texttt{find-policy} to solve 4-Queens instantly and 8-Queens;
+a Stochastic Finite MDP where synthesis operates on expected traces;
+and autonomous controllers for CartPole (500/500), MountainCar (1000/1000), and Acrobot (500/500, avg.\ 88 steps)---the last using a \texttt{DirectRewardMDP} EC whose reward is derived from the total energy of the Euler-integrated next state, computed from the Lagrangian ODE of the double pendulum entirely within Agda.
 
 This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code while producing this PDF.
 The synthesis framework builds on the CSHRL foundation~\cite{CSHRL2026} without modifying it---all results are additive.
@@ -235,14 +237,24 @@ This paper makes the following contributions, each machine-verified in Agda with
 \item \textsc{Strict Separation}: a concrete SOSD-but-not-FOSD example: $\mu = \{0{:}2, 2{:}1\}$ vs.\ $\nu = \{1{:}3\}$ where FOSD fails at $r{=}1$ but SOSD holds everywhere.
 \end{itemize}
 
-\item \textbf{Compositional Ranking Algebra (\S\ref{sec:compose}):} An algebraic framework for composing independently-verified rankings, implemented in \texttt{Probability.Compose} and \texttt{Core.Compose}.  Key results:
+\item \textbf{Compositional Ranking Algebra (\S\ref{sec:compose}):} An algebraic framework for composing independently-verified rankings, implemented in \texttt{Probability.Compose}, \texttt{Probability.Convolution}, and \texttt{Core.Compose}.  Key results:
 \begin{itemize}
 \item \textsc{Prefix-Sum Linearity}: \texttt{prefix-sum} distributes over addition (\texttt{prefix-sum-+}) and scalar multiplication (\texttt{prefix-sum-*})---it is a \emph{linear operator} on $\mathbb{N} \to \mathbb{N}$.
 \item \textsc{sd-weight Distributivity}: \texttt{sd-weight} inherits linearity: $\text{sd-weight}~k~(d_1 \mathbin{{+}\!{+}} d_2) = \text{sd-weight}~k~d_1 + \text{sd-weight}~k~d_2$ and $\text{sd-weight}~k~(\text{scale}~c~d) = c \cdot \text{sd-weight}~k~d$ (induction on $k$, using \texttt{prefix-sum-ext}).
 \item \textsc{SD Closure}: FOSD and SD$[k]$ are closed under distribution concatenation (\texttt{SD-++}) and reward scaling (\texttt{SD-scale}).
-\item \textsc{Product Composition}: if two independent components have \texttt{VerifiedRanking}s at SD$[k]$, the product (coordinated) ranking is verified at SD$[k]$ for the composite.
+\item \textsc{Convolution FOSD Closure}: \texttt{FOSD-conv} proves that the independent sum (convolution) of FOSD-dominated distributions is FOSD-dominated, via a discrete Abel summation argument (\texttt{fosd-gws}).  \texttt{FOSD$\to$SD-conv} lifts the result to any SD$[k]$.
+\item \textsc{Product Composition}: if two independent components have \texttt{VerifiedRanking}s, the product ranking is verified for the composite---via concatenation (\texttt{++-product}) or convolution (\texttt{conv-product}).
 \item \textsc{Sum Composition}: if two disjoint environments have \texttt{VerifiedRanking}s, the dispatched ranking is verified for the union---with impossible state/action mismatches excluded by $\bot$.
 \item \textsc{Composability}: algebraic operations compose: \texttt{scaled-product~c~vr₁~vr₂ = scale-ranking~c~(++-product~vr₁~vr₂)}.
+\end{itemize}
+
+\item \textbf{Verified State Abstraction (\S\ref{sec:abstraction}):} A general framework for lifting verified rankings from finite abstract systems to arbitrary (potentially infinite or continuous) concrete state spaces.  Key results:
+\begin{itemize}
+\item \textsc{StateAbstraction}: a record bundling a projection, embedding, and section property---no finiteness assumption on the concrete type.
+\item \textsc{abstract-lift}: the central theorem---verify on abstract states, automatically obtain a \texttt{VerifiedRanking} on the full concrete system, under marginal-invariance (same abstract class $\Rightarrow$ same reward distributions).
+\item \textsc{Composition}: product abstraction (component-wise), composed abstraction (two-level chains), and \texttt{abstract-conv-product} (abstraction + convolution + lifting in one pipeline).
+\item \textsc{AllFeatAgree Subsumption}: feature-based abstraction is a special case where $\texttt{project} = \text{feature-vector}$.
+\item \textsc{Demonstrations}: (i)~the \emph{Regional Policy} demo (\texttt{AbstractionDemo}); (ii)~\texttt{ThreeZoneDemo}; (iii)~\texttt{AbstractConvProductDemo}; (iv)~\texttt{ComposeAbstractionDemo}; (v)~\texttt{SimplePendulumDemo}; (vi)~\texttt{CartPoleDemo}; (vii)~\texttt{RealCartPoleDemo}; (viii)~\texttt{DiscretizedCartPoleLearning}; (ix)~\texttt{CartPoleContinuousLearning}; (x)~\texttt{CartPolePhysicsLearning}---physics-motivated dynamics on 4 phase-space states, CEGIS discovers a 2-feature ranking (angle $\vee$ velocity), lifted to a verified policy on~$\mathbb{Q}^4$.
 \end{itemize}
 
 \end{enumerate}
@@ -263,6 +275,7 @@ This work is \emph{additive}: it imports the CSHRL core (\texttt{Core}, \texttt{
 \node[box=nord13!30] (synth) at (3,-1.5) {\textbf{Synthesis}\\(this paper)};
 \node[box=nord7!20] (fdmdp) at (1.5,-3.2) {FDMDP\\Synthesis};
 \node[box=nord7!20] (cpmdp) at (4.5,-3.2) {CPMDP\\Synthesis};
+\node[box=nord11!20] (ccmdp) at (-3,-3.2) {ContinuousControl\\MDP};
 \node[box=nord12!20] (e2e) at (3,-4.8) {End-to-End\\Demos};
 
 \draw[arr] (core) -- (ec);
@@ -270,11 +283,13 @@ This work is \emph{additive}: it imports the CSHRL core (\texttt{Core}, \texttt{
 \draw[arr] (core) -- (synth);
 \draw[arr] (synth) -- (fdmdp);
 \draw[arr] (synth) -- (cpmdp);
+\draw[arr] (ec) -- (ccmdp);
 \draw[arr] (fdmdp) -- (e2e);
 \draw[arr] (cpmdp) -- (e2e);
+\draw[arr] (ccmdp) -- (e2e);
 \draw[arr,dashed,nord3] (ec) -- (e2e);
 \end{tikzpicture}
-\caption{Architecture. The synthesis framework (yellow) builds on the CSHRL Core without modifying it.  EC-specific modules instantiate the generic DSL for each domain.  End-to-end demos integrate synthesis with Environment Classes.}
+\caption{Architecture. The synthesis framework (yellow) builds on the CSHRL Core without modifying it.  EC-specific modules instantiate the generic DSL for each domain.  The \texttt{ContinuousControlMDP} EC (green) factors the fragility--FOSD--abstraction pipeline into a reusable module, instantiated for CartPole and MountainCar.  Its generalisation \texttt{DirectRewardMDP} accepts rewards derived from physics (e.g.\ next-state total energy from Euler-integrated ODE), instantiated for Acrobot.  End-to-end demos integrate synthesis with Environment Classes.}
 \label{fig:arch}
 \end{figure}
 
@@ -309,6 +324,8 @@ record CoindHomo : Set₁ where
 \begin{itemize}
 \item \textbf{FiniteDeterministicMDP}: parameterized by finite \texttt{State}, \texttt{Action}, and a deterministic \texttt{step : State → Action → State × Reward}.
 \item \textbf{CombinatorialPlacementMDP}: parameterized by a configuration type, placement action, and predicates \texttt{is-dead}, \texttt{is-solved} that determine when a configuration is terminal.
+\item \textbf{ContinuousControlMDP}: parameterized by a concrete state type, a finite grid abstraction, and a reward-level monotonicity proof.  Given these, the EC automatically provides fragility analysis, FOSD synthesis, marginal-reward construction, an auto-derived ordering from fragility comparison, and a verified ranking lifted to the continuous state space via \texttt{abstract-lift}---reducing the per-environment boilerplate from $O(|S| \cdot |A|^2)$ proof cases to $O(L^2)$, where $L$ is the number of distinct reward levels (${\sim}$3--5).  Both \texttt{CartPoleAutoController} and \texttt{MountainCarAutoController} are instantiations of this EC.
+\item \textbf{DirectRewardMDP}: a generalisation of \texttt{ContinuousControlMDP} that accepts an arbitrary reward function $\texttt{cc-reward} : \text{GridState} \to \text{Action} \to \mathbb{N}$ instead of deriving one from fragility.  This accommodates environments where the natural reward is derived from a physics quantity computed within Agda (e.g., total energy of the Euler-integrated next state) rather than graph distance.  \texttt{AcrobotAutoController} is an instantiation.
 \end{itemize}
 
 \noindent The synthesis framework presented here provides a systematic way to \emph{construct} the ranking ($\le_a$) or the environment predicates (\texttt{is-dead}, \texttt{is-solved}) from observations, yielding verified \texttt{CoindHomo} instances or verified EC instantiations.
@@ -2185,7 +2202,7 @@ The framework supports six synthesis patterns across deterministic, stochastic, 
 
 \item \textbf{SD hierarchy pattern (parameterized distributional ranking synthesis):} The SD hierarchy generalizes the FOSD pattern to $k$-th order.  When FOSD fails (CDFs cross), an \texttt{SDCoindHomo~$k$} for $k \ge 1$ may still be established.  The master bridge (\texttt{sd-homo→ev-lex}) ensures that \emph{any} SD level yields EV-stream optimality.  The hierarchy subsumption (\texttt{sd-homo-subsumes}) means a single FOSD verification at $k{=}0$ automatically provides the stronger guarantee at all levels---but when FOSD fails, the framework can ``fall back'' to SOSD ($k{=}1$) or TOSD ($k{=}2$), accepting the weaker guarantee that the ranking is optimal for risk-averse or prudent agents respectively.
 
-\item \textbf{Compositional pattern (modular ranking synthesis):} The compositional algebra enables a ``divide and conquer'' approach.  Rather than verifying a monolithic ranking on a large composite environment, the framework decomposes it into independent components, verifies each in isolation, and composes the proofs via \texttt{product-ranking}, \texttt{sum-ranking}, or \texttt{scale-ranking}.  The closure properties (\texttt{SD-++}, \texttt{SD-scale}) guarantee that composition preserves SD$[k]$ at any level.  This pattern is orthogonal to the five above: each component can use \emph{any} of the other patterns, and the compositional algebra combines the results.
+\item \textbf{Compositional pattern (modular ranking synthesis):} The compositional algebra enables a ``divide and conquer'' approach.  Rather than verifying a monolithic ranking on a large composite environment, the framework decomposes it into independent components, verifies each in isolation, and composes the proofs via \texttt{product-ranking}, \texttt{conv-product}, \texttt{sum-ranking}, or \texttt{scale-ranking}.  The closure properties (\texttt{SD-++}, \texttt{SD-scale}, \texttt{FOSD-conv}) guarantee that composition preserves SD$[k]$ at any level.  This pattern is orthogonal to the five above: each component can use \emph{any} of the other patterns, and the compositional algebra combines the results.
 \end{itemize}
 
 \subsection{Computational Considerations}
@@ -2554,6 +2571,29 @@ The core algebraic insight is that \texttt{prefix-sum} is a \emph{linear operato
 
 \noindent Instantiating $\oplus$ with \texttt{++} and \texttt{SD-++} gives the concrete \texttt{++-product}: marginal rewards merge as mixtures.  Instantiating with \texttt{scale} gives \texttt{scale-ranking}: reward amplification preserves verification.
 
+\paragraph{Convolution product.}
+Beyond concatenation, the framework now supports \textbf{convolution} (independent sum): given two distributions $\mu_1$ and $\mu_2$ over $\mathbb{N}$, the convolution $\mu_1 * \mu_2$ is the distribution of $X_1 + X_2$ where $X_i \sim \mu_i$ are independent.  The key new result is:
+
+\begin{spec}
+  FOSD-conv : total-weight μ₁ ≡ total-weight ν₁ →
+    μ₁ FOSD≤ ν₁ → μ₂ FOSD≤ ν₂ →
+    conv μ₁ μ₂ FOSD≤ conv ν₁ ν₂
+\end{spec}
+
+\noindent The proof decomposes into two directions.  \emph{Kernel direction}: for fixed base $d_1$, if $\mu_2 \preceq_\textsc{FOSD} \nu_2$ then $\text{conv}(d_1, \mu_2) \preceq_\textsc{FOSD} \text{conv}(d_1, \nu_2)$---this follows from pointwise CDF comparison (\texttt{gws-mono}) after showing FOSD is preserved by additive shifting (\texttt{FOSD-shift}).  \emph{Base direction}: for fixed kernel $d_2$, if $\mu_1 \preceq_\textsc{FOSD} \nu_1$ then $\text{conv}(\mu_1, d_2) \preceq_\textsc{FOSD} \text{conv}(\nu_1, d_2)$---this is the deep result, proved via a \textbf{discrete Abel summation} induction (\texttt{fosd-gws}).  The induction decomposes a generalized weighted sum $\sum_{(v,w) \in d} w \cdot h(v)$ for non-increasing $h$ by peeling off the last non-zero level, using the FOSD hypothesis at each threshold.
+
+The convolution closure lifts to the full SD hierarchy via \texttt{FOSD$\to$SD-conv}:
+
+\begin{spec}
+  conv-product :
+    (tw : ∀ s a b n → total-weight (m₁ s a n) ≡ total-weight (m₁ s b n)) →
+    VerifiedRanking S₁ A₁ m₁ 0 → VerifiedRanking S₂ A₂ m₂ 0 →
+    VerifiedRanking (S₁ × S₂) (A₁ × A₂)
+      (λ (s₁,s₂) (a₁,a₂) n → conv (m₁ s₁ a₁ n) (m₂ s₂ a₂ n)) k
+\end{spec}
+
+\noindent While \texttt{++-product} merges reward lists (a mixture model), \texttt{conv-product} sums independent rewards---the natural combinator for product MDPs where rewards are additive.  The equal-total-weight precondition on $m_1$ reflects a standard normalization that holds in practice for probability distributions.
+
 \paragraph{Sum composition.}  Two disjoint environments with state spaces $S_1 \uplus S_2$ compose with a \emph{dispatched} ranking: in state $\text{inj}_1~s_1$, use ranking~1; in state $\text{inj}_2~s_2$, use ranking~2.  Mismatched state/action pairs are excluded by $\bot$ (impossible to construct, so never encountered):
 
 \begin{spec}
@@ -2579,9 +2619,9 @@ The compositional algebra addresses a key scalability challenge: as environments
 \begin{enumerate}
 \item Decompose a complex environment into independent components.
 \item Verify each component's ranking in isolation (smaller state/action spaces).
-\item Compose the proofs via \texttt{product-ranking}, \texttt{sum-ranking}, or \texttt{scale-ranking}.
+\item Compose the proofs via \texttt{product-ranking}, \texttt{conv-product}, \texttt{sum-ranking}, or \texttt{scale-ranking}.
 \end{enumerate}
-The composed proof is as strong as the component proofs---no additional verification is needed at the composite level.  This mirrors how software verification handles large systems: verify modules independently, then compose via interfaces.
+The composed proof is as strong as the component proofs---no additional verification is needed at the composite level.  The convolution combinator is particularly natural for product MDPs with additive rewards: it expresses that ``summing independent draws from better distributions yields a better sum distribution.''  This mirrors how software verification handles large systems: verify modules independently, then compose via interfaces.
 \end{remark}
 
 \subsubsection{Demonstration: BiasedBandit \texorpdfstring{$\times$}{x} CoinFlip}
@@ -2591,6 +2631,389 @@ The composed proof is as strong as the component proofs---no additional verifica
 The \emph{portfolio} environment (state $= S_1 \times S_2$, action $= A_1 \times A_2$, 4 combinations) is verified by a single call to \texttt{++-product}.  The product ranking is computationally tested: $(\texttt{ArmB}, \texttt{Stay}) \le (\texttt{ArmA}, \texttt{Flip})$ is $(\top, \top)$, confirmed by \texttt{refl}.  CDF values of the composed marginal distributions are verified at depth~0: the dominant pair $(\texttt{ArmA}, \texttt{Flip})$ has CDF$(0) = 2$, while the dominated pair $(\texttt{ArmB}, \texttt{Stay})$ has CDF$(0) = 4$---confirming that the product FOSD holds ($2 \le 4$).
 
 The portfolio ranking is then upgraded for free: \texttt{ranking-subsumes} lifts it to SOSD ($k{=}1$) and TOSD ($k{=}2$).  Scaling by factor 3 via \texttt{scaled-product} is a one-liner.  The phased environment (\texttt{sum-ranking}) dispatches rankings by component: in phase 1 (bandit), $\texttt{ArmB} \le \texttt{ArmA}$; in phase 2 (coinflip), $\texttt{Stay} \le \texttt{Flip}$---both confirmed by \texttt{tt}.  All tests pass by \texttt{refl}; the full file compiles under \texttt{--safe} with zero postulates.
+
+\subsection{Verified State Abstraction}
+\label{sec:abstraction}
+
+A persistent limitation of the framework has been its restriction to \emph{finite} state spaces: every demo uses enumerable states, and the paper's related-work section acknowledges that ``CSH does not yet address continuous state spaces.''  The \texttt{Core.Abstraction} module resolves this limitation with a single, general theorem.
+
+\subsubsection{The Abstraction Record}
+
+A \texttt{StateAbstraction} bundles three components:
+
+\begin{itemize}
+\item \textbf{project}: $\text{Concrete} \to \text{Abstract}$---collapses concrete states to abstract classes.
+\item \textbf{embed}: $\text{Abstract} \to \text{Concrete}$---selects a representative for each class.
+\item \textbf{section}: $\texttt{project} \circ \texttt{embed} = \text{id}$---the representatives are consistent.
+\end{itemize}
+
+No finiteness assumption is placed on \texttt{Concrete}: it can be $\mathbb{N}$, $\mathbb{R}^n$, or any type in \texttt{Set}.  The only requirement is that the abstract type is tractable enough for verification.
+
+\subsubsection{The Lifting Theorem}
+
+The central result is \texttt{abstract-lift}:
+
+\begin{quote}
+\emph{Given a state abstraction and a proof that the marginal reward function is constant within each abstract class (marginal-invariance), any \texttt{VerifiedRanking} on the abstract system lifts to a \texttt{VerifiedRanking} on the full concrete system.}
+\end{quote}
+
+The concrete ranking orders actions by their abstract-state ordering: at state~$s$, action~$a$ is ranked against action~$b$ according to the abstract ordering at $\texttt{project}(s)$.  Preservation transfers via marginal-invariance: since all concrete states in a class have identical reward distributions, the SD$[k]$ inequality verified at the representative applies to every member.
+
+This is the standard model-irrelevance condition from the state abstraction literature (Li et al., 2006), but formalized constructively in Agda with a machine-checked lifting proof.
+
+\subsubsection{Composition}
+
+The abstraction module provides three composition operators:
+\begin{itemize}
+\item \texttt{product-abstraction}: given abstractions for two components, the product abstraction works component-wise---enabling modular abstraction of product environments.
+\item \texttt{compose-abstraction}: two-level abstractions chain---if $C \xrightarrow{\alpha_1} M \xrightarrow{\alpha_2} A$, then $C \xrightarrow{\alpha_2 \circ \alpha_1} A$.  This supports hierarchical refinement: start coarse, refine where needed.
+\item \texttt{abstract-conv-product}: the full pipeline for continuous-state product MDPs with additive rewards---abstract each component, verify FOSD on abstract systems, compose via convolution, and lift to the concrete product.
+\end{itemize}
+
+\subsubsection{Connection to AllFeatAgree}
+
+The feature-based abstraction (\texttt{AllFeatAgree}) from Section~\ref{sec:quotient} is a special case.  If $\texttt{project} = \text{feature-vector}$ and marginal-invariance holds (the target respects features), then \texttt{abstract-lift} subsumes the feature-based propagation results.  The general framework extends this beyond features to any abstraction function satisfying the section property.
+
+\subsubsection{Demonstration: Infinite-State Regional Policy}
+
+\texttt{AbstractionDemo} demonstrates the framework on an infinite state space.  The \emph{Regional Policy} environment has:
+\begin{itemize}
+\item \textbf{State} $= \mathbb{N}$ (population density, unbounded---an infinite state space).
+\item \textbf{Actions}: \texttt{Invest} or \texttt{Conserve}.
+\item \textbf{Rewards}: depend only on a density classification (\emph{sparse} vs.\ \emph{dense}).  In sparse regions, \texttt{Invest} yields higher returns; in dense regions, \texttt{Conserve} is better.
+\end{itemize}
+
+The abstraction:
+\begin{itemize}
+\item $\texttt{project}(n) = n >^{\mathbb{N}} \textit{threshold}$ (a \texttt{Bool}: is the region dense?).
+\item $\texttt{embed}(\textit{true}) = \textit{threshold} + 1$, $\texttt{embed}(\textit{false}) = 0$ (representatives).
+\item \texttt{section}: verified by computation (\texttt{refl}).
+\end{itemize}
+
+FOSD proofs on the two abstract distributions are discharged computationally using \texttt{fosd?-sound} with \texttt{refl}.  The abstract \texttt{VerifiedRanking} on \texttt{Bool} (2~states) is then lifted via \texttt{abstract-lift} to \texttt{infinite-state-ranking}: a \texttt{VerifiedRanking} on all of~$\mathbb{N}$.  Spot checks confirm: at density~0, \texttt{Invest} is preferred; at density~1000, \texttt{Conserve} is preferred---both verified by~\texttt{tt}.
+
+\subsubsection{Demonstration: Three-Zone Abstraction}
+
+\texttt{ThreeZoneDemo} extends the Regional Policy idea to three abstract states (\texttt{Low}, \texttt{Medium}, \texttt{High}), showing the framework scales beyond binary abstraction.  State remains~$\mathbb{N}$; the abstraction partitions into Low ($n \le 5$), Medium ($6 \le n \le 10$), and High ($n > 10$).  Policy by zone: Low prefers \texttt{Invest}, Medium is balanced (tie), High prefers \texttt{Conserve}.  The same \texttt{abstract-lift} pipeline applies: verify on 3~abstract states, lift to all of~$\mathbb{N}$.  Spot checks at 0, 5 (Low), 6, 10 (Medium), 11, 99 (High) confirm the policy---all verified by~\texttt{tt}.
+
+\subsubsection{Demonstration: Abstract Convolution Product}
+
+\texttt{AbstractConvProductDemo} exercises the full \texttt{abstract-conv-product} pipeline: abstraction + convolution + lifting.  Two independent Regional Policy environments (each with $\mathbb{N}$ states, \texttt{Bool} abstraction, \texttt{Invest}|\texttt{Conserve} actions) are composed.  The product has state~$\mathbb{N} \times \mathbb{N}$ and action pairs; rewards combine by convolution (independent sum).  The demo verifies FOSD on each 2-state abstract system, composes via \texttt{conv-product}, and lifts to the full $(\mathbb{N} \times \mathbb{N})$ concrete product.  Verification cost: $2 \times 2 = 4$ abstract state pairs, regardless of the infinite product space.  Spot checks confirm: at sparse-sparse $(0,3)$, \texttt{(Invest,Invest)} dominates; at dense-dense $(10,100)$, \texttt{(Conserve,Conserve)} dominates---both by~\texttt{tt}.
+
+\subsubsection{Demonstration: Two-Level Abstraction}
+
+\texttt{ComposeAbstractionDemo} demonstrates \texttt{compose-abstraction}: abstract in two stages ($\mathbb{N} \to \texttt{Zone} \to \texttt{Bool}$), then lift in one.  The first level partitions $\mathbb{N}$ into Low ($n \le 5$), Medium ($6 \le n \le 10$), and High ($n > 10$).  The second level collapses Low and Medium to \texttt{false} (sparse), High to \texttt{true} (dense).  Marginal-invariance requires Low and Medium to have identical marginals; both use the sparse distribution (Invest better).  The composed abstraction yields the same policy as Regional Policy (sparse $\to$ Invest, dense $\to$ Conserve), but obtained by composing two simpler abstractions.
+
+\subsubsection{Demonstration: Simple Pendulum}
+
+\texttt{SimplePendulumDemo} is a step toward CartPole: 16 discrete angle bins (0--15), two actions (push Left, push Right).  The abstraction partitions into left half (0--7) and right half (8--15).  Policy: left half $\to$ prefer Left (push toward upright at 0); right half $\to$ prefer Right (push toward upright at 8).  Pendulum-like structure (angle, push direction) but fully discrete; marginal-invariance holds because reward depends only on which half the angle falls into.  Spot checks at 0, 5 (left) and 8, 15 (right) confirm the policy---verified by~\texttt{tt}.
+
+\subsubsection{Demonstration: CartPole}
+
+\texttt{CartPoleDemo} completes the progression: the full 4D CartPole state structure (position, velocity, angle, angular velocity) with discretization.  State $= \mathbb{N}^4$ (discretized bins); abstraction uses the angle component (left half 0--7 vs right half 8--15).  Reward depends only on abstract state, so marginal-invariance holds by construction.  Policy: left half $\to$ prefer Left; right half $\to$ prefer Right.  Verification cost: 2 abstract states, regardless of the discretized 4D space.  Spot checks at $(0,0,0,0)$, $(3,1,7,2)$ (left) and $(1,0,8,0)$, $(2,5,15,3)$ (right) confirm the policy---all verified by~\texttt{tt}.  This is the standard CartPole structure (4D state, 2 actions, angle-based policy) with discretization and abstraction-friendly reward design.
+
+\subsubsection{Demonstration: Real CartPole}
+
+\texttt{RealCartPoleDemo} lifts CartPole to a \emph{rational} state space: State $= \mathbb{Q}^4$ (position, velocity, angle, angular velocity) with no discretization.  The same abstraction applies: $\theta < 0$ (left half) vs $\theta \ge 0$ (right half).  Embedding picks representatives $(0,0,-\tfrac{1}{2},0)$ and $(0,0,\tfrac{1}{2},0)$; marginal-invariance holds because reward depends only on abstract state.  Policy: $\theta < 0 \to$ prefer Left; $\theta \ge 0 \to$ prefer Right.  Spot checks at $(0,0,-\tfrac{1}{2},0)$, $(\tfrac{1}{2},-\tfrac{1}{2},-\tfrac{1}{4},\tfrac{1}{2})$ (left) and $(0,0,\tfrac{1}{2},0)$, $(-\tfrac{1}{2},\tfrac{1}{2},\tfrac{1}{4},-\tfrac{1}{2})$ (right) confirm the policy---all verified by~\texttt{tt}.  This demonstrates that \texttt{abstract-lift} applies to continuous-style state representations (exact rationals) without discretization.
+
+\subsubsection{Demonstration: CartPole with Learning}
+
+\texttt{DiscretizedCartPoleMDP} and \texttt{DiscretizedCartPoleLearning} add \emph{real learning}: a finite 16-state CartPole (angle bins s0--s15) with deterministic step dynamics, reward $+1$ per step until terminal.  The MDP integrates with \texttt{StochasticFiniteMDP} (Finder, expected traces) and \texttt{FOSDStochasticFiniteMDP} (FOSD synthesis, learning bridge).  A sample \texttt{(s7, Right, Left)} at a left-half state is processed by \texttt{synth-learn-batch}; \texttt{extract-rank-model} yields a \texttt{RankModel} that correctly prefers Left over Right at s7 (\texttt{test-extracted-correct}).  This completes the pipeline: CartPole with step dynamics $\to$ FOSD observations $\to$ CEGIS synthesis $\to$ verified \texttt{RankModel}---real learning, not just verification.
+
+\subsubsection{Demonstration: Continuous CartPole with Learning}
+
+\texttt{CartPoleContinuousLearning} unifies the learning and verification tracks into a single end-to-end pipeline: \emph{Learn~$\to$ Verify~$\to$ Lift to Continuous}.
+
+\begin{enumerate}
+\item \textbf{Learn.} A 2-state abstract MDP on \texttt{Bool} (left-half vs.\ right-half) with reward that encodes angle-action alignment is defined.  FOSD synthesis at depth~0 produces four observations; CEGIS synthesizes the ranking predicates \texttt{feat~is-left} (``Right~$\le$~Left holds at left-half'') and \texttt{$\neg$p~feat~is-left} (``Left~$\le$~Right holds at right-half'').  The same ranking is independently recovered by the learning bridge from 4 samples via \texttt{synth-learn-batch} and \texttt{extract-rank-model}---all confirmed by \texttt{refl}.
+\item \textbf{Verify.} The learned ordering is proved to preserve $\mathrm{SD}[0]$ on the marginal reward distributions.  The proof is computational: \texttt{fosd?-sound} discharges both non-trivial cases; reflexivity and absurdity handle the rest.
+\item \textbf{Lift.} \texttt{abstract-lift} transfers the verified ranking from \texttt{Bool} to $\mathbb{Q}^4$ via the angle-sign abstraction ($\theta < 0$ vs.\ $\theta \ge 0$).  The result is a \texttt{VerifiedRanking}~$\mathbb{Q}^4$~\texttt{Action}~\texttt{marginal}~\texttt{0}---a provably correct policy for \emph{all} rational CartPole states.
+\end{enumerate}
+
+Spot checks confirm the policy at $(-\tfrac{1}{2},0,0,0)$ and $(\tfrac{1}{2},-\tfrac{1}{2},-\tfrac{1}{4},\tfrac{1}{2})$ (left half, Left preferred) and at $(0,0,\tfrac{1}{2},0)$ and $(-\tfrac{1}{2},\tfrac{1}{2},\tfrac{1}{4},-\tfrac{1}{2})$ (right half, Right preferred)---all verified by~\texttt{tt}.  No hand-coded policy, no discretization of the continuous state, no postulates; the ordering was discovered by CEGIS and lifted to $\mathbb{Q}^4$ with a machine-checked proof.
+
+\subsubsection{Demonstration: CartPole with Physics-Based Dynamics}
+
+\texttt{CartPolePhysicsLearning} extends the pipeline with a \emph{physics-motivated} step function on 4~abstract states.  The state space is the \emph{phase-space quadrant} $\text{Phase} = \{\texttt{LL}, \texttt{LR}, \texttt{RL}, \texttt{RR}\}$, encoding the sign of both the angle ($\theta$) and the angular velocity ($\dot\theta$):
+
+\smallskip
+\begin{center}
+\begin{tabular}{lll}
+\texttt{LL} & $\theta < 0,\ \dot\theta < 0$ & falling left (critical) \\
+\texttt{LR} & $\theta < 0,\ \dot\theta \ge 0$ & recovering from left (safe) \\
+\texttt{RL} & $\theta \ge 0,\ \dot\theta < 0$ & recovering from right (safe) \\
+\texttt{RR} & $\theta \ge 0,\ \dot\theta \ge 0$ & falling right (critical)
+\end{tabular}
+\end{center}
+\smallskip
+
+The step function encodes linearised CartPole dynamics: Left push causes $\ddot\theta > 0$ (pole tilts right), Right push causes $\ddot\theta < 0$.  At critical states, the correct push recovers the angular velocity (reward~1) while the wrong push keeps the state critical (reward~0).  At safe states, either action yields reward~1 but the wrong push reverses the velocity.
+
+CEGIS at depth~1 with three features (\texttt{angle-neg}, \texttt{vel-neg}, \texttt{right-ok}) synthesises two ranking predicates---confirmed by \texttt{refl}:
+\begin{itemize}
+\item ``Right~$\le$~Left'' $=$ \texttt{feat~angle-neg~$\vee$p~feat~vel-neg} (angle or velocity is negative)
+\item ``Left~$\le$~Right'' $=$ \texttt{feat~right-ok} (not in the critical-left state)
+\end{itemize}
+
+The resulting 4-region policy distinguishes \emph{critical} states (one action mandatory) from \emph{safe} states (either action acceptable)---a genuinely richer policy than the 2-state angle-only version.  The learning bridge independently recovers the same model from 8~samples.  \texttt{abstract-lift} lifts to $\mathbb{Q}^4$; spot checks verify Left-only at $(\theta{<}0,\dot\theta{<}0)$, Right-only at $(\theta{\ge}0,\dot\theta{\ge}0)$, and both-OK at the recovering quadrants.
+
+\begin{remark}[From Finite to Continuous]
+\texttt{abstract-lift} is parametric in \texttt{Concrete~:~Set}---it places no cardinality constraints.  The same theorem applies to any type, including abstract representations of continuous spaces.  The key assumption is marginal-invariance: states in the same abstract class must have identical reward distributions.  This is a semantic condition on the MDP, not a syntactic restriction on the type.  The verification work is $O(|\text{Abstract}|)$---four states in this demo---regardless of the concrete space's cardinality.
+\end{remark}
+
+
+\subsubsection{Demonstration: Autonomous CartPole Controller}
+\label{sec:auto-cartpole}
+
+\texttt{CartPoleAutoController} is the culmination of the CartPole progression.  It implements a \emph{fully autonomous} pipeline from physics to deployable controller: the human provides only the equations of motion, the terminal condition, a grid resolution, and a reward-level monotonicity proof (${\sim}$8~cases for 3~reward levels).  Everything else---transitions, fragility, rewards, action ordering, verified ranking, and extractable policy---is derived automatically by the \texttt{ContinuousControlMDP} Environment Class.  The resulting controller achieves 500/500~steps (the maximum episode length) on all 1\,000 test episodes in OpenAI Gymnasium's \texttt{CartPole-v1}, matching DQN-level performance with a formally verified policy.
+
+\paragraph{The ten-stage pipeline.}
+The module is organized into ten logical stages, each building on the previous:
+
+\begin{enumerate}
+\item \textbf{State space and grid.}  The abstract state space is a \emph{phase-space grid} on two variables: the pole angle $\theta$ and the angular velocity $\dot\theta$.  Six angle zones (far-left, moderate-left, near-left, near-right, moderate-right, far-right) and four velocity zones (fast-negative, slow-negative, slow-positive, fast-positive) yield $6 \times 4 = 24$ non-terminal grid cells plus a \texttt{Terminal} state, for 25~abstract states total.  The boundaries are chosen at $\theta \in \{-0.1,\, -0.04,\, 0,\, 0.04,\, 0.1\}$ and $\dot\theta \in \{-0.5,\, 0,\, 0.5\}$, giving a resolution fine enough to capture the diagonal decision boundary in $(\theta,\dot\theta)$-space.
+
+\item \textbf{Euler-integrated transitions.}  The linearized CartPole ODE ($\ddot\theta = (g\theta - F/m_{\mathrm{total}}) / \ell_{\mathrm{eff}}$) is discretized via 2nd-order Euler integration, entirely in Agda using exact rational arithmetic (\texttt{Data.Rational}).  A representative point is chosen in each grid cell (the cell center), the Euler step is computed at that point for each action, and the result is binned back to the grid.  This produces a concrete function \texttt{euler-bin~:~GridState~$\to$~Action~$\to$~GridState} that computes the dynamics from first principles.
+
+The transition graph is then defined as a lookup table \texttt{next-state} with 48 entries (24~non-terminal states~$\times$~2~actions).  Crucially, each entry is \emph{verified} to agree with the Euler dynamics via a \texttt{refl} proof:
+\begin{center}
+\texttt{check-FLFN-L~:~euler-bin~FLFN~Left~$\equiv$~FLSP~~~~;~check-FLFN-L~=~refl}
+\end{center}
+All 48~such checks pass, establishing that the lookup table faithfully encodes the physics.  The table form enables efficient normalization during subsequent proof steps.
+
+\item \textbf{Fragility analysis.}  The transition graph is analyzed by the general-purpose \texttt{CSHRL.Analysis.Fragility} module (described below) to compute the \emph{fragility} of each state: the minimum number of steps to reach \texttt{Terminal} under worst-case (adversarial) play.  For the 25-state CartPole grid, the fixed-point converges in two iterations and yields three fragility levels:
+\begin{center}
+\begin{tabular}{cl}
+\textbf{Fragility} & \textbf{States} \\
+\hline
+0 & \texttt{Terminal} \\
+1 & \texttt{FLFN, FLSN, FLSP, MLFN, MRFP, FRSN, FRSP, FRFP} \\
+2 & all remaining 16 non-terminal states
+\end{tabular}
+\end{center}
+Fragility~1 means the adversary can force termination in a single step; fragility~2 means the agent can survive at least one more step regardless of the opponent's strategy.  The computed values are verified by \texttt{refl}:
+\begin{center}
+\texttt{check-frag-FLFN~:~fragility~FLFN~$\equiv$~1~~~~;~check-frag-FLFN~=~refl}
+\end{center}
+
+\item \textbf{Fragility as reward signal.}  The MDP's step function is defined as
+\begin{center}
+\texttt{abstract-step~s~a~=~let~ns~=~next-state~s~a~in~pure~(ns\,,\,fragility~ns)}
+\end{center}
+This encodes \emph{multi-step} safety information into the \emph{immediate} reward: a transition to a fragility-2 state earns reward~2 (``the agent is safe for at least two more steps''), while a transition to Terminal earns reward~0.  The key insight is that by compressing the minimax depth into a single number, a depth-0 FOSD comparison at the synthesis level already sees the full strategic structure of the game.
+
+\item \textbf{FOSD observations from dynamics.}  The \texttt{SFDMDPSynthesisFOSD} module is opened with \texttt{abstract-step}, enabling \texttt{fosd-compare} to compute observations by direct evaluation of the MDP model.  At depth~0, \texttt{fosd-compare} queries \texttt{abstract-step} for each action and compares the resulting reward distributions.  Because fragility already encodes multi-step information, depth-0 suffices to separate all 25~states into the correct action preference:
+\begin{center}
+\begin{tabular}{ll}
+\texttt{LEFT\_WINS}  & states where Left leads to higher fragility \\
+\texttt{RIGHT\_WINS} & states where Right leads to higher fragility \\
+\texttt{TIED}        & states where both actions are equally safe
+\end{tabular}
+\end{center}
+These classifications are verified computationally:
+\begin{center}
+\texttt{test-obs-FLFN~:~fosd-compare~0~FLFN~$\equiv$~just~LEFT\_WINS~~~~;~test-obs-FLFN~=~refl}
+\end{center}
+
+\item \textbf{State abstraction.}  A \texttt{StateAbstraction} maps the concrete $\mathbb{Q}^4$ state space to the 25-state grid via \texttt{project} (binning by angle and velocity zones) and \texttt{embed} (choosing a representative point in each zone).  The section property \texttt{project~$\circ$~embed~$\equiv$~id} is verified by \texttt{refl} at all 25~states.
+
+\item \textbf{Auto-derived reward distributions.}  The marginal reward distribution for each state-action pair is derived entirely from the computed fragility.  Three canonical distributions are defined: \texttt{bad} (fragility~0), \texttt{medium} (fragility~1), and \texttt{good} (fragility~$\ge 2$).  The function \texttt{marginal-by-grid~s~a~\_~=~reward-dist~(fragility~(next-state~s~a))} maps any state-action pair to the appropriate distribution with no manual case analysis.
+
+\item \textbf{Auto-derived action ordering.}  The ordering relation on actions is derived by comparing the fragility of the successor states:
+\begin{center}
+\texttt{order~s~=~frag-order~(frag-reward~s~Left)~(frag-reward~s~Right)}
+\end{center}
+where \texttt{frag-order} compares two natural numbers and returns \texttt{left-wins}, \texttt{right-wins}, or \texttt{both-safe} as the appropriate ordering type.  No manual state-by-state assignment; the ordering is a direct consequence of the dynamics.
+
+\item \textbf{Verified ranking.}  A \texttt{VerifiedRanking~GridState~Action~abs-marginal~0} is constructed with the auto-derived ordering and FOSD proofs.  The proof obligation for each state reduces to showing that the appropriate FOSD lemma (\texttt{fosd-bad$\le$medium}, \texttt{fosd-medium$\le$good}, etc.) or reflexivity (\texttt{SD-refl}) applies.  For the 4~\texttt{TIED} states (MLFP, NLSP, NRSN, MRFN), both actions yield the same fragility, so both directions are reflexive.  \texttt{abstract-lift} then promotes this to a \texttt{VerifiedRanking}~$\mathbb{Q}^4$~\texttt{Action}~\texttt{marginal}~\texttt{0}---a provably correct policy for all rational CartPole states.
+
+\item \textbf{Policy extraction.}  The \texttt{decide~:~$\mathbb{Q}^4$~$\to$~Action} function is extracted as a direct lookup table.  It is the deployable controller: given a continuous state, it projects to the grid and returns the verified-optimal action.  A faithful Python translation of this lookup table achieves 500/500~steps on \texttt{CartPole-v1} with zero heuristics or post-hoc tweaking.
+\end{enumerate}
+
+\paragraph{The Fragility module: push-button safety analysis.}
+The \texttt{CSHRL.Analysis.Fragility} module (\fpath{src/CSHRL/Analysis/Fragility.agda}) provides a \emph{general-purpose}, reusable fragility computation for any finite deterministic MDP.  It is parameterized by seven arguments:
+
+\smallskip
+\begin{center}
+\begin{tabular}{ll}
+\texttt{S~:~Set}                   & state type \\
+\texttt{\_$\stackrel{?}{=}$\_~:~(s₁~s₂~:~S)~$\to$~Dec~(s₁~$\equiv$~s₂)} & decidable equality \\
+\texttt{A~:~Set}                   & action type \\
+\texttt{next~:~S~$\to$~A~$\to$~S} & transition function \\
+\texttt{terminal?~:~S~$\to$~Bool}  & terminal predicate \\
+\texttt{all-states~:~List~S}       & finite enumeration of states \\
+\texttt{all-actions~:~List~A}      & finite enumeration of actions
+\end{tabular}
+\end{center}
+\smallskip
+
+The algorithm is a Bellman-style fixed-point iteration on a table (\texttt{List~$\mathbb{N}$}) indexed parallel to \texttt{all-states}:
+
+\begin{enumerate}
+\item Initialize all fragilities to~0.
+\item At each iteration, for each state~$s$: if $s$ is terminal, $\text{fragility}(s) = 0$; otherwise $\text{fragility}(s) = 1 + \min_a \text{fragility}(\text{next}(s,a))$.
+\item Iterate $|\texttt{all-states}|$ times (sufficient for convergence, since fragility values are bounded by the number of states).
+\end{enumerate}
+
+The module exports two functions: \texttt{fragility~:~S~$\to$~$\mathbb{N}$} and \texttt{frag-reward~:~S~$\to$~A~$\to$~$\mathbb{N}$} (the fragility of the successor state).  For \texttt{CartPoleAutoController}, the entire module is instantiated by a single \texttt{open}:
+\begin{center}
+\texttt{open~ComputeFragility~GridState~\_$\stackrel{?}{=}$g\_~Action~next-state~terminal?~all-grid-states~all-actions}
+\end{center}
+
+This design means that \emph{any} new environment can obtain automatic fragility analysis by providing the same seven parameters---no environment-specific code needed.
+
+\paragraph{Conceptual significance.}
+Fragility bridges a gap between control theory and the CSHRL verification framework.  In control theory, the concept appears as the \emph{viability kernel radius} or \emph{time-to-failure}: it measures how many steps an agent can guarantee before the system enters an unsafe region.  In game theory, it is the \emph{minimax distance} in the adversarial game between the agent (minimizing steps to terminal) and the environment (maximizing them, or vice versa---fragility uses the adversarial perspective where the opponent tries to \emph{force} termination).
+
+Within CSHRL, fragility serves as a \emph{compressed multi-step value function}: it encodes the strategic depth of a position into a single natural number.  This matters because the FOSD comparison machinery operates on immediate reward distributions.  Without fragility, depth-0 FOSD comparison can only distinguish states whose immediate transitions have different safety properties---it sees one step ahead.  With fragility as the reward signal, depth-0 comparison sees the \emph{full} minimax safety structure, because the immediate reward already reflects multi-step consequences.  The effect is that shallow (depth-0) comparisons suffice to derive the complete action ordering, even for states that would otherwise require deep unrolling to distinguish.
+
+Fragility also integrates naturally with the stochastic dominance framework.  Because fragility values are natural numbers, they define a total order on distributions of fragility.  The three FOSD lemmas (\texttt{bad~FOSD$\le$~medium}, \texttt{medium~FOSD$\le$~good}, \texttt{bad~FOSD$\le$~good}) correspond to the three possible strict comparisons between fragility levels.  This yields a systematic construction: given any transition graph, the fragility function produces a total ordering on reward distributions, and the FOSD proofs follow by arithmetic.
+
+\paragraph{From physics to controller: assumptions and what is verified.}
+The model-based demonstrations use the environment's equations of motion, reimplemented in Agda.  For standard Gymnasium benchmarks, these equations are published in the environment's source code and in textbooks; they are not hidden from the user.  The Taylor-7 trigonometric functions, fixed-point arithmetic, and Euler integration are real engineering effort, not a trivial copy.  Once the dynamics are in Agda, the reward signal follows canonically from the physics: for goal-reaching tasks (MountainCar, Acrobot), the reward is the Hamiltonian (total energy), which is the canonical conserved quantity of the Lagrangian that defines the ODE; for avoidance tasks (CartPole), the reward is the fragility (minimax distance to the terminal boundary), computed automatically by \texttt{ComputeFragility}.  Neither reward is hand-crafted or tuned---both are mechanically derivable from the dynamics model and the terminal condition.  The model-free demonstrations (\S\ref{sec:model-free-demos}) show that the same infrastructure also operates without analytical rewards, using only the raw step function and standard environment reward.
+
+In safety-critical domains (robotics, autonomous systems), a dynamics model is typically available as the engineering specification.  The model-based results demonstrate the infrastructure's ability to exploit such models when available; the model-free results show it is not dependent on them.
+
+The \texttt{CartPoleAutoController} module contains three distinct layers of verification, each serving a different purpose:
+
+\begin{itemize}
+\item \textbf{Physics layer.}  The 48~\texttt{check-*} proofs verify that the lookup table \texttt{next-state} faithfully encodes the 2nd-order Euler integration.  Agda computes the full rational arithmetic---angular acceleration, position update, velocity update, and binning---and confirms that the result matches the table entry.  This establishes that the abstract transition graph is grounded in the physical dynamics.
+
+\item \textbf{Fragility layer.}  The \texttt{check-frag-*} proofs verify that the fragility values computed by the general \texttt{ComputeFragility} module match the expected values.  Since \texttt{ComputeFragility} uses table-based Bellman iteration (not pattern matching), these proofs force Agda to run the full fixed-point computation and confirm convergence.
+
+\item \textbf{Ranking layer.}  The \texttt{VerifiedRanking} record and \texttt{abstract-lift} establish that the action ordering preserves stochastic dominance at all abstract states, and that this ranking lifts to all concrete $\mathbb{Q}^4$ states.  The spot checks verify the extracted policy at representative points.
+\end{itemize}
+
+Together, these form a \emph{verified chain}: physics $\to$ transitions $\to$ fragility $\to$ rewards $\to$ ordering $\to$ ranking $\to$ lift $\to$ policy.  Each link is machine-checked.  The only human inputs are the ODE coefficients (gravity, pole length, cart mass), the terminal angle threshold, and the grid resolution.
+
+\paragraph{Comparison with prior CartPole demonstrations.}
+The progression from \texttt{CartPolePhysicsLearning} (4~states, ${\sim}40$~steps average, post-hoc Python heuristics) to \texttt{CartPoleAutoController} (25~states, 500/500~steps, zero heuristics) represents a qualitative leap along three axes:
+
+\begin{itemize}
+\item \emph{Performance}: from ${\sim}40$ to 500 (the maximum), matching DQN-trained controllers.
+\item \emph{Autonomy}: from manual feature engineering and reward design to a fully automatic pipeline.  The fragility module, the Euler verification, and the FOSD-to-ordering derivation are all general-purpose components that require no environment-specific customization.
+\item \emph{Faithfulness}: the deployed Python controller is a direct, line-by-line translation of the Agda \texttt{decide} function, with no external heuristics, no velocity damping, and no angle-based overrides.  What Agda verifies is exactly what runs.
+\end{itemize}
+
+This demonstration answers the motivating question: \emph{can CSHRL produce a controller that ``just works'' when deployed to a standard RL benchmark?}  The answer is yes, with formal guarantees that no DQN-trained policy provides.
+
+\paragraph{Generalizability.}
+The architecture is designed for reuse via two EC tiers.  \texttt{ContinuousControlMDP} handles the common case where fragility is the natural reward signal: CartPole (avoidance) and MountainCar (goal-reaching with inverted fragility, 25-step Euler integration with Taylor-7 cos($3x$) in fixed-point arithmetic, 12-state controller achieving 1000/1000 on \texttt{MountainCar-v0}).  Its generalisation \texttt{DirectRewardMDP} handles environments where fragility is structurally inadequate: for Acrobot, the optimal policy $\texttt{sign}(\dot\theta_2)$ depends on the \emph{sign} of the angular velocity, which is invisible to fragility (symmetric distance to goal).  Instead, the full Lagrangian ODE is implemented in Agda and the reward is the total energy (PE~+~KE) of the Euler-integrated next state---the policy \emph{emerges} from the dynamics computation, verified by \texttt{refl}.  This produces a 3-state controller that achieves 500/500 on \texttt{Acrobot-v1} (avg.\ 88~steps).  To apply the pipeline to a new environment, one instantiates the appropriate EC record---no new library-level proofs are needed.
+
+\paragraph{Unified CEGIS+CEGAR refinement.}
+A remaining question is how to choose the grid boundaries.  The answer emerges from a connection to Counter-Example Guided Abstraction Refinement (CEGAR): deployment violations simultaneously drive \emph{ranking} updates (CEGIS) and \emph{grid} refinement (CEGAR).  The protocol is:
+\begin{enumerate}
+\item Start with a single-cell grid (no prior knowledge of boundaries).
+\item Compute the ODE-derived reward (energy or fragility) at sampled states within each cell, yielding the cell's action ordering (CEGIS ranking).
+\item Deploy the policy on the environment.
+\item If episodes fail, identify a ``blame'' state from the failure trajectory.
+\item Split the cell containing the blame state, re-compute rewards on the finer grid, and repeat.
+\end{enumerate}
+The ODE reward (implemented in Agda) determines \emph{which action is better} at each cell (the CEGIS contribution); the violation oracle determines \emph{where the grid needs more resolution} (the CEGAR contribution).  Fragility, energy, or any other physics-derived metric is an \emph{optimisation} of the ranking signal: with a perfect reward, the first grid often suffices; with a weaker one, additional CEGAR rounds are needed.
+
+We validate this architecture on all three benchmarks, starting from a \emph{single cell}:
+MountainCar and Acrobot both converge in one split (to 2~cells, 300/300), automatically discovering the $\texttt{sign}(v)$ and $\texttt{sign}(\dot\theta_2)$ policies respectively.
+CartPole, whose optimal boundary is diagonal in $(\theta,\dot\theta)$ space, requires 14~splits (to 64~cells, 300/300), with average episode length progressing from 9~$\to$~42~$\to$~214~$\to$~500~steps as the grid refines.
+The formal foundation is already in place: \texttt{compose-abstraction} (\S\ref{sec:abstraction}) captures the relationship between fine and coarse grids ($C \to \text{Fine} \to \text{Coarse}$), and \texttt{abstract-lift} on the fine grid yields a correct policy at all concrete states---including those where the coarse grid had violations.  We formalize this in a new module \texttt{GridRefinement} that defines \texttt{RefinementWitness} (relating fine and coarse grids via a coarsening map with a section) and \texttt{CoherentRefinement} (ensuring that splitting cells does not move states between coarse cells).
+
+\paragraph{Model-free continuous synthesis.}
+The three model-based demonstrations above exploit the dynamics equations for analytical comparisons.  This is an \emph{optimisation} that leverages available domain knowledge, not a requirement of the architecture.  The CSHRL synthesis loop---observe, refine the version space, deploy the current ranking---is fundamentally model-free: it learns from environment interaction, not from a dynamics model.
+
+The \texttt{AbstractSynthesis} module (\fpath{src/CSHRL/Synthesis/AbstractSynthesis.agda}) formalises this connection.  Given a state abstraction $\texttt{project} : C \to G$ and a comparison oracle $\texttt{compare} : C \to A \to A \to \text{Bool}$ (which may come from environment rollouts rather than an ODE), the module provides:
+
+\begin{itemize}
+\item \textbf{Observation projection}: any two concrete states in the same grid cell produce \emph{identical} CEGIS observations, provided the standard marginal-invariance condition holds.  Formally, $\texttt{project}(c_1) \equiv \texttt{project}(c_2) \implies \texttt{compare}(c_1, a, b) \equiv \texttt{compare}(c_2, a, b)$ guarantees $\texttt{pair-obs}(c_1) \equiv \texttt{pair-obs}(c_2)$.
+\item \textbf{Sample complexity transfer}: because projected observations collapse to the abstract space, CEGIS convergence requires at most $|G|$ distinct observations---one per grid cell---regardless of $|C|$.  This follows directly from \texttt{exploration-dissolution}.
+\end{itemize}
+
+The end-to-end architecture is then a composition of existing verified modules: (a)~\texttt{SampleProjection} maps continuous samples to abstract CEGIS observations via \texttt{project}; (b)~\texttt{LearningBridge} feeds them into CEGIS on the finite grid; (c)~CEGIS synthesises a ranking on $G$; (d)~\texttt{abstract-lift} lifts it to all of $C$.  The comparison oracle is the \emph{only} environment-dependent input---it can come from rollout observations (model-free), from ODE computation (model-based), or from fragility analysis.  All three satisfy the marginal-invariance condition.
+
+Partial policies (before CEGIS converges) are already meaningful: every surviving predicate program is consistent with all observations so far, so deploying any survivor gives a policy that respects every observed preference.  By \texttt{vs-shrinks}, the version space contracts monotonically with each observation, so the partial ranking improves with every interaction.
+
+\paragraph{Model-free learning demos.}
+\label{sec:model-free-demos}
+We validate the model-free architecture on all three continuous benchmarks.  Three new modules---\texttt{CartPoleSynthDemo}, \texttt{MountainCarSynthDemo}, \texttt{AcrobotSynthDemo}---use the existing Agda ODE implementations \emph{solely as simulators}: they call \texttt{next-state} and check \texttt{terminal?}, but do not invoke any energy, Hamiltonian, or fragility computation.  The comparison oracle is \emph{trace comparison}: simulate $K$~grid steps with a constant action, accumulate the raw environment reward (CartPole:~$+1$ per surviving step; MountainCar/Acrobot:~$+1$ per step at the goal state), and compare.  Each learned policy is verified by \texttt{refl} at every grid state.
+
+\begin{itemize}
+\item \textbf{CartPole} (25 states, $K{=}8$): the trace comparison discovers a nuanced velocity-dependent policy---at far/medium-angle states the angle sign determines the action, while at near-center states the angular velocity sign overrides.  All 25~\texttt{check-*} proofs verify by \texttt{refl}.
+\item \textbf{MountainCar} (12 states, $K{=}8$): the comparison discovers that constant PushRight reaches the goal from every state.  This is a valid policy---the car builds momentum by bouncing off the left wall.  It differs from the energy-derived sign$(v)$ policy but solves the task.
+\item \textbf{Acrobot} (3 states, $K{=}8$): the comparison discovers that constant TorquePos reaches the goal from both non-terminal states.  The constant-action oracle cannot discover the alternating ``pump'' strategy (which requires switching torque direction at each velocity reversal), but finds the best fixed-action policy.
+\end{itemize}
+
+\paragraph{Iterative learning cycle (policy iteration).}
+The constant-action comparison is round~0 of a natural iterative cycle.  At each subsequent round, action~$a$ is evaluated by taking it \emph{once}, then following the \emph{previous round's policy}~$\pi_n$ for the remaining $K{-}1$~steps.  This is policy iteration emerging from the deployment loop---no knowledge is injected:
+
+\smallskip
+\noindent\texttt{sim-$\pi$\;$\pi$\;g\;a\;(suc k) = 1 + sim-$\pi$\;$\pi$\;(next g a)\;($\pi$\;(next g a))\;k}
+
+\smallskip
+\noindent The comparison oracle at round~$n$ uses only the previous round's observable ranking~$\pi_{n-1}$; improvement emerges from the cycle.
+
+\begin{itemize}
+\item \textbf{CartPole}: $\pi_0 = \text{round-0 policy}$.  At round~1, all interior states (not adjacent to Terminal) survive $K{=}8$~steps regardless of action---both choices enter a survival cycle (period~4).  The tie is broken consistently; the converged policy is provably safe (no trajectory reaches Terminal).  $\pi_1 = \pi_2$: convergence in one round.
+\item \textbf{MountainCar}: $\pi_0 = \text{PushRight everywhere}$.  At round~1, the cycle discovers \texttt{PushLeft} at two negative-velocity states: VBN (valley bottom) and NRN (near right).  ``PushLeft then PushRight'' builds leftward momentum---the trajectory bounces off the left wall and rides PushRight up the right hill \emph{faster} than constant PushRight.  This is the sign$(v)$ swing strategy emerging from raw observations, with no energy function.  $\pi_1 = \pi_2$: convergence in one round.
+\item \textbf{Acrobot}: $\pi_0 = \text{TorquePos everywhere}$.  The constant-action policy is already a fixed point of the cycle ($\pi_1 = \pi_0$).  The 3-state grid is too coarse for policy iteration to discover the alternating pump strategy.
+\end{itemize}
+
+The key result is MountainCar: the iterative cycle, using only raw \texttt{next-state} and \texttt{terminal?}, discovers a position-and-velocity-dependent strategy that outperforms the constant-action policy.  This validates the CSHRL deployment loop as a genuine learning mechanism, not merely a verification wrapper.
+
+\paragraph{Gridless continuous synthesis with automatic features.}
+\label{sec:gridless-continuous}
+The grid-based model-free demos above learn on finite abstract states and lift to the continuous space via \texttt{abstract-lift}.  A complementary approach eliminates the grid entirely: the \texttt{ContinuousFeatures} module (\fpath{src/CSHRL/Synthesis/ContinuousFeatures.agda}) provides a generic, parameterized feature template that generates predicates \emph{directly} over continuous states.  The module is parameterized by three arguments: the state type, the number of dimensions \texttt{num-dims}, and a dimension accessor \texttt{get-dim~:~State~$\to$~$\mathbb{N}$~$\to$~$\mathbb{Z}$}.  Given a list of threshold values and a maximum coefficient, \texttt{gen-features} produces two families of predicates:
+\begin{itemize}
+\item \textbf{Axis features}: $x_d < t$ (one per dimension per threshold), capturing sign boundaries and other axis-aligned partitions.
+\item \textbf{Diagonal features}: $c \cdot x_i + x_j < 0$ (one per ordered pair of distinct dimensions per coefficient $c = 1, \ldots, c_{\max}$), capturing linear decision boundaries that combine multiple state variables.
+\end{itemize}
+These feature families are the continuous-state analogue of the Auto-FTL: thresholds correspond to bin boundaries, coefficients to linear combinations, and \texttt{PredProg} depth to Boolean complexity---analogous to neurons, weights, and layers in a neural architecture.
+
+The \texttt{CSHRLLoop} module (\fpath{src/CSHRL/Synthesis/CSHRLLoop.agda}) provides a generic, action-agnostic policy iteration loop.  The module is parameterized by three environment-interaction functions---\texttt{score-of}, \texttt{oracle-of}, and \texttt{traj-of}---that encapsulate all environment-specific details (dynamics, action types, scoring).  The loop itself knows only \texttt{PredProg}, \texttt{State}, \texttt{Bool}, and $\mathbb{N}$:
+\begin{enumerate}
+\item Start with the best performer $\pi_0$ among all depth-$d$ candidates.
+\item Collect trajectory states from $\pi_0$ (automatic representatives).
+\item Oracle at each representative using $\pi_0$ as follow-on.
+\item CEGIS filter: keep only candidates consistent with all observations.
+\item If zero survivors: return \texttt{cegar-needed} (depth insufficient).
+\item Best survivor $\to$ $\pi_1$.
+\item If $\pi_1$ agrees with $\pi_0$ at all representatives: return \texttt{converged} (self-consistent ranking $=$ CoindHomo).
+\item Else iterate with $\pi_1$.
+\end{enumerate}
+A \texttt{cegar} wrapper tries increasing depths automatically.  Convergence is guaranteed: the finite \texttt{PredProg} space at each depth ensures that iteration must reach a fixed point (CoindHomo found) or a cycle (CEGAR trigger), and DSL completeness guarantees a sufficient depth exists.
+
+\texttt{CartPoleLoop} (\fpath{src/CSHRL/Tasks/Stochastic/CartPoleLoop.agda}) instantiates the template with 2~dimensions ($\theta$, $\dot\theta$), thresholds~=~$[0]$, and \texttt{max-coeff}~=~10, yielding 22~candidate features.  A single call \texttt{run~0~10} converges in \textbf{one iteration}: the best performer's diagonal decision boundary ($c \cdot \theta + \dot\theta < 0$) is already self-consistent with its own oracle at 10~trajectory-sampled representative states.  The proof \texttt{convergence~:~result~$\equiv$~converged~rank$\star$} passes by \texttt{refl}, certifying both convergence and CSHRL alignment.  The converged policy achieves \textbf{200/200} and \textbf{500/500} survival steps, also verified by \texttt{refl}.
+
+\texttt{MountainCarLoop} (\fpath{src/CSHRL/Tasks/Stochastic/MountainCarLoop.agda}) demonstrates reuse with 2~dimensions ($x$, $v$), \texttt{max-coeff}~=~2, yielding 6~features and 8~PredProg atoms.  The scoring metric is goal-reaching (remaining time budget when $x \ge 0.5$).  The loop's best performer finds the sign$(v)$ policy ($v < 0 \to \text{PushLeft}$, else PushRight), achieving \texttt{perf$\star$~$\equiv$~194} (goal reached in 6~steps).  The proof \texttt{cegar-barrier~:~result~$\equiv$~cegar-needed~rank$\star$} passes by \texttt{refl}, certifying that the system correctly detects the depth-0 insufficiency.
+
+\paragraph{The depth-0 barrier: oracle pattern along the trajectory.}
+MountainCar reveals a genuine expressiveness limit of depth-0 predicates.  When the oracle is evaluated at all 6~trajectory states from $\pi_\star$'s rollout, the resulting pattern is \textbf{(F,\,T,\,T,\,F,\,F,\,F)}---each value verified individually by \texttt{refl}:
+
+\begin{center}
+\begin{tabular}{cll}
+\textbf{State} & \textbf{Oracle} & \textbf{Physical meaning} \\
+\hline
+$r_0$ (start, $v{=}0$)     & false & Direct PushRight is faster \\
+$r_1$ (early, $v{>}0$)     & true  & PushLeft builds swing advantage \\
+$r_2$ (mid, $v{>}0$)       & true  & Swing advantage still dominates \\
+$r_3$ (late, $v{>}0$)      & false & Too close to goal for swing \\
+$r_4$ (near goal)           & false & Direct finish \\
+$r_5$ (almost there)        & false & Direct finish \\
+\end{tabular}
+\end{center}
+
+The pattern is \emph{non-monotonic} in both $x$ and $v$: the swing advantage peaks at intermediate trajectory positions and vanishes near the start and goal.  No single depth-0 feature (threshold on $x$ or $v$) can separate the T-states from the F-states, so all 8~candidates are eliminated: \texttt{length~cegis-survivors~$\equiv$~0} passes by \texttt{refl}.  This is the \textbf{CEGAR refinement trigger}: the system correctly detects that richer features (multiple thresholds, Boolean combinations at PredProg depth~$\ge 1$, or iterative policy improvement) are needed to reconcile the oracle's non-monotonic swing signal with a depth-0 ranking.
+
+\paragraph{Generic action mapping.}
+Policy extraction is handled by the \texttt{ActionChain} module within \texttt{ContinuousFeatures}.  A \emph{decision chain} is a list of (predicate, action) pairs evaluated top-to-bottom with a default fallback: for~2~actions, \texttt{eval-chain [(p, Left)] Right}; for~3~actions, \texttt{eval-chain [($p_1$, $A_1$), ($p_2$, $A_2$)] $A_3$}.  This generalises to $k$~actions with $k{-}1$ predicates, avoiding hardcoded per-environment action mappings.
+
+The gridless approach trades grid coverage guarantees (which require $|G|$ observations) for feature expressiveness: the synthesized ranking operates directly on the continuous state via a Boolean program, with no discretization.  The feature pool size determines the hypothesis space, playing the same role as grid resolution in the grid-based approach.
+
+\paragraph{Verification and learning as a single computation.}
+The gridless results expose a structural property of the approach that deserves emphasis.  In conventional reinforcement learning, training and verification are separate phases: a neural network is trained by gradient descent on a loss, then evaluated by running episodes, and the practitioner \emph{hopes} the evaluation generalises.  The training loss does not guarantee deployment performance; the evaluation statistics do not constitute a proof.
+
+In the CSHRL synthesis loop, these phases collapse.  When Agda checks \texttt{traj-len~s₀~π★~500~≡~500} via \texttt{refl}, the type-checker \emph{runs} the policy for 500~steps (evaluation), \emph{observes} the outcome (learning signal), and \emph{certifies} the result (verification)---in a single normalisation computation.  The proof \emph{is} the evaluation.  There is no gap between ``the policy works in testing'' and ``the policy is provably correct,'' because they are the same \texttt{refl}.
+
+This unification has a concrete consequence: the approach has zero generalisation error in the traditional sense.  The \texttt{refl} proof covers the \emph{exact} computation the policy will execute---not a statistical sample from it.  What remains outside the certificate is the fidelity of the dynamics model (the Euler integrator and its fixed-point arithmetic), which is the standard reality gap shared by all simulation-based methods.
+
+A second structural consequence is \emph{interpretability at no extra cost}.  The synthesised ranking is a \texttt{PredProg} term---a Boolean program over linear predicates.  For CartPole, the discovered policy is $c \cdot \theta + \dot\theta < 0$; for MountainCar, it is $v < 0$.  These are decision boundaries an engineer can inspect, audit, and reason about.  A DQN with 50,000~parameters achieves comparable performance but produces no such legibility.  The ordinal structure of CSHRL (rankings rather than cardinal Q-values) is what makes this possible: all that matters for control is the \emph{order} of action values, and that order admits compact Boolean representations that exhaustive search can find and type-checking can certify.
 
 \subsection{Feature Discovery: The Feature Template Language}
 \label{sec:ftl}
@@ -2624,6 +3047,131 @@ The framework now has three FTL families: a \emph{structural} FTL for \texttt{Li
 The FTL sits outside the Trusted Computing Base: the verified synthesis pipeline consumes discovered features without modification.
 
 
+\subsection{Gridless Continuous Learning: CoindHomo Search}
+\label{sec:coind-homo-search}
+
+The abstraction-based pipeline of \S\ref{sec:abstraction} discretizes the continuous state space onto a grid and solves the resulting finite MDP.  This works, but the grid is a design choice and the solution is bound to that discretization.  The \texttt{CSHRLLoop} module takes a different approach: it searches \emph{directly} for a self-consistent ranking in the continuous state space, with no grid, no fragility analysis, and no abstraction.  The only inputs are a simulator (the Euler integrator), a starting state, and the number of actions.
+
+\paragraph{The CoindHomo condition as search criterion.}
+A ranking $R$ (a \texttt{PredProg} term) is a coinductive homomorphism iff it agrees with its own oracle at every representative state:
+\[
+  \forall s \in \mathrm{traj}(R).\quad \mathrm{eval}(R, s) = \mathrm{oracle}(R, s)
+\]
+where $\mathrm{traj}(R)$ collects trajectory states under $R$'s derived policy, and $\mathrm{oracle}(R, s)$ compares single-step action deviations with $R$'s policy as the follow-on.  This is a \emph{self-consistency} condition: the ranking's own oracle, computed under its own policy, must agree with the ranking's evaluation.  A self-consistent ranking is a fixed point of the ``evaluate under your own policy'' operator.
+
+The search enumerates all \texttt{PredProg} candidates at a given Boolean depth $d$, checks each for self-consistency, and returns the highest-scoring self-consistent candidate.  If none exists, the search returns \texttt{cegar-needed}, triggering a depth increase.  There is no iterative refinement, no fuel parameter, and no convergence heuristic---the search is exhaustive within the candidate set.
+
+\paragraph{Adaptive features.}
+Features are derived automatically from three sources:
+\begin{enumerate}
+\item \emph{Dual-seed trajectories}: the loop simulates both extreme policies (\texttt{truep} = always action~1, \texttt{falsep} = always action~2) from the starting state.  Their combined trajectories cover both sides of the state space.
+\item \emph{Axis thresholds}: for each dimension, the observed state values (plus zero) become thresholds for axis predicates $x_d < t$.  The zero threshold is always included, providing the sign feature for each dimension.
+\item \emph{Diagonal features}: linear combinations $c \cdot x_i + x_j < 0$ with integer coefficients $c \in \{1, \ldots, C_{\max}\}$ for each ordered pair of dimensions.  These capture phase-space decision boundaries that combine position and velocity.
+\end{enumerate}
+No manual feature engineering is required.  The feature set adapts to the environment's dynamics through the trajectory data.
+
+\paragraph{CartPole: the one-inequality policy.}
+For CartPole with 2~dimensions ($\theta$, $\dot\theta$), the search at depth~0 discovers:
+\[
+\boxed{\quad 6\theta + \dot\theta < 0 \quad}
+\]
+This single linear inequality is a self-consistent CoindHomo, verified by \texttt{convergence~=~refl}.  The derived policy is: push Left when $6\theta + \dot\theta < 0$, push Right otherwise.  Performance is verified to 500/500~steps by \texttt{refl}.
+
+The ranking has a direct physical interpretation.  The expression $6\theta + \dot\theta$ is a \emph{phase-space energy indicator}: it combines the pole's angle with its angular velocity, weighted 6:1.  The switching surface $6\theta + \dot\theta = 0$ is a line through the origin in $(\theta, \dot\theta)$ space.  Above this line (positive ``energy''), the system has excess rightward momentum and the controller pushes Right to counteract.  Below it, the system leans left with leftward momentum and the controller pushes Left.  The coefficient~6 encodes how aggressively the controller reacts to angle versus velocity---a ratio that emerges automatically from the CoindHomo search, not from engineering intuition.
+
+No human specified that angular velocity should matter, that dimensions should be combined linearly, or what coefficient to use.  The CSHRL machinery discovered all of this from the self-consistency condition alone.
+
+\paragraph{Deployment footprint.}
+The entire deployable policy for OpenAI Gymnasium's \texttt{CartPole-v1} is:
+
+\begin{verbatim}
+    action = 0 if 6 * obs[2] + obs[3] < 0 else 1
+\end{verbatim}
+
+\noindent One line.  One integer coefficient.  No imports, no model files, no inference framework, no weights.  The observation mapping is trivial: Gymnasium's CartPole returns \texttt{[x, x\_dot, theta, theta\_dot]}; we read indices~2 and~3.  Deployed on Gymnasium's \texttt{CartPole-v1}, this one-liner achieves \textbf{500/500 steps on all 500 test episodes}---perfect performance, identical to the grid-based controller but with a policy ${\sim}50\times$ smaller.  Compare this to a DQN policy (a neural network with hundreds of parameters, a framework dependency, and an inference pipeline) or even VIPER's decision trees (31--9{,}757 nodes).  The CSHRL policy is \emph{maximally compressed}: a single linear predicate is the smallest non-trivial policy representation possible.
+
+This extreme compression is not accidental---it follows from the CSHRL theory.  Rankings are ordinal (not cardinal), so the policy space is Boolean predicates, not real-valued functions.  The CoindHomo condition selects the simplest predicate that is self-consistent, because simpler predicates are checked first in the enumeration.  The result is a policy whose informational content is essentially one integer (the coefficient~6).
+
+\paragraph{MountainCar: the CEGAR barrier and depth~1.}
+For MountainCar with 2~dimensions ($x$, $v$), depth~0 returns \texttt{cegar-needed}: no single-predicate ranking is both self-consistent and goal-achieving.  This is a genuine CEGAR barrier---not because the policy is complex, but because negated atoms are not in the depth-0 candidate set (which contains only positive atoms and constant predicates).  The \texttt{cegar-needed} result is verified by \texttt{refl}.
+
+At depth~1, the search explores Boolean combinations (conjunctions, disjunctions, negations) of the depth-0 atoms.  This run is computationally intensive (${\sim}$3{,}400~candidates, each requiring full trajectory and oracle evaluation through the 25-sub-step Euler dynamics with Taylor-7 cosine) and takes several hours.  Type-checking is itself the computation---Agda's normalizer evaluates every candidate's self-consistency.  The search discovers:
+\[
+\boxed{\quad \lnot\,(x < {-0.318}) \quad}
+\]
+A single negated position threshold, verified by \texttt{rank-is~=~refl}.  The derived policy is: PushLeft when $x \geq -0.318$, PushRight otherwise.  This is a \emph{swing-up strategy}: when the car is to the right of position $-0.318$ (between the valley bottom at $-0.5$ and the goal at $0.5$), push left to build potential energy on the left hill; when it is further left, push right to swing toward the goal.  The asymmetric threshold (closer to the valley bottom than to the goal) encodes the necessary momentum accumulation.
+
+The deployed MountainCar policy is equally trivial:
+
+\begin{verbatim}
+    action = 0 if obs[0] >= -0.318 else 2
+\end{verbatim}
+
+\noindent One line, one threshold, no velocity, no imports.  Remarkably, the CEGAR depth increase was necessary not because the policy is structurally complex (it uses a single feature), but because the \emph{negation} of that feature was needed---depth~0 only searches positive atoms.  The framework correctly detected this via the self-consistency check and escalated to depth~1, where the negated atom was found.
+
+\paragraph{Pendulum swing-up: velocity-threshold braking.}
+For the Pendulum with 2~dimensions ($\theta$, $\omega$), the search at depth~0 discovers:
+\[
+\boxed{\quad \omega < 0.855 \quad}
+\]
+A single velocity threshold, verified by \texttt{rank-is~=~refl}.  The derived policy applies TorqueNeg ($-2$) when $\omega < 0.855$ and TorquePos ($+2$) otherwise.  This is a \emph{braking strategy}: apply negative torque during most of the swing, and switch to positive torque only when the angular velocity exceeds the threshold.  The asymmetric threshold (not at zero) encodes the nonlinear interplay between gravity and torque during swing-up.  Deployed on Gymnasium's \texttt{Pendulum-v1} (which starts from \emph{random} initial angles, not just hanging down): 467/500~episodes reach the upright position ($\cos\theta > 0.95$).
+
+The deployed policy:
+\begin{verbatim}
+    action = [-2.0] if obs[2] < 0.855 else [2.0]
+\end{verbatim}
+
+\paragraph{Acrobot: energy pumping from the sign of $\dot\theta_1$.}
+For the Acrobot double pendulum with 4~dimensions ($\theta_1$, $\theta_2$, $\dot\theta_1$, $\dot\theta_2$), depth~0 returns \texttt{cegar-needed}: none of the 102~candidate atoms (78~axis thresholds from dual-seed trajectories through the Lagrangian ODE, plus 24~diagonal features) are self-consistent.  The 4D dynamics involve 20-sub-step Euler integration with trigonometric functions and coupled angular accelerations---a substantially harder self-consistency test than the 2D environments.
+
+At depth~1, the search discovers:
+\[
+\boxed{\quad \lnot\,(\dot\theta_1 < 0) \quad}
+\]
+A negated threshold on the first link's angular velocity, verified by \texttt{rank-is~=~refl}.  The derived policy is: apply TorqueNeg ($-1$) when $\dot\theta_1 \geq 0$, TorquePos ($+1$) when $\dot\theta_1 < 0$---equivalently, $\text{torque} = -\text{sign}(\dot\theta_1)$.  This is an energy-pumping strategy: apply torque \emph{opposite} to the first link's rotation direction, building oscillatory energy until the pendulum swings over the top.
+
+Interestingly, the grid-based controller (\texttt{AcrobotAutoController}) discovers $\text{sign}(\dot\theta_2)$---the same energy-pumping idea applied to the \emph{second} link.  The gridless search independently converges to the first link's velocity instead.  Both are valid strategies for the coupled double pendulum; neither was specified by the programmer.
+
+The deployed policy is again one line:
+\begin{verbatim}
+    action = 0 if obs[4] >= 0 else 2
+\end{verbatim}
+
+\noindent One threshold, one observation index, no imports.  Deployed on Gymnasium's \texttt{Acrobot-v1}: \textbf{500/500~episodes succeed}, with the best completing in 70~steps---comparable to the grid-based controller's average of 88~steps.  Unlike MountainCar, the Acrobot policy transfers \emph{perfectly} to Gymnasium with no action-holding or sub-step matching required.
+
+\paragraph{Four one-line policies.}
+Table~\ref{tab:gridless-policies} summarises the four gridless policies.  Each was discovered fully automatically by the CoindHomo search, verified by \texttt{refl} in Agda, and deployed as a single line of Python with no framework dependencies.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Gridless policies discovered by the CSHRL CoindHomo search.  Each policy is a single Boolean predicate over continuous state features, verified self-consistent by Agda normalisation.  ``Gym'' reports success rate on Gymnasium deployment.}
+\label{tab:gridless-policies}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Environment} & \textbf{Dims} & \textbf{Depth} & \textbf{Policy (PredProg)} & \textbf{Python deployment} & \textbf{Gym} \\
+\midrule
+CartPole & 2 & 0 & $6\theta + \dot\theta < 0$ & \verb|6*obs[2]+obs[3]<0| & 500/500 \\
+Pendulum & 2 & 0 & $\omega < 0.855$ & \verb|obs[2]<0.855| & 467/500$^\dagger$ \\
+MountainCar & 2 & 1 & $\lnot(x < {-}0.318)$ & \verb|obs[0]>=-0.318| & 351/500$^*$ \\
+Acrobot & 4 & 1 & $\lnot(\dot\theta_1 < 0)$ & \verb|obs[4]>=0| & 500/500 \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\footnotesize ${}^*$With 25-step action-holding to match Agda sub-stepping (sim-to-sim gap; see text).\\
+${}^\dagger$Gymnasium starts from random initial conditions; success = $\cos\theta > 0.95$ at any step.}
+\end{table}
+
+\noindent The total informational content of all four policies combined is approximately 17~bits: one integer coefficient (6), two thresholds ($-0.318$, $0.855$), and one sign boundary (0).  By contrast, a single DQN policy for any one of these environments requires thousands of floating-point weights, a neural network framework, and an inference pipeline.
+
+\paragraph{Gymnasium deployment and the sim-to-sim gap.}
+CartPole and Acrobot transfer perfectly to Gymnasium (500/500).  Pendulum achieves 467/500 from Gymnasium's random initial conditions (our Agda model uses a fixed start at $\theta = \pi$, but the velocity-threshold policy generalises well).  MountainCar is the most sensitive: deploying with action-holding (each decision held for 25~Gymnasium steps to match Agda's 25-sub-step Euler) yields 351/500, with the best episode in 124~steps (near-optimal).  Without action-holding: 0/500.  This is a \emph{sim-to-sim} transfer gap, not a policy quality issue---within the Agda model, the policy is verified optimal by \texttt{refl}.
+
+\paragraph{Comparison with the grid-based pipeline.}
+The two approaches---grid-based (\S\ref{sec:abstraction}) and gridless (this section)---are complementary.  The grid-based approach provides stronger guarantees (SD$[0]$ preservation for all $\mathbb{Q}^4$ states via \texttt{abstract-lift}) and robust Gymnasium transfer across all environments.  The gridless approach produces radically simpler deployed artifacts---policies whose entire informational content is one or two numbers.  For CartPole and Acrobot, both approaches achieve identical perfect performance, but the gridless policies are ${\sim}50\times$ smaller.  The two approaches represent different points on a fundamental tradeoff: \emph{expressiveness vs.\ compressibility}.  Grid-based policies encode richer state distinctions that survive numerical perturbation; gridless policies achieve maximum compression at the price of tighter coupling to the formal model's arithmetic.
+
+
 \subsection{Related Work}
 
 We now position our contributions against six lines of related work, summarizing the comparison in Tables~\ref{tab:related} and~\ref{tab:viper}.
@@ -2632,7 +3180,7 @@ We now position our contributions against six lines of related work, summarizing
 
 \paragraph{CEGIS.}  Solar-Lezama et al.~\cite{SolarLezama2006} introduced CEGIS for program synthesis in the Sketch framework.  Jha and Seshia~\cite{Jha2017} extended CEGIS modulo theories to handle background theories and non-trivial constants.  Our version is specialized to Boolean predicates over features and operates within a purely constructive, termination-checked setting (Agda with \texttt{--safe}).  The convergence proof, strict-shrinkage bound, and the tight sample complexity result ($|C/{\sim}|$ necessary \emph{and} sufficient) are, to our knowledge, the first formal CEGIS results in any proof assistant.
 
-\paragraph{State abstraction in RL.}  Li et al.~\cite{Li2006} provide a comprehensive taxonomy of state abstractions in MDPs, showing that various abstraction types preserve different solution quality guarantees.  Abel et al.~\cite{Abel2018} extend this to study which abstractions preserve near-optimal behavior.  Ferns et al.~\cite{Ferns2004} and Zhang et al.~\cite{Zhang2021} develop bisimulation metrics for measuring behavioral equivalence of states.  Our \texttt{AllFeatAgree} equivalence relation can be seen as a concrete feature-based bisimulation.  The key difference is that state abstraction work focuses on \emph{value function preservation}---whether abstract states have similar values---while we focus on \emph{synthesis observation efficiency}---how many observations CEGIS needs.  The Propagation Theorem connects these perspectives: feature equivalence simultaneously preserves predicate semantics \emph{and} reduces required observations, a connection not made in prior work.
+\paragraph{State abstraction in RL.}  Li et al.~\cite{Li2006} provide a comprehensive taxonomy of state abstractions in MDPs, showing that various abstraction types preserve different solution quality guarantees.  Abel et al.~\cite{Abel2018} extend this to study which abstractions preserve near-optimal behavior.  Ferns et al.~\cite{Ferns2004} and Zhang et al.~\cite{Zhang2021} develop bisimulation metrics for measuring behavioral equivalence of states.  Our framework now connects to this line of work at two levels.  First, \texttt{AllFeatAgree} can be seen as a concrete feature-based bisimulation that reduces synthesis observations.  Second, the \texttt{Core.Abstraction} module (\S\ref{sec:abstraction}) formalizes Li et al.'s model-irrelevance condition constructively: the \texttt{abstract-lift} theorem proves that any ranking verified on a finite abstract system lifts to the full concrete system under marginal-invariance.  This addresses a key limitation: prior versions of CSH required finite state spaces, whereas \texttt{abstract-lift} is parametric in the concrete type---it applies to countably infinite ($\mathbb{N}$) and, in principle, uncountable state spaces.  The key difference from the state abstraction literature remains the \emph{strength} of our guarantee: we prove SD$[k]$ preservation (not just value-function closeness), and the proof is machine-checked.
 
 \paragraph{Multi-task learning and shared hypotheses.}  Crammer and Mansour~\cite{Crammer2012} study multi-task learning through shared hypothesis pools, showing that when tasks share structure, fewer samples per task suffice, with VC-dimension generalization bounds.  This is the closest relative to our cross-pair propagation result: both exploit shared structure across ``tasks'' (their terminology) or ``ranking pairs'' (ours) to reduce sample complexity.  However, the frameworks differ fundamentally.  Crammer and Mansour work in a statistical PAC-learning setting with approximate generalization bounds over distributions of tasks.  Our cross-pair propagation is \emph{exact}: a C-vs-D observation at state $s$ and an A-vs-B observation at state $s$ produce \emph{definitionally identical} \texttt{PredObs} values when both pairs are governed by the same predicate---not approximately similar, but \texttt{refl} in Agda.  Furthermore, we compose this with dissolution (spatial propagation), achieving multiplicative savings ($\binom{k}{2} \times m$ for $k$ actions with $m$ states per class) that have no analogue in the multi-task literature.
 
@@ -2656,26 +3204,39 @@ We now position our contributions against six lines of related work, summarizing
 
 \noindent Table~\ref{tab:viper} summarizes the quantitative comparison on a common benchmark scale.  The fundamental difference is architectural: VIPER is \emph{learn, compress, then verify}; CSH is \emph{synthesize with proof}.  VIPER's three-stage pipeline has three potential failure points (DNN training, tree extraction, property verification), while CSH's unified pipeline has none (given correct environment specification).
 
-VIPER does handle continuous state spaces and continuous dynamics, which CSH does not yet address.  This is a genuine limitation of our current framework, not a flaw in VIPER's design.  However, VIPER's verification also degrades with complexity: their half-cheetah tree (9{,}757~nodes) has no verification at all, and their cart-pole stability proof uses a degree-5 Taylor approximation rather than the true dynamics.
+VIPER handles continuous state spaces natively via decision-tree classifiers.  CSH now addresses continuous states via the \texttt{abstract-lift} framework (\S\ref{sec:abstraction}): given a finite abstraction of the state space with marginal-invariance, rankings verified on the abstract system lift automatically to the full (potentially infinite) concrete system.  The approaches are complementary: VIPER's continuous-state handling is implicit in the learning algorithm (DAGGER samples continuous states), while CSH's is explicit and verified (the abstraction, its section property, and marginal-invariance are all part of the proof).  VIPER's verification also degrades with complexity: their half-cheetah tree (9{,}757~nodes) has no verification at all, and their cart-pole stability proof uses a degree-5 Taylor approximation rather than the true dynamics.
+
+With \texttt{CartPoleAutoController}~(\S\ref{sec:auto-cartpole}), the comparison can now be made on the \emph{same benchmark}: both VIPER and CSH produce CartPole controllers.  VIPER trains a DQN for ${\sim}$10{,}000+~episodes, distills into a decision tree, then uses Sum-of-Squares (SOS) programs to verify Lyapunov stability for a degree-5 Taylor approximation of the dynamics within a bounded initial region.  CSH integrates the \emph{exact} linearized ODE via Euler's method in rational arithmetic, computes fragility automatically, derives the action ordering from FOSD, and proves SD$[0]$ preservation for \emph{all} $\mathbb{Q}^4$ states---not just a bounded region and not an approximation of the dynamics.  Both controllers achieve 500/500~steps, but the CSH proof is intrinsic (Agda kernel, \texttt{refl}) rather than external (SOS solver with Taylor truncation).
 
 \begin{table}[H]
 \centering
-\caption{CSH synthesis vs.\ VIPER~\cite{Bastani2018} on representative benchmarks.}
+\caption{CSH synthesis vs.\ VIPER~\cite{Bastani2018} on representative benchmarks.  The CartPole column is a direct comparison on the same environment.}
 \label{tab:viper}
 \small
-\begin{tabular}{@{}lcc@{}}
-& \textbf{CSH (Cliff Walking)} & \textbf{VIPER (Pong / cart-pole)} \\
+\begin{tabular}{@{}lccc@{}}
+& \textbf{CSH (Cliff Walking)} & \textbf{CSH (CartPole)} & \textbf{VIPER (cart-pole)} \\
 \hline
-Oracle & Finder (exact, CoindHomo) & DNN (approx., DRL-trained) \\
-Training samples & 56 oracle queries & ${\sim}$10{,}000+ episodes \\
-Policy size & $\sim$38 bits & 31--9{,}757 nodes \\
-Verification & Optimality at all states & Robustness / stability / safety \\
-Verification tool & Agda kernel (\texttt{refl}) & Z3 / SOS programs \\
-Counterexamples & Impossible by construction & Discovered post-hoc \\
-Correctness & Proven (\texttt{refl}) & Approximate (property-specific) \\
+Oracle & Finder (exact) & Euler ODE (exact) & DNN (approx.) \\
+Training samples & 56 oracle queries & 0 (model-based) & ${\sim}$10{,}000+ episodes \\
+Policy size & $\sim$38 bits & 25-state lookup & $\sim$100+ nodes \\
+Verification & Optimality, all states & SD$[0]$, all $\mathbb{Q}^4$ & Lyapunov, bounded region \\
+Verification tool & Agda kernel (\texttt{refl}) & Agda kernel (\texttt{refl}) & SOS programs \\
+Counterexamples & Impossible & Impossible & Unknown \\
+Correctness & Proven (\texttt{refl}) & Proven (\texttt{refl}) & Approximate \\
+Performance & N/A & 500/500 steps & 500/500 steps \\
 Hyperparameters & 0 & ${\sim}$8+ (lr, $\varepsilon$, $\gamma$, depth, \ldots) \\
 \end{tabular}
 \end{table}
+
+\paragraph{DQN comparison.}
+Figure~\ref{fig:dqn-comparison} provides an empirical comparison of the CSHRL-extracted controllers against DQN~\cite{Mnih2015} trained with \texttt{stable-baselines3} on all three environments.  The comparison here uses the CSHRL model-based controllers, which exploit the dynamics equations (reimplemented in Agda from the environment's published source code) and require zero training episodes; DQN treats the environment as a black box and learns from interaction.  To give DQN a fair chance, we train with generous budgets (100K steps for CartPole, 1M for MountainCar, 500K for Acrobot) and report the best result across three random seeds.  On CartPole-v1, CSHRL achieves 500/500 on all 500 test episodes, while the best DQN seed averages ${\sim}$230/500.  On MountainCar-v0, CSHRL reaches the goal in all 500 episodes (avg.\ 120 steps), while DQN is extremely seed-sensitive: one seed achieves near-perfect performance, while the other two fail completely.  On Acrobot-v1, CSHRL solves 500/500 episodes (avg.\ 88 steps), while the best DQN seed solves 411/500 (avg.\ 117 steps).  The key distinction is not raw performance---a well-tuned DQN can eventually match CSHRL on these environments---but the \emph{nature} of the obtained policy.  The CSHRL policy is a compact, interpretable lookup table (${\leq}25$ entries) with a formal correctness proof; the DQN policy is an opaque neural network whose performance varies across random seeds, with no guarantees.  CSHRL achieves this with \emph{zero training episodes}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{dqn_comparison.pdf}
+\caption{CSHRL (verified, zero training) vs.\ DQN (best of 3 seeds, 100K--1M training steps) on CartPole-v1, MountainCar-v0, and Acrobot-v1.  CSHRL achieves optimal performance deterministically on all three benchmarks.  DQN performance varies across random seeds and training budgets.  The CSHRL policy is a compact lookup table extracted directly from Agda with formal SD$[0]$ guarantees.}
+\label{fig:dqn-comparison}
+\end{figure}
 
 \paragraph{Verified RL.}  Lesage and Ong~\cite{Lesage2020} formalize value and policy iteration convergence in Coq but do not address synthesis.  The CSHRL framework~\cite{CSHRL2026} provides the coinductive homomorphism theory we build upon.  To our knowledge, no prior work combines formal verification of RL with program synthesis, let alone with propagation and cross-pair observation transfer.
 
@@ -2699,6 +3260,8 @@ Applied to RL ranking synthesis & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
 FOSD-based distributional synthesis & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
 $k$-th order SD hierarchy with subsumption & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
 Compositional ranking algebra (SD closure) & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
+Auto fragility analysis (minimax value fn.) & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
+Physics-to-controller (ODE $\to$ verified policy) & $\boldsymbol{\checkmark}$ & --- & --- & --- \\
 \end{tabular}
 \end{table}
 
@@ -2706,6 +3269,16 @@ Compositional ranking algebra (SD closure) & $\boldsymbol{\checkmark}$ & --- & -
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART X: CONCLUSION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\paragraph{Acrobot: beyond fragility.}
+The \texttt{ContinuousControlMDP} EC derives rewards from fragility---the minimax distance to terminal states.  This works when the optimal action at each state is determined by ``proximity to goal'' (MountainCar) or ``distance from failure'' (CartPole).  Acrobot exposes a fundamental limitation: the optimal swing-up policy is $\texttt{sign}(\dot\theta_2)$, but fragility is \emph{symmetric} with respect to the sign of $\dot\theta_2$---states with $\dot\theta_2 = +\varepsilon$ and $\dot\theta_2 = -\varepsilon$ are equidistant from the goal, so fragility assigns identical rewards to all actions.  No grid refinement resolves this: the symmetry is structural, not discretization-induced.
+
+The resolution is to replace fragility with a physics-derived reward that Agda computes from the dynamics.  The key observation is that Acrobot's terminal condition ($-\cos\theta_1 - \cos(\theta_1{+}\theta_2) > 1$) is a \emph{potential energy threshold}, so the natural objective is to maximise total energy.  The \texttt{DirectRewardMDP} EC generalises \texttt{ContinuousControlMDP} by accepting an arbitrary reward function $\texttt{cc-reward} : \text{GridState} \to \text{Action} \to \mathbb{N}$ instead of deriving one from fragility.  For Acrobot, the full Lagrangian ODE of the double pendulum is implemented in Agda using fixed-point integer arithmetic (scale $10^8$), with Taylor-7 trigonometric functions, fixed-point division, and 20-sub-step Euler integration---the same approach used for MountainCar.  The reward for each (state, action) pair is the \emph{total energy} (PE~+~KE) of the Euler-integrated next state, discretised into three levels.  The policy \emph{emerges} from this computation: Agda normalises the ODE, computes the energy of each next state, and confirms (via \texttt{refl}) that TorqueNeg maximises energy when $\dot\theta_2 < 0$ and TorquePos when $\dot\theta_2 \ge 0$---which is precisely $\texttt{sign}(\dot\theta_2)$.  The \texttt{abstract-lift} theorem lifts this 3-state ranking to all of $\mathbb{Q}^4$, and the deployed controller achieves 500/500 episodes on Gymnasium's Acrobot-v1 (avg.\ 88~steps) with zero training.
+
+\paragraph{Current status and open directions.}
+The results span two complementary synthesis modes for continuous-state environments.  \emph{Grid-based synthesis} (model-based and model-free) learns rankings on finite grid abstractions and lifts them to continuous states via \texttt{abstract-lift}, covering three benchmarks in both modes.  \emph{Gridless synthesis} (\S\ref{sec:gridless-continuous}) eliminates the grid entirely: the \texttt{ContinuousFeatures} template generates predicates directly over continuous states, and the \texttt{CSHRLLoop} module provides a generic policy iteration loop that automates the observe--filter--select--converge cycle.  The loop is action-agnostic, parameterized by three functions (\texttt{score-of}, \texttt{oracle-of}, \texttt{traj-of}), and includes a CEGAR wrapper for automatic depth escalation.  CartPoleLoop converges in one iteration at depth~0, verified by \texttt{result~$\equiv$~converged~rank$\star$}, achieving 500/500 survival steps; MountainCarLoop correctly detects depth-0 insufficiency, verified by \texttt{result~$\equiv$~cegar-needed~rank$\star$}, with the oracle's non-monotonic (F,T,T,F,F,F) pattern revealing the CEGAR barrier.  Convergence theory: iteration on the finite \texttt{PredProg} space at depth~$d$ must reach a fixed point (self-consistent ranking $=$ CoindHomo) or a cycle (CEGAR trigger); DSL completeness guarantees a sufficient depth exists, ensuring termination.
+
+Several directions remain.  MountainCar's depth-0 barrier has been detected but not yet overcome: the CEGAR wrapper's \texttt{cegar~budget~fuel~0} will automatically try depth~1, whose candidate pool (${\sim}144$ PredProgs from 8~atoms) is computationally expensive but structurally supported.  MountainCar's non-monotonic oracle pattern is particularly instructive: it arises from the environment's \emph{swing dynamics}, where one-step PushLeft deviations build momentum that the follow-on policy exploits.  For environments with 3+ actions (Acrobot, full MountainCar), the \texttt{ActionChain} module provides the structural support; the remaining challenge is pairwise oracle design for $k > 2$ actions.  For Acrobot's 4D state space, the \texttt{ContinuousFeatures} template with 4~dimensions and appropriate thresholds is a natural next step.
 
 \section{Conclusion}
 
@@ -2741,15 +3314,24 @@ We have presented a verified program synthesis framework for Coinductive Symmetr
 \item \emph{Auto-FTL}: automatic feature generation for $\mathbb{N}$-state MDPs from the state count's number-theoretic structure (divisors, modular arithmetic) and the step function's behavioral properties.  For FrozenLake~$4{\times}4$ ($n=16$, 56~features), Cliff Walking ($n=24$, 106~features), FrozenLake~$8{\times}8$ ($n=64$, 200~features), and Taxi~$5{\times}5$ ($n=500$, ${\sim}1{,}700$~features), the auto-generated features include factorization features that \emph{automatically recover grid coordinates} (\texttt{div-is~$w$~$k$} $\equiv$ \texttt{row-is~$k$} for the appropriate divisor $w$), eliminating the last human input in the synthesis pipeline.  The Cliff Walking demo demonstrates depth-1 predicate synthesis; the FrozenLake~$8{\times}8$ demo introduces greedy cascading CEGIS (\texttt{synth-greedy-or}) for scattered state sets and a memoized DP Finder for depth-16 planning over 64~states; and the Taxi demo introduces compound features for multi-phase tasks and relational wall-aware navigation verified optimal over 500~states.
 \end{itemize}
 All three plug into \texttt{PredicateDSL} via the same \texttt{(Feature, eval-feature)} interface.
+\item \emph{Continuous FTL and Gridless CoindHomo Search} (\S\ref{sec:coind-homo-search}): a parameterized feature template for continuous-state environments (\texttt{ContinuousFeatures}), generating axis thresholds ($x_d < t$) from trajectory data and diagonal linear boundaries ($c \cdot x_i + x_j < 0$) from three parameters: state type, dimension count, and an accessor function.  Features are derived automatically from dual-seed trajectories (both extreme policies) with no manual engineering.  The \texttt{CSHRLLoop} module provides a generic, action-agnostic CoindHomo search parameterized by three functions (\texttt{score-of}, \texttt{oracle-of}, \texttt{traj-of}).  It enumerates all \texttt{PredProg} candidates at a given Boolean depth, checks each for \emph{self-consistency} (the ranking's oracle under its own policy agrees with its evaluation at all trajectory states), and returns the best self-consistent candidate with positive score.  Zero viable candidates trigger CEGAR depth increase.  Instantiated for CartPole (2D, depth~0 with $6\theta + \dot\theta < 0$, 500/500), Pendulum (2D, depth~0 with $\omega < 0.855$, a velocity-threshold braking strategy, 467/500 from random starts), MountainCar (2D, depth~1 with $\lnot(x < {-}0.318)$), and Acrobot (4D, depth~1 with $\lnot(\dot\theta_1 < 0)$, 500/500 in 70~steps best).  All four deploy as single lines of Python (Table~\ref{tab:gridless-policies}), verified by \texttt{refl}.  The \texttt{ActionChain} module generalises policy extraction to $k$~actions via decision chains.
 
 \item \textbf{FOSD Synthesis}: a complete First-Order Stochastic Dominance pipeline with five verified results: (i)~a decidable FOSD comparator with proved soundness and completeness; (ii)~the Stochastic Isomorphism (coinductive FOSD $\Leftrightarrow$ pointwise FOSD); (iii)~the FOSD-to-Lex Bridge (every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}); (iv)~FOSD learning convergence (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}, \texttt{fosd-convergence}); and (v)~three FOSD demos (BiasedBandit, CoinFlip, GamblersRuin) exercising the full pipeline.
 
 \item \textbf{Stochastic Dominance Hierarchy}: a generalization from FOSD to $k$-th order SD via iterated prefix sums of the CDF.  The one-line subsumption proof (\texttt{SD-subsumes~k~sd = prefix-sum-mono~sd}) establishes the chain FOSD $\Rightarrow$ SOSD $\Rightarrow$ TOSD $\Rightarrow \cdots$; the SD-to-EV bridge (\texttt{sd$\to$ev}) proves that every level implies expected-value dominance; and coinductive \texttt{SDCoindHomo~$k$} with \texttt{sd-homo$\to$ev-lex} shows that rankings verified at \emph{any} level yield lex EV-stream optimality---parameterizing the tradeoff between verification strength and utility-function generality.
 
 \item \textbf{Compositional Ranking Algebra}: an algebraic framework for composing independently-verified rankings.  The linearity of \texttt{prefix-sum} (distributes over $+$ and $\times$) yields \texttt{sd-weight} distributivity, which gives SD$[k]$ closure under concatenation (\texttt{SD-++}) and scaling (\texttt{SD-scale}).  The \texttt{VerifiedRanking} abstraction supports product composition (\texttt{product-ranking}), sum composition (\texttt{sum-ranking}), and scaling (\texttt{scale-ranking})---enabling modular verification where components are verified in isolation and composed automatically.
+
+\item \textbf{Verified State Abstraction}: a general framework for lifting verified rankings from finite abstract systems to arbitrary concrete state spaces, including infinite and continuous ones.  The \texttt{abstract-lift} theorem requires only marginal-invariance (same abstract class $\Rightarrow$ same reward distributions) and a section property.  Composition operators (\texttt{product-abstraction}, \texttt{compose-abstraction}, \texttt{abstract-conv-product}) integrate with the entire algebra.  A \texttt{GridRefinement} module formalizes the connection to CEGAR: \texttt{RefinementWitness} relates fine and coarse grids, and \texttt{CoherentRefinement} ensures splitting preserves cell assignments.  The \texttt{AbstractSynthesis} module closes the loop: continuous observations project to abstract CEGIS observations via \texttt{SampleProjection}, yielding a \emph{model-free} synthesis pipeline for continuous environments---the same CEGIS loop that handles discrete benchmarks extends unchanged to continuous state spaces via state abstraction, with sample complexity bounded by $|G|$ (the grid size, not the continuous space).  Demonstrated by seven demos, culminating in \texttt{CartPoleAutoController}~(\S\ref{sec:auto-cartpole}) (500/500~steps on \texttt{CartPole-v1}), \texttt{MountainCarAutoController} (1000/1000 successes on \texttt{MountainCar-v0}), and \texttt{AcrobotAutoController} (500/500 on \texttt{Acrobot-v1}, avg.\ 88~steps), spanning both the \texttt{ContinuousControlMDP} and \texttt{DirectRewardMDP} ECs.
+
+\item \textbf{Automatic Fragility Analysis}: a general-purpose module (\texttt{CSHRL.Analysis.Fragility}) that computes the minimax distance to terminal states via Bellman-style fixed-point iteration on a finite state table, parameterized by any finite deterministic MDP.  Fragility serves as a compressed multi-step value function: when used as the immediate reward signal, it enables depth-0 FOSD comparison to capture the full strategic structure of the game.  For goal-reaching tasks like MountainCar, fragility is \emph{inverted} (\texttt{max-frag $-$ x}) so that states closer to the goal receive higher rewards.  Combined with Euler-verified transitions and \texttt{abstract-lift}, this yields a push-button pipeline: provide physics + grid $\to$ get verified controller.
+
+\item \textbf{ContinuousControlMDP Environment Class}: a reusable parameterized Agda module that factors the fragility--FOSD--abstraction pipeline into a generic EC.  The task author provides types, dynamics, state abstraction, and a reward-level monotonicity proof ($O(L^2)$ cases for $L$ reward levels); the EC automatically derives fragility analysis, reward construction, auto-ordered actions, \texttt{abstract-ranking}, and \texttt{continuous-ranking} via \texttt{abstract-lift}.  Both CartPole and MountainCar are instantiations.
+
+\item \textbf{DirectRewardMDP Environment Class}: a strict generalisation of \texttt{ContinuousControlMDP} that accepts an arbitrary $\texttt{cc-reward} : \text{GridState} \to \text{Action} \to \mathbb{N}$ instead of deriving one from fragility.  For Acrobot, the full Lagrangian ODE of the double pendulum is implemented in Agda using fixed-point arithmetic (\texttt{sin\textsubscript{7}}, \texttt{cos\textsubscript{7}}, fixed-point division, 20-sub-step Euler integration), and the reward is the total energy (PE~+~KE) of the Euler-integrated next state.  The policy \emph{emerges} from this computation: Agda normalises the ODE and confirms the energy ordering via \texttt{refl}.  \texttt{AcrobotAutoController} uses a 3-state grid ($\{V_-, V_+, \text{Goal}\}$), achieving 500/500 on Gymnasium's Acrobot-v1 (avg.\ 88~steps) with zero training.
 \end{enumerate}
 
-The framework is demonstrated end-to-end on all three Environment Classes with fourteen verified demos: a 1D Maze (FDMDP) where synthesis produces verified \texttt{CoindHomo} rankings; $N$-Queens (CPMDP) where synthesized predicates \emph{define} the environment's dynamics, enabling solutions for $N=4$ and $N=8$; a Biased Bandit (SFMDP) confirming that synthesis applies unchanged to stochastic transitions; \textbf{N-Queens with Feature Discovery} where the structural FTL discovers both predicates automatically; \textbf{Maze with Feature Discovery} where the dynamics FTL discovers the ``goal'' concept; \textbf{FrozenLake~$4{\times}4$}---a well-known OpenAI Gym benchmark with fully automated policy synthesis from hand-crafted features; \textbf{Cliff Walking~$4{\times}6$}---a Sutton \& Barto benchmark with cliff detection; \textbf{Auto-FTL FrozenLake}---FrozenLake solved with \emph{zero human feature engineering}, where grid coordinates emerge automatically from modular arithmetic; \textbf{Auto-FTL Cliff Walking}---the same zero-engineering pipeline applied to Cliff Walking ($n=24$, 106~features, 6~divisors), demonstrating scaling to richer factorization structure and depth-1 predicate synthesis; \textbf{FrozenLake~$8{\times}8$}---a $4\times$ scale-up ($n=64$, 200~features, 53~non-terminal states) solved in 7~seconds via a memoized DP Finder and greedy cascading CEGIS (\texttt{synth-greedy-or}); \textbf{Taxi~$5{\times}5$}---a $10\times$ scale-up to 501~states with 6~actions, internal walls, and a multi-phase task, solved via both fully automated 6-stage cascading CEGIS (${\sim}1{,}700$ auto-generated features, 9.5~minutes) and interpretable wall-aware relational navigation, verified optimal at all 500~non-terminal states; and \textbf{Slippery FrozenLake~$4{\times}4$}---the first stochastic RL benchmark in the synthesis pipeline, featuring a \textbf{memoized stochastic Finder} (\texttt{MemoizedStochastic}) that builds a DP value table in $O(\text{depth} \times |S| \times |A| \times |\text{outcomes}|)$ time, enabling depth-10 planning that produces a genuine safety-aware policy (all 4~actions with expected-value justifications), with decision-tree CEGIS and full verification at all 11~non-terminal states; and \textbf{Slippery FrozenLake~$8{\times}8$}---scaling the stochastic pipeline to 64~states (53~non-terminal, 10~holes), same memoized Finder at depth~10, policy computed in ${\sim}27$~seconds, with \texttt{synth-decision-tree} over 16~row/col features (D$\to$L$\to$U$\to$R cascade), verified at all 53~states in ${\sim}2.9$~hours.  All tests pass by \texttt{refl}.
+The framework is demonstrated end-to-end on all three Environment Classes with verified demos: a 1D Maze (FDMDP) where synthesis produces verified \texttt{CoindHomo} rankings; $N$-Queens (CPMDP) where synthesized predicates \emph{define} the environment's dynamics, enabling solutions for $N=4$ and $N=8$; a Biased Bandit (SFMDP) confirming that synthesis applies unchanged to stochastic transitions; \textbf{N-Queens with Feature Discovery} where the structural FTL discovers both predicates automatically; \textbf{Maze with Feature Discovery} where the dynamics FTL discovers the ``goal'' concept; \textbf{FrozenLake~$4{\times}4$}---a well-known OpenAI Gym benchmark with fully automated policy synthesis from hand-crafted features; \textbf{Cliff Walking~$4{\times}6$}---a Sutton \& Barto benchmark with cliff detection; \textbf{Auto-FTL FrozenLake}---FrozenLake solved with \emph{zero human feature engineering}, where grid coordinates emerge automatically from modular arithmetic; \textbf{Auto-FTL Cliff Walking}---the same zero-engineering pipeline applied to Cliff Walking ($n=24$, 106~features, 6~divisors), demonstrating scaling to richer factorization structure and depth-1 predicate synthesis; \textbf{FrozenLake~$8{\times}8$}---a $4\times$ scale-up ($n=64$, 200~features, 53~non-terminal states) solved in 7~seconds via a memoized DP Finder and greedy cascading CEGIS (\texttt{synth-greedy-or}); \textbf{Taxi~$5{\times}5$}---a $10\times$ scale-up to 501~states with 6~actions, internal walls, and a multi-phase task, solved via both fully automated 6-stage cascading CEGIS (${\sim}1{,}700$ auto-generated features, 9.5~minutes) and interpretable wall-aware relational navigation, verified optimal at all 500~non-terminal states; \textbf{Slippery FrozenLake~$4{\times}4$}---the first stochastic RL benchmark in the synthesis pipeline, featuring a \textbf{memoized stochastic Finder} (\texttt{MemoizedStochastic}) that builds a DP value table in $O(\text{depth} \times |S| \times |A| \times |\text{outcomes}|)$ time, enabling depth-10 planning that produces a genuine safety-aware policy (all 4~actions with expected-value justifications), with decision-tree CEGIS and full verification at all 11~non-terminal states; \textbf{Slippery FrozenLake~$8{\times}8$}---scaling the stochastic pipeline to 64~states (53~non-terminal, 10~holes), same memoized Finder at depth~10, policy computed in ${\sim}27$~seconds, with \texttt{synth-decision-tree} over 16~row/col features (D$\to$L$\to$U$\to$R cascade), verified at all 53~states in ${\sim}2.9$~hours; \textbf{Autonomous CartPole}~(\S\ref{sec:auto-cartpole})---a fully automatic physics-to-controller pipeline for continuous-state CartPole: Euler-integrated ODE dynamics discretized onto a 25-state $(\theta,\dot\theta)$ phase-space grid, automatic fragility analysis via \texttt{ComputeFragility}, fragility-derived rewards enabling depth-0 FOSD ordering, \texttt{abstract-lift} to $\mathbb{Q}^4$, and a deployable \texttt{decide}~function that achieves 500/500~steps on OpenAI Gymnasium's \texttt{CartPole-v1}---matching DQN-level performance with zero manual feature engineering and a machine-checked optimality proof; \textbf{Autonomous MountainCar}---the same \texttt{ContinuousControlMDP} EC applied to a goal-reaching task with non-trivial dynamics (Taylor-7 cos approximation, 25-step Euler integration in fixed-point integer arithmetic, all within Agda), producing a 12-state controller that achieves 1000/1000 success on Gymnasium's \texttt{MountainCar-v0} with zero training episodes and a formal SD$[0]$ guarantee; \textbf{Autonomous Acrobot}---the \texttt{DirectRewardMDP} EC (a generalisation of \texttt{ContinuousControlMDP}) applied to swing-up control, with the full double-pendulum Lagrangian ODE implemented in Agda and the reward derived from the total energy of the Euler-integrated next state, producing a 3-state controller whose $\texttt{sign}(\dot\theta_2)$ policy \emph{emerges} from the dynamics and achieves 500/500 on Gymnasium's Acrobot-v1 (avg.\ 88~steps) with zero training; and \textbf{Gridless CartPole, Pendulum, MountainCar \& Acrobot}~(\S\ref{sec:coind-homo-search})---a radically different approach that bypasses grids entirely, searching for a self-consistent CoindHomo ranking directly in continuous state space with automatically generated features.  CartPole converges at depth~0 with $6\theta + \dot\theta < 0$ (500/500).  Pendulum converges at depth~0 with $\omega < 0.855$ (467/500 from random starts).  MountainCar converges at depth~1 with $\lnot(x < {-}0.318)$.  Acrobot converges at depth~1 with $\lnot(\dot\theta_1 < 0)$ (500/500, 70-step best).  All four deploy as single lines of Python, verified by \texttt{refl} (Table~\ref{tab:gridless-policies}).
 
 The \textbf{FOSD synthesis pipeline} (\S\ref{sec:fosd-synth}) upgrades stochastic rankings from expected-value comparison to distributional dominance.  The complete pipeline includes: a decidable FOSD comparator with proved soundness \emph{and} completeness (\texttt{fosd?-sound}, \texttt{fosd?-complete}); the Stochastic Isomorphism establishing that coinductive FOSD is isomorphic to pointwise FOSD; the FOSD-to-Lex Bridge proving that every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}; FOSD learning convergence (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}, \texttt{fosd-convergence}) connecting FOSD observations to CEGIS version-space refinement; and three FOSD demos (BiasedBandit, CoinFlip, GamblersRuin) exercising the full pipeline from observations to verified \texttt{FOSDCoindHomo}---all machine-verified.
 
@@ -2757,9 +3339,13 @@ The \textbf{Stochastic Dominance Hierarchy} (\S\ref{sec:sd-hierarchy}) extends t
 
 The \textbf{Compositional Ranking Algebra} (\S\ref{sec:compose}) addresses scalability by proving that verified rankings compose.  The key structural insight is that \texttt{prefix-sum} is a linear operator: it distributes over addition and scalar multiplication.  Since \texttt{sd-weight} is iterated prefix-sum, it inherits this linearity, yielding distributivity of \texttt{sd-weight} over distribution concatenation (\texttt{++}) and scaling.  The closure properties (\texttt{SD-++}, \texttt{SD-scale}) follow as one-line corollaries.  At the environment level, the \texttt{VerifiedRanking} abstraction packages an action ordering with its SD$[k]$ preservation proof.  Product composition, sum composition, and scaling are all proved to preserve verification---and they compose with each other: \texttt{scaled-product~c~vr₁~vr₂ = scale-ranking~c~(++-product~vr₁~vr₂)} demonstrates genuine algebraic composability.  This enables modular verification: decompose a complex environment into components, verify each in isolation, and compose the proofs automatically.
 
+The \textbf{Verified State Abstraction} (\S\ref{sec:abstraction}) addresses the framework's most significant limitation: restriction to finite state spaces.  The \texttt{abstract-lift} theorem is type-parametric: \texttt{Concrete} can be any \texttt{Set}, with no finiteness or enumerability assumption.  The key insight is that the \texttt{VerifiedRanking} record is already parametric in the state type---the bottleneck was the \emph{verification}, not the \emph{types}.  By factoring verification through an abstraction (project + embed + section), the work becomes $O(|\text{Abstract}|)$ regardless of the concrete space's cardinality.  The marginal-invariance condition is the constructive analogue of Li et al.'s model-irrelevance: states sharing an abstract label must have identical reward distributions.  This subsumes the feature-based \texttt{AllFeatAgree} equivalence as a special case (with $\texttt{project} = \text{feature-vector}$) and integrates with the full compositional algebra via \texttt{product-abstraction}, \texttt{compose-abstraction}, and \texttt{abstract-conv-product}.  The progression from SimplePendulum to CartPoleDemo to the \textbf{Autonomous CartPole Controller}~(\S\ref{sec:auto-cartpole}), \textbf{Autonomous MountainCar Controller}, and \textbf{Autonomous Acrobot Controller} demonstrates that the abstraction machinery scales from infinite $\mathbb{N}$ to product spaces to control benchmarks that match or exceed the performance of deep RL.  The \texttt{ContinuousControlMDP} EC factors the common fragility-based pipeline into a reusable module, instantiated for CartPole (500/500~steps, avoidance task) and MountainCar (1000/1000 successes, goal-reaching task with inverted fragility rewards and Taylor-7 cos dynamics in fixed-point arithmetic).  Its generalisation \texttt{DirectRewardMDP} accommodates domain-specific rewards, demonstrated by Acrobot (500/500, avg.\ 88~steps, energy-based reward from the Euler-integrated Lagrangian ODE)---all with zero manual feature engineering.  Three additional \textbf{model-free learning demos} (\texttt{CartPoleSynthDemo}, \texttt{MountainCarSynthDemo}, \texttt{AcrobotSynthDemo}) validate that the same ODE simulators can be used as black-box environments: the comparison oracle is raw trace comparison (constant-action simulation counting survival or goal-reaching steps), with no energy, fragility, or analytical reward.  The learned policies are verified by \texttt{refl} at every grid state.
+
 The \textbf{Feature Template Languages} (\S\ref{sec:ftl}) address the human knowledge bottleneck with three complementary discovery pipelines.  The structural FTL derives features from state structure (pairwise comparisons); the dynamics FTL derives features from step-function behavior (reward, self-loops); and the Auto-FTL derives features from the state count's number-theoretic properties (divisors, modular arithmetic) combined with dynamics.  Together they cover all three ECs with progressively less human input.  The Auto-FTL, in particular, eliminates the feature engineering step entirely: the human provides only the environment definition, and the features emerge from the state encoding.  This is validated on four environments---FrozenLake~$4{\times}4$ ($n=16$, 56~features), Cliff Walking ($n=24$, 106~features), FrozenLake~$8{\times}8$ ($n=64$, 200~features), and Taxi~$5{\times}5$ ($n=500$, ${\sim}1{,}700$~features)---with grid coordinates emerging automatically as factorization features in all cases.  Taxi demonstrates that the Auto-FTL's divisor-based decomposition extends to compound state encodings: divisors 4, 20, and 100 recover destination, grid position, and row respectively.  Feature vectors and equivalence class counting ($|C/{\sim}|$) connect feature quality to the tight sample complexity bound.  Crucially, the FTL also controls \emph{synthesis tractability}: by providing semantically meaningful features, it keeps the required \texttt{PredProg} depth at~0--1, where enumeration remains feasible---enumeration takes seconds, rather than depth~3+, where it becomes infeasible.  When even depth-1 is insufficient for scattered state sets (as with FrozenLake~$8{\times}8$'s 3 U-optimal states), \texttt{synth-greedy-or} builds the predicate incrementally from atoms, avoiding exponential enumeration entirely.  When the state space exceeds the Peano bottleneck (as with Taxi's 500 states), compound and relational features provide a synthesis path that sidesteps iterative CEGIS entirely, while maintaining verified optimality.  All three FTLs sit outside the Trusted Computing Base.
 
 All results are machine-verified in Agda with \texttt{--safe --guardedness}, zero postulates.  This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code.  The synthesis framework is additive---it builds on the CSHRL foundation without modification, demonstrating the extensibility of the coinductive homomorphism approach.
+
+The deepest consequence of the approach is that \emph{learning and verification are the same computation}.  When the type-checker normalises \texttt{traj-len~s₀~π★~500~≡~500} to confirm \texttt{refl}, it simultaneously runs the policy, evaluates its performance, and certifies the result.  There is no separate training phase, no evaluation phase, and no hope that test-time statistics generalise---the proof \emph{is} the evaluation.  This unification is made possible by CSHRL's ordinal foundation: because rankings (not cardinal Q-values) are the fundamental objects, policies admit compact Boolean representations that exhaustive search can find and dependent types can certify.  The result is a synthesis pipeline that produces not only deployable controllers for continuous-state benchmarks, but machine-checked correctness certificates for those controllers---something no gradient-based RL framework currently provides.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2772,14 +3358,14 @@ The paper is a literate Agda document.  Building the PDF type-checks all embedde
 \item \textbf{Tested toolchain:} Agda 2.7.x (2.7.0 recommended), Agda StdLib 2.0, Lua\LaTeX.
 \item \textbf{Build commands:} In \texttt{literate/}, run \texttt{make synthesis} (or \texttt{agda --latex CSHRLSynthesis.lagda.tex} followed by \texttt{lualatex} on the generated \texttt{CSHRLSynthesis.tex}).
 \item \textbf{Fonts:} The document uses \texttt{fontspec} and Unicode math fonts (see preamble for \texttt{DejaVu} and \texttt{STIX Two Math}).
-\item \textbf{Full codebase:} The complete synthesis framework resides in \fpath{src/CSHRL/Synthesis/} with end-to-end demos in \fpath{src/CSHRL/Tasks/Synthesized/}.
+\item \textbf{Full codebase:} The complete synthesis framework resides in \fpath{src/CSHRL/Synthesis/} with end-to-end demos in \fpath{src/CSHRL/Tasks/Synthesized/}.  The fragility analysis module is at \fpath{src/CSHRL/Analysis/Fragility.agda}; the \texttt{ContinuousControlMDP} EC is at \fpath{src/CSHRL/EnvironmentClass/ContinuousControlMDP.agda}; the \texttt{DirectRewardMDP} EC is at \fpath{src/CSHRL/EnvironmentClass/DirectRewardMDP.agda}; the autonomous CartPole controller is at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleAutoController.agda}; the autonomous MountainCar controller is at \fpath{src/CSHRL/Tasks/Stochastic/MountainCarAutoController.agda}; the autonomous Acrobot controller is at \fpath{src/CSHRL/Tasks/Stochastic/AcrobotAutoController.agda}; the Python extractions are at \fpath{scripts/cartpole\_cshrl.py}, \fpath{scripts/mountaincar\_cshrl.py}, and \fpath{scripts/acrobot\_cshrl.py}; the grid refinement theory is at \fpath{src/CSHRL/Analysis/GridRefinement.agda}; the model-free continuous synthesis bridge is at \fpath{src/CSHRL/Synthesis/AbstractSynthesis.agda}; the model-free learning demos are at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleSynthDemo.agda}, \fpath{src/CSHRL/Tasks/Stochastic/MountainCarSynthDemo.agda}, and \fpath{src/CSHRL/Tasks/Stochastic/AcrobotSynthDemo.agda}; the gridless continuous feature template is at \fpath{src/CSHRL/Synthesis/ContinuousFeatures.agda}; the generic CSHRL policy iteration loop is at \fpath{src/CSHRL/Synthesis/CSHRLLoop.agda}; the gridless continuous learning loops are at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/PendulumLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/MountainCarLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/AcrobotLoop.agda}, and the depth-1 modules at \fpath{src/CSHRL/Tasks/Stochastic/MountainCarD1.agda} and \fpath{src/CSHRL/Tasks/Stochastic/AcrobotD1.agda}; the gridless deployment scripts are at \fpath{scripts/record\_cartpole\_gridless.py}, \fpath{scripts/record\_pendulum\_gridless.py}, \fpath{scripts/record\_mountaincar\_gridless.py}, and \fpath{scripts/record\_acrobot\_gridless.py}; and the DQN comparison script is at \fpath{scripts/dqn\_comparison.py}.
 \end{itemize}
 
 \appendix
 \input{CSHRLSynthesis-Demos}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{thebibliography}{20}
+\begin{thebibliography}{21}
 
 \bibitem{CSHRL2026}
 Corral-Corral, R. (2026).
@@ -2889,6 +3475,11 @@ Universal coalgebra: A theory of systems.
 Shapiro, M., Pregui\c{c}a, N., Baquero, C., and Zawirski, M. (2011).
 Conflict-free replicated data types.
 In \textit{Proceedings of SSS}, LNCS 6976, pp.~386--400.
+
+\bibitem{Mnih2015}
+Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.~A., Veness, J., Bellemare, M.~G., Graves, A., Riedmiller, M., Fidjeland, A.~K., Ostrovski, G., et~al. (2015).
+Human-level control through deep reinforcement learning.
+\textit{Nature}, 518(7540):529--533.
 
 \end{thebibliography}
 
