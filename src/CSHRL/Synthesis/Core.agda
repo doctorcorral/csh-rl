@@ -77,6 +77,24 @@ module PredicateDSL
   eval falsep      _ = false
 
   ------------------------------------------------------------------
+  -- Policy extraction: decision chain over PredProgs
+  --
+  -- Maps a list of (predicate, action) pairs and a default action
+  -- to a policy Carrier → Action.  Generalises binary pol-of to
+  -- k-ary action spaces without hardcoding the mapping.
+  --
+  --   2 actions: pol-chain [(rank★ , Left)] Right
+  --   3 actions: pol-chain [(p₁ , A₁) , (p₂ , A₂)] A₃
+  ------------------------------------------------------------------
+
+  pol-chain : {Action : Set} → List (PredProg × Action)
+            → Action → Carrier → Action
+  pol-chain []              def _ = def
+  pol-chain ((p , a) ∷ rest) def c with eval p c
+  ... | true  = a
+  ... | false = pol-chain rest def c
+
+  ------------------------------------------------------------------
   -- Feature Equivalence
   --
   -- Two carriers are feature-equivalent w.r.t. a predicate program
@@ -179,13 +197,18 @@ module PredicateDSL
     atoms : List PredProg
     atoms = truep ∷ falsep ∷ map feat all-features
 
-    -- Extend candidate set by one level of Boolean operators
+    -- Extend candidate set by one level of Boolean operators.
+    -- Includes mixed conjunctions/disjunctions (atom ∧ ¬atom, etc.)
+    -- so that depth 1 can express predicates like x<0 ∧ ¬(v<t).
     extend : List PredProg → List PredProg
     extend prev =
-      prev
-      ++ map ¬p_ prev
+      let neg = map ¬p_ prev
+      in prev
+      ++ neg
       ++ concatMap (λ p → map (p ∧p_) prev) prev
       ++ concatMap (λ p → map (p ∨p_) prev) prev
+      ++ concatMap (λ p → map (p ∧p_) neg)  prev
+      ++ concatMap (λ p → map (p ∨p_) neg)  prev
 
     enumerate : ℕ → List PredProg
     enumerate zero    = atoms
