@@ -20,6 +20,24 @@ agda src/CSHRL/Synthesis/FOSDStochasticFiniteMDP.agda
 agda src/CSHRL/EnvironmentClass/FiniteDeterministicMDP.agda
 # Task modules that are dependencies of other tasks (avoids serialization bug)
 agda src/CSHRL/Tasks/Synthesized/CliffWalkE2E.agda
+agda src/CSHRL/Learning/StochasticFiniteMDP.agda
 agda src/CSHRL/Tasks/Stochastic/GamblersRuin.agda
 agda src/CSHRL/Tasks/Stochastic/GamblersRuinFOSDSynth.agda
+agda src/CSHRL/Tasks/Stochastic/DiscretizedCartPoleMDP.agda
+agda src/CSHRL/Tasks/Stochastic/DiscretizedCartPoleLearning.agda
+agda src/CSHRL/Tasks/Stochastic/CartPoleContinuousLearning.agda
+agda src/CSHRL/Tasks/Stochastic/CartPolePhysicsLearning.agda
+agda src/CSHRL/Tasks/Stochastic/CartPoleController.agda
+agda src/CSHRL/Analysis/Fragility.agda
+agda src/CSHRL/Core/Abstraction.agda
+agda src/CSHRL/Probability/SD.agda
+agda src/CSHRL/Probability/Compose.agda
+agda src/CSHRL/Probability/Convolution.agda
+agda src/CSHRL/Core/Compose.agda
+agda src/CSHRL/EnvironmentClass/ContinuousControlMDP.agda
+agda src/CSHRL/EnvironmentClass/DirectRewardMDP.agda
+agda src/CSHRL/Tasks/Stochastic/CartPoleAutoController.agda
+agda src/CSHRL/Tasks/Stochastic/AcrobotAutoController.agda
+agda src/CSHRL/Synthesis/ContinuousFeatures.agda
+agda src/CSHRL/Synthesis/CSHRLLoop.agda
 echo "Dependencies OK. You can now compile any task module."

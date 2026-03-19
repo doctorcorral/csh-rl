@@ -37,6 +37,7 @@ agda-synthesis: $(SYNTHESIS).lagda.tex $(SYNTHESIS)-Demos.lagda.tex
 	$(AGDA) --latex $(SYNTHESIS).lagda.tex
 	$(AGDA) --latex $(SYNTHESIS)-Demos.lagda.tex
 	cp agda-spec.sty latex/
+	-cp dqn_comparison.pdf latex/
 
 synthesis: agda-synthesis
 	cd latex && $(LATEX) $(LATEX_FLAGS) $(SYNTHESIS).tex
