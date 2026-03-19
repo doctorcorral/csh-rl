@@ -1,0 +1,22 @@
+# Agda build artifacts
+_build/
+
+# LaTeX build artifacts
+literate/_build/
+literate/latex/
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.ptb
+
+# Python
+__pycache__/
+*.pyc
+
+# Videos (binary, not for version control)
+videos/
+
+# OS
+.DS_Store
