@@ -36,7 +36,7 @@ module CSHRL.Synthesis.ContinuousFeatures where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat  as ℕ using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Integer.Base as ℤ
-  using (ℤ; +_)
+  using (ℤ; +_; -[1+_])
   renaming (_+_ to _+ℤ_; _*_ to _*ℤ_)
 open import Data.Integer.Properties as ℤP
   using () renaming (_<?_ to _<?ℤ_)
@@ -83,9 +83,9 @@ module ContFeatures
     range zero    = []
     range (suc n) = range n ++ (n ∷ [])
 
-    pos-range : ℕ → List ℤ
-    pos-range zero    = []
-    pos-range (suc n) = pos-range n ++ (+ suc n ∷ [])
+    coeff-range : ℕ → List ℤ
+    coeff-range zero    = []
+    coeff-range (suc n) = coeff-range n ++ (+ suc n ∷ -[1+ n ] ∷ [])
 
     ordered-pairs : List (ℕ × ℕ)
     ordered-pairs =
@@ -100,7 +100,7 @@ module ContFeatures
 
   diag-features : ℕ → List CFeature
   diag-features max-c =
-    concatMap (λ { (i , j) → map (diag i j) (pos-range max-c) })
+    concatMap (λ { (i , j) → map (diag i j) (coeff-range max-c) })
              ordered-pairs
 
   gen-features : List ℤ → ℕ → List CFeature
