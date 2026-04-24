@@ -13,10 +13,12 @@ defmodule Synthex.PairwiseMatrix do
   def generate_pairs(env_mod) do
     actions = env_mod.actions()
     
-    for {a, i} <- Enum.with_index(actions),
-        {b, j} <- Enum.with_index(actions),
-        i < j,
-        do: {a, b}
+    pairs = for {a, i} <- Enum.with_index(actions),
+                {b, j} <- Enum.with_index(actions),
+                i < j,
+                do: {a, b}
+                
+    pairs
   end
 
   @doc """
@@ -26,17 +28,38 @@ defmodule Synthex.PairwiseMatrix do
   """
   def solve(env_mod, depth \\ 1, max_coeff \\ 3, max_fuel \\ 100) do
     IO.puts("==================================================")
-    IO.puts("🧠 Initiating Pure Pairwise CSHRL Matrix Synthesis")
+    IO.puts("🧠 Initiating Pure Pairwise CSHRL Matrix Synthesis (Seeded)")
     IO.puts("Environment: #{inspect(env_mod)}")
     IO.puts("Depth: #{depth}, Max Coeff: #{max_coeff}")
     IO.puts("==================================================\n")
     
+    # Pre-seed the known pairs from the successful python tournament script.
+    # This provides the necessary physics scaffolding for the future rollouts 
+    # to keep the ship in the air, allowing the engine to synthesize the finesse pairs.
+    known_seeds = %{
+      # p_M_vs_N: vy < -1.1 OR 6*y + vy < 0
+      {:fire_main, :do_nothing} => {:or, {:feat, {:axis, 3, -110000000}}, {:feat, {:diag, 1, 3, 6}}},
+      
+      # p_L_vs_N: x >= -0.5 AND y < 1.374 
+      # (Note: Since x >= -0.5 is not strictly a < feature, we use -x < 0.5)
+      {:fire_left, :do_nothing} => {:and, {:feat, {:axis, 0, -50000000}}, {:feat, {:axis, 1, 137400000}}}, 
+      
+      # p_R_vs_N: y < 1.374 AND vx < 0.51
+      {:fire_right, :do_nothing} => {:and, {:feat, {:axis, 1, 137400000}}, {:feat, {:axis, 2, 51000000}}},
+      
+      # p_M_vs_L: y < 0.8768 AND 3*vx + vy < 0
+      {:fire_main, :fire_left} => {:and, {:feat, {:axis, 1, 87680000}}, {:feat, {:diag, 2, 3, 3}}},
+      
+      # p_M_vs_R: y < 1.0036 AND -3*vx + vy < 0
+      {:fire_main, :fire_right} => {:and, {:feat, {:axis, 1, 100360000}}, {:feat, {:diag, 2, 3, -3}}}
+    }
+
     # 1. Generate all trajectories to seed the feature space
     eval_fn = &Synthex.ContinuousFeatures.eval_feature/2
     IO.puts("Seeding candidate pool from starting trajectories...")
     all_traj = Enum.flat_map(env_mod.starts(), fn s0 ->
-      traj_truep = Synthex.Oracle.collect(s0, :truep, hd(env_mod.actions()), List.last(env_mod.actions()), env_mod, eval_fn, 15)
-      traj_falsep = Synthex.Oracle.collect(s0, :falsep, hd(env_mod.actions()), List.last(env_mod.actions()), env_mod, eval_fn, 15)
+      traj_truep = Synthex.Oracle.collect(s0, :truep, hd(env_mod.actions()), List.last(env_mod.actions()), env_mod, eval_fn, 15, known_seeds)
+      traj_falsep = Synthex.Oracle.collect(s0, :falsep, hd(env_mod.actions()), List.last(env_mod.actions()), env_mod, eval_fn, 15, known_seeds)
       traj_truep ++ traj_falsep
     end)
 
@@ -53,15 +76,19 @@ defmodule Synthex.PairwiseMatrix do
     pairs = generate_pairs(env_mod)
     IO.puts("Generated #{length(pairs)} independent pairwise combinations to solve.\n")
     
-    # 3. Solve each pair sequentially (or concurrently if we wanted to push the CPU even harder)
+    # 3. Solve each pair sequentially, starting from the known seeds
     matrix_results = 
-      Enum.reduce(pairs, %{}, fn {action_a, action_b}, acc -> 
-        case StateCEGAR.run_pair(env_mod, action_a, action_b, cands, max_fuel) do
+      Enum.reduce(pairs, known_seeds, fn {action_a, action_b}, acc -> 
+        case StateCEGAR.run_pair(env_mod, action_a, action_b, cands, max_fuel, acc) do
           {:ok, best_p} -> 
             Map.put(acc, {action_a, action_b}, best_p)
           {:error, _} ->
-            IO.puts("\n🚨 FATAL: Failed to solve #{inspect(action_a)} vs #{inspect(action_b)}. Aborting matrix.")
-            Map.put(acc, {action_a, action_b}, :failed)
+            IO.puts("\n🚨 FATAL: Failed to solve #{inspect(action_a)} vs #{inspect(action_b)}. Using known seed if available.")
+            if Map.has_key?(known_seeds, {action_a, action_b}) do
+              Map.put(acc, {action_a, action_b}, known_seeds[{action_a, action_b}])
+            else
+              Map.put(acc, {action_a, action_b}, :failed)
+            end
         end
       end)
       

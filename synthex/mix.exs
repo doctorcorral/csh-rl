@@ -19,7 +19,8 @@ defmodule Synthex.MixProject do
 
   defp deps do
     [
-      {:flow, "~> 1.2"}
+      {:flow, "~> 1.2"},
+      {:jason, "~> 1.4"}
     ]
   end
 end
