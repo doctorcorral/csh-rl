@@ -617,11 +617,15 @@ find a self-consistent predicate at the current depth.
 \section{Synthesis Architecture}
 %% ================================================================
 
-The synthesis pipeline has two variants---\textbf{flat-partition
-CEGAR} for direct full-ranking synthesis (Pendulum) and
-\textbf{coordinate descent with full-ranking determination}
-for episodic environments (LunarLander)---both producing
-full-ranking partitions using simulation-in-the-loop evaluation.
+This section details the two oracle-based synthesis methods:
+\textbf{flat-partition CEGAR} for direct full-ranking synthesis
+(Pendulum) and \textbf{coordinate descent with full-ranking
+determination} for episodic environments (LunarLander).
+Partition-based search (\S\ref{sec:partition}) and
+binary-weighted decomposition (\S\ref{sec:bipedal}) are
+described in their respective sections.  All four methods
+produce full-ranking partitions using simulation-in-the-loop
+evaluation.
 
 \subsection{Flat-Partition CEGAR}
 \label{sec:flat-cegar}
@@ -701,7 +705,7 @@ action) is optimized by coordinate descent: each position is
 optimized independently using episode reward, cycling through
 all positions with seed rotation. This is efficient because
 each candidate predicate is scored by running complete
-complete episodes---episode reward directly captures landing
+episodes---episode reward directly captures landing
 success, fuel efficiency, and crash avoidance without requiring
 an oracle follow-up policy. Within each CEGAR round, multiple
 iterations refine the predicates; trajectory states from the
@@ -808,9 +812,10 @@ not within the real environment.
 \label{sec:pendulum}
 %% ================================================================
 
-The inverted pendulum has 2-dimensional continuous state
-$(\theta, \omega)$ and 3 discrete actions: \texttt{TorqueNeg} ($-2$),
-\texttt{NoTorque} ($0$), \texttt{TorquePos} ($+2$).
+The inverted pendulum has 3-dimensional continuous state
+$(\cos\theta, \sin\theta, \omega)$ and 3 discrete actions:
+\texttt{TorqueNeg} ($-2$), \texttt{NoTorque} ($0$),
+\texttt{TorquePos} ($+2$).
 
 \subsection{Environment Embedding}
 
@@ -1724,12 +1729,12 @@ patterns:
   When the ground is close, the front knee applies maximum
   extension---a terrain-reactive reflex.
 
-\item \textbf{Bit significance}: higher-weight bits (coarser
-  action components) tend to use simpler predicates (e.g.,
-  knee2's $w{=}1$ bit is a single atomic feature), while
-  lower-weight bits (fine corrections) use more complex
-  conjunctions.  The synthesis naturally allocates predicate
-  complexity proportional to the action resolution.
+\item \textbf{Mixed complexity}: some bits use single atomic
+  features (e.g., knee2's $w{=}1$ bit is $-2 \dot\theta_2 +
+  \omega_1 < 0$), while others require conjunctions or
+  disjunctions of two atoms.  No bit exceeds depth~1.
+  The synthesis naturally discovers the minimal predicate
+  complexity needed for each bit's contribution to the gait.
 \end{itemize}
 
 \subsection{Deployment Results}
@@ -1819,12 +1824,16 @@ pattern, it is an artifact; if it generalizes, the compactness
 finding is robust.
 
 \paragraph{Setup.}
-With $b = 3$ bits per dimension and $d = 2$ action dimensions,
-the decomposition yields 6~binary predicates (vs.\ 12 for
-BipedalWalker).  Each predicate decides one bit of one joint
-torque.  The same coordinate-descent + CEGAR pipeline is used,
-with 3077~features generated from trajectory states.  Synthesis
-completed in approximately 17~hours (3~CEGAR rounds,
+The 8D observation vector is:
+$[\alpha_0,\, \alpha_1,\, v_x,\, v_y,\,
+  \dot\theta_0,\, \dot\theta_1,\, \dot\theta_2,\, \dot\theta_3]$
+(two joint angles, 2D center-of-mass velocity, four angular
+velocities).  With $b = 3$ bits per dimension and $d = 2$
+action dimensions, the decomposition yields 6~binary predicates
+(vs.\ 12 for BipedalWalker).  Each predicate decides one bit of
+one joint torque.  The same coordinate-descent + CEGAR pipeline
+is used, with 3077~features generated from trajectory states.
+Synthesis completed in approximately 17~hours (3~CEGAR rounds,
 5~iterations each).
 
 \paragraph{The discovered policy.}
@@ -2262,7 +2271,7 @@ The most striking result is the compression ratio.  All twelve
 environments are solved with 1--12 Boolean predicates, encoding
 the complete decision structure in approximately 18--100 bits.
 The CartPole policy is a single linear inequality:
-$6\theta + \dot\theta < 0$.  The LunarLander policy is three
+$2\theta + \dot\theta < 0$.  The LunarLander policy is three
 depth-1 predicates.  Even BipedalWalker---a continuous-action
 locomotion task with 24-dimensional state---requires only 12
 Boolean predicates.  By contrast, a minimal DQN for CartPole
@@ -2275,7 +2284,7 @@ is fundamentally low-dimensional}, and deep RL's parameter
 overhead is spent on representation, not on decision complexity.
 
 \paragraph{Interpretability.}
-A human can read $6\theta + \dot\theta < 0 \Rightarrow \text{Left}$
+A human can read $2\theta + \dot\theta < 0 \Rightarrow \text{Left}$
 and immediately understand \emph{why}: it is a phase-space
 hyperplane separating the ``falling left'' from ``falling right''
 regimes.  Failure modes, edge cases, and domain transfer
