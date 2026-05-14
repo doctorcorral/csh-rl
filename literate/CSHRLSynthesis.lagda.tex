@@ -136,9 +136,9 @@ The framework introduces thirteen components, all machine-verified in Agda:
 \textbf{(8)}~\emph{Online synthesis with learning integration}: observation order is provably irrelevant (refinement commutes), replayed observations are provably redundant, and a generic \texttt{LearningBridge} connects learning feedback to synthesis with a bridge sufficiency theorem composing learning convergence with synthesis correctness;
 \textbf{(9)}~\emph{Sample complexity lower bound}: two targets agreeing on observed carriers produce identical version spaces (\texttt{same-obs-same-vs}), so survivors transfer freely between indistinguishable targets (\texttt{survivor-transfer}); combined with the upper bound (\texttt{sufficient-cegis}), this proves the sample complexity is \emph{exactly} $|C/{\sim}|$;
 \textbf{(10)}~\emph{DSL completeness}: a constructive fingerprint construction proves that the Boolean \texttt{PredProg} DSL is expressively complete for feature-respecting targets---for any target constant on equivalence classes, there exists a \texttt{PredProg} matching it everywhere (\texttt{dsl-complete});
-\textbf{(11)}~\emph{First-Order Stochastic Dominance (FOSD) synthesis}: a complete FOSD pipeline where rankings are based on distributional dominance rather than expected values---with a decidable FOSD comparison (\texttt{fosd?}) proved both sound and complete, the \textbf{Stochastic Isomorphism} (coinductive FOSD $\Leftrightarrow$ pointwise FOSD), a \textbf{FOSD-to-lex bridge} (\texttt{FOSDCoindHomo} $\Rightarrow$ lexicographic EV-stream dominance), and a \textbf{learning convergence} theorem (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}) connecting FOSD observations to CEGIS version-space refinement;
-\textbf{(12)}~\emph{Stochastic Dominance Hierarchy}: a generalization from FOSD to $k$-th order SD via iterated prefix sums of the CDF---with a one-line hierarchy subsumption proof (\texttt{SD-subsumes}: $\text{SD}[k] \Rightarrow \text{SD}[k{+}1]$ via \texttt{prefix-sum-mono}), the \textbf{SD-to-EV bridge} (\texttt{sd$\to$ev}: every SD level implies expected-value dominance), \textbf{SDCoindHomo}~$k$ (rankings verified at any level automatically yield EV-stream optimality), and a coinductive \textbf{hierarchy subsumption on homos} (\texttt{sd-homo-subsumes}: weaker requirements capture broader utility-function classes---risk-averse (SOSD), prudent (TOSD), and beyond);
-\textbf{(13)}~\emph{Compositional Ranking Algebra}: an algebraic framework for composing independently-verified rankings---proving that \texttt{prefix-sum} is a \emph{linear operator} (distributes over $+$ and $\times$), that \texttt{sd-weight} inherits this linearity, and that FOSD and SD$[k]$ are closed under distribution concatenation (\texttt{SD-++}), reward scaling (\texttt{SD-scale}), and \textbf{convolution} (\texttt{FOSD-conv}: the independent sum of FOSD-dominated distributions is FOSD-dominated, proved via discrete Abel summation); a \texttt{VerifiedRanking} abstraction with \textbf{product composition} (two independently-verified components yield a verified product via concatenation or convolution), \textbf{sum composition} (disjoint environments compose with dispatched rankings), and \textbf{scaling} (reward amplification preserves verification)---enabling modular, compositional verification where each component is verified in isolation and composed automatically.
+\textbf{(11)}~\emph{FOSD synthesis}: building on the FOSD theory developed in~\cite{CSHRLSuccessor}, we add a \textbf{learning convergence} theorem (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}) connecting FOSD observations to CEGIS version-space refinement---the synthesis engine uses distributional dominance rather than expected values, with unchanged \texttt{PredicateDSL} and propagation theorems;
+\textbf{(12)}~\emph{Stochastic Dominance Hierarchy}: the SD$[k]$ theory (see~\cite{CSHRLSuccessor} for definitions and proofs) enables fallback to SOSD or TOSD when FOSD fails, while retaining correctness guarantees for the corresponding utility-function class;
+\textbf{(13)}~\emph{Compositional Ranking Algebra}: the full proof infrastructure for composing independently-verified rankings---proving \texttt{prefix-sum} linearity, \texttt{sd-weight} distributivity, closure under concatenation (\texttt{SD-++}), scaling (\texttt{SD-scale}), and \textbf{convolution} (\texttt{FOSD-conv}, via discrete Abel summation); with \texttt{VerifiedRanking} product, sum, and scaling composition enabling modular verification (see~\cite{CSHRLSuccessor} for condensed definitions).
 
 We demonstrate the full pipeline end-to-end on three Environment Classes and three continuous-control benchmarks:
 a Finite Deterministic MDP (1D Maze) where CEGIS synthesizes ranking predicates that yield a verified \texttt{CoindHomo} and optimal policy;
@@ -147,7 +147,7 @@ a Stochastic Finite MDP where synthesis operates on expected traces;
 and autonomous controllers for CartPole (500/500), MountainCar (1000/1000), and Acrobot (500/500, avg.\ 88 steps)---the last using a \texttt{DirectRewardMDP} EC whose reward is derived from the total energy of the Euler-integrated next state, computed from the Lagrangian ODE of the double pendulum entirely within Agda.
 
 This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code while producing this PDF.
-The synthesis framework builds on the CSHRL foundation~\cite{CSHRL2026} without modifying it---all results are additive.
+The synthesis framework builds on the CSHRL foundation~\cite{CSHRLSuccessor} without modifying it---all results are additive.  The core FOSD, SD hierarchy, and state abstraction theories are developed in~\cite{CSHRLSuccessor}; this paper focuses on the synthesis pipeline and its applications.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -215,36 +215,13 @@ This paper makes the following contributions, each machine-verified in Agda with
 \item \emph{8-Queens:} Synthesized predicates verified equivalent to hand-crafted ones; full solution and partial completion in $8^8$ search space.
 \end{itemize}
 
-\item \textbf{FOSD Synthesis (\S\ref{sec:fosd-synth}):} A complete First-Order Stochastic Dominance pipeline that upgrades stochastic rankings from expected-value comparison to \emph{distributional} dominance.  Five results, all machine-verified:
-\begin{itemize}
-\item \textsc{fosd?-complete}: the decidable FOSD comparator \texttt{fosd?} is proved complete (FOSD$_\le$ implies \texttt{fosd?}~=~\texttt{true}), complementing the existing soundness proof.
-\item \textsc{Stochastic Isomorphism}: coinductive FOSD on reward streams is isomorphic to pointwise FOSD (\texttt{conjecture-forward}, \texttt{conjecture-reverse})---extending the Stream Isomorphism to distributions.
-\item \textsc{FOSD-to-Lex Bridge}: \texttt{fosd→lex-stream} proves that pointwise FOSD at every depth implies lexicographic EV-stream dominance; \texttt{fosd-homo→ev-lex} lifts this to show every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}.
-\item \textsc{FOSD Learning Convergence}: \texttt{fosd-obs-sound} proves that if a \texttt{RankModel} preserves FOSD, then \texttt{fosd-compare} observations are truthful at every depth; \texttt{model-obs-consistent} proves these observations survive CEGIS refinement; \texttt{fosd-convergence} combines both with version-space monotonicity.
-\item \textsc{FOSD Demos}: full \texttt{PointwiseFOSD} and \texttt{FOSDCoindHomo} instances for BiasedBandit and CoinFlip, plus GamblersRuin end-to-end FOSD synthesis with \texttt{ModelPreservesFOSD} and \texttt{WithLearningBridge}.
-\end{itemize}
+\item \textbf{FOSD Synthesis (\S\ref{sec:fosd-synth}):} Building on the FOSD theory from~\cite{CSHRLSuccessor}, we add FOSD learning convergence (\texttt{fosd-obs-sound}, \texttt{model-obs-consistent}, \texttt{fosd-convergence}) connecting FOSD observations to CEGIS version-space refinement, and demonstrate full end-to-end FOSD synthesis on BiasedBandit, CoinFlip, and GamblersRuin.
 
-\item \textbf{Stochastic Dominance Hierarchy (\S\ref{sec:sd-hierarchy}):} A generalization from first-order (FOSD) to $k$-th order stochastic dominance, implemented in \texttt{Probability.SD} and \texttt{Core.SD}.  Key results:
-\begin{itemize}
-\item \textsc{SD Hierarchy}: $k$-th order SD defined via iterated prefix sums of the CDF (\texttt{sd-weight}).  SD$[0]$ = FOSD, SD$[1]$ = SOSD (risk-averse agents), SD$[2]$ = TOSD (prudent agents).
-\item \textsc{Subsumption}: a one-line proof that SD$[k] \Rightarrow$ SD$[k{+}1]$---prefix-sum preserves monotonicity (\texttt{SD-subsumes~k~sd = prefix-sum-mono~sd}).
-\item \textsc{SD-to-EV Bridge}: every SD level implies expected-value dominance (\texttt{sd$\to$ev}), proved by showing that sd-weight at $r=0$ equals CDF at $r=0$ at all orders.
-\item \textsc{SDCoindHomo $k$}: coinductive homomorphisms parameterized by SD order, with hierarchy subsumption (\texttt{sd-homo-subsumes}: $\text{SDCoindHomo}~k \Rightarrow \text{SDCoindHomo}~(k{+}1)$) and the master bridge (\texttt{sd-homo$\to$ev-lex}: any SD level yields lex EV-stream dominance).
-\item \textsc{Strict Separation}: a concrete SOSD-but-not-FOSD example: $\mu = \{0{:}2, 2{:}1\}$ vs.\ $\nu = \{1{:}3\}$ where FOSD fails at $r{=}1$ but SOSD holds everywhere.
-\end{itemize}
+\item \textbf{Stochastic Dominance Hierarchy (\S\ref{sec:sd-hierarchy}):} The SD$[k]$ theory (developed in~\cite{CSHRLSuccessor}) enables fallback to SOSD/TOSD when FOSD fails.  This paper uses the hierarchy in the synthesis patterns (\S\ref{sec:sd-hierarchy}).
 
-\item \textbf{Compositional Ranking Algebra (\S\ref{sec:compose}):} An algebraic framework for composing independently-verified rankings, implemented in \texttt{Probability.Compose}, \texttt{Probability.Convolution}, and \texttt{Core.Compose}.  Key results:
-\begin{itemize}
-\item \textsc{Prefix-Sum Linearity}: \texttt{prefix-sum} distributes over addition (\texttt{prefix-sum-+}) and scalar multiplication (\texttt{prefix-sum-*})---it is a \emph{linear operator} on $\mathbb{N} \to \mathbb{N}$.
-\item \textsc{sd-weight Distributivity}: \texttt{sd-weight} inherits linearity: $\text{sd-weight}~k~(d_1 \mathbin{{+}\!{+}} d_2) = \text{sd-weight}~k~d_1 + \text{sd-weight}~k~d_2$ and $\text{sd-weight}~k~(\text{scale}~c~d) = c \cdot \text{sd-weight}~k~d$ (induction on $k$, using \texttt{prefix-sum-ext}).
-\item \textsc{SD Closure}: FOSD and SD$[k]$ are closed under distribution concatenation (\texttt{SD-++}) and reward scaling (\texttt{SD-scale}).
-\item \textsc{Convolution FOSD Closure}: \texttt{FOSD-conv} proves that the independent sum (convolution) of FOSD-dominated distributions is FOSD-dominated, via a discrete Abel summation argument (\texttt{fosd-gws}).  \texttt{FOSD$\to$SD-conv} lifts the result to any SD$[k]$.
-\item \textsc{Product Composition}: if two independent components have \texttt{VerifiedRanking}s, the product ranking is verified for the composite---via concatenation (\texttt{++-product}) or convolution (\texttt{conv-product}).
-\item \textsc{Sum Composition}: if two disjoint environments have \texttt{VerifiedRanking}s, the dispatched ranking is verified for the union---with impossible state/action mismatches excluded by $\bot$.
-\item \textsc{Composability}: algebraic operations compose: \texttt{scaled-product~c~vr₁~vr₂ = scale-ranking~c~(++-product~vr₁~vr₂)}.
-\end{itemize}
+\item \textbf{Compositional Ranking Algebra (\S\ref{sec:compose}):} The full proof infrastructure for composing independently-verified rankings (definitions summarized in~\cite{CSHRLSuccessor}; detailed proofs here).  Key results: prefix-sum linearity, sd-weight distributivity, closure under concatenation, scaling, and convolution (via discrete Abel summation), with product/sum/scale composition of \texttt{VerifiedRanking}s.
 
-\item \textbf{Verified State Abstraction (\S\ref{sec:abstraction}):} A general framework for lifting verified rankings from finite abstract systems to arbitrary (potentially infinite or continuous) concrete state spaces.  Key results:
+\item \textbf{Verified State Abstraction (\S\ref{sec:abstraction}):} A general framework for lifting verified rankings from finite abstract systems to arbitrary concrete state spaces (core theorem in~\cite{CSHRLSuccessor}).  Key results:
 \begin{itemize}
 \item \textsc{StateAbstraction}: a record bundling a projection, embedding, and section property---no finiteness assumption on the concrete type.
 \item \textsc{abstract-lift}: the central theorem---verify on abstract states, automatically obtain a \texttt{VerifiedRanking} on the full concrete system, under marginal-invariance (same abstract class $\Rightarrow$ same reward distributions).
@@ -2116,15 +2093,10 @@ Extended demonstrations (8-Queens scaling, N-Queens feature discovery, FrozenLak
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PART VIII: A SELF-CONTAINED EXAMPLE
+% PART VIII: A SELF-CONTAINED EXAMPLE (code retained for type-checking)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Self-Contained Example: Synthesis in Action}
-\label{sec:example}
-
-To make this document self-contained as a proof artifact, we include a small type-checked example demonstrating the full synthesis theory.  This example uses a toy domain with two carriers and one feature.
-
-\begin{code}
+\begin{code}[hide]
 module ToyExample where
   data ToyCarrier : Set where
     Hot Cold : ToyCarrier
@@ -2138,64 +2110,35 @@ module ToyExample where
 
   open PredicateDSL ToyCarrier ToyFeature eval-toy
   open CEGIS (is-hot ∷ [])
-\end{code}
 
-\paragraph{Version space.}  At depth 0, we have 3 candidates:
-
-\begin{code}
   check-vs : length (initial-vs 0) ≡ 3
   check-vs = refl
-\end{code}
 
-\paragraph{Observation 1.}  ``Hot carriers should evaluate to true'':
-
-\begin{code}
   obs₁ : PredObs
   obs₁ = Hot , true
 
   after-obs₁ : length (refine (initial-vs 0) obs₁) ≡ 2
   after-obs₁ = refl
-\end{code}
 
-\noindent \texttt{falsep} is eliminated (it evaluates to \texttt{false} at \texttt{Hot}).
-
-\paragraph{Observation 2.}  ``Cold carriers should evaluate to false'':
-
-\begin{code}
   obs₂ : PredObs
   obs₂ = Cold , false
 
   after-both : length (cegis-loop (initial-vs 0) (obs₁ ∷ obs₂ ∷ [])) ≡ 1
   after-both = refl
-\end{code}
 
-\noindent \texttt{truep} is eliminated (it evaluates to \texttt{true} at \texttt{Cold}).  Only \texttt{feat is-hot} survives---the correct predicate is pinpointed from just 2 observations.
-
-\paragraph{Propagation.}  Two \texttt{Hot} carriers are feature-equivalent and thus indistinguishable:
-
-\begin{code}
   hot-equiv : AllFeatAgree Hot Hot
   hot-equiv is-hot = refl
 
   propagation-demo : refine (initial-vs 0) (Hot , true)
                    ≡ refine (initial-vs 0) (Hot , true)
   propagation-demo = refine-equiv (initial-vs 0) Hot Hot true hot-equiv
-\end{code}
 
-\paragraph{Dissolution.}  After observing \texttt{Hot}, all equivalent carriers are redundant:
-
-\begin{code}
   dissolution-demo :
     cegis-loop (refine (initial-vs 0) (Hot , true))
                (map (λ c → (c , true)) [])
     ≡ refine (initial-vs 0) (Hot , true)
   dissolution-demo = exploration-dissolution (initial-vs 0) Hot true [] tt
 \end{code}
-
-\section{Cross-Pair Propagation (Summary)}
-\label{sec:cross-pair-summary}
-
-CEGIS observations are \emph{pair-agnostic}: when ranking pairs share the same feature structure, observing a sub-optimal pair (C~vs~D) determines top-tier rankings (A~$>$~B) without ever comparing A or B.  Two observations from a single pair can determine all $\binom{4}{2} = 6$ rankings at all 6 states---a $18\times$ savings.  Full details, verified learning curves, and rollout performance at scale are in Appendix~\ref{sec:extended-demos}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2221,9 +2164,9 @@ The framework supports six synthesis patterns across deterministic, stochastic, 
 
 \item \textbf{SFMDP pattern (stochastic ranking synthesis):} The step function returns \emph{distributions} over successor states.  Synthesis produces ranking predicates from expected trace comparisons, yielding a \texttt{StochasticCoindHomo}.  This demonstrates the framework's modularity: the generic \texttt{PredicateDSL} theory applies unchanged---only the observation-generation layer adapts to expected traces.
 
-\item \textbf{FOSD pattern (distributional ranking synthesis):} The same stochastic step function, but observations compare marginal CDFs rather than expected values.  A ranking proven to preserve FOSD yields a \texttt{FOSDCoindHomo}, which the FOSD-to-Lex Bridge (\texttt{fosd-homo→ev-lex}) automatically promotes to a \texttt{StochasticCoindHomo}.  The FOSD pattern is strictly stronger: the synthesized ranking is optimal for \emph{all monotone utility functions} (risk-averse, risk-neutral, risk-seeking), not just expected-value maximizers.  The learning convergence theorem (\texttt{fosd-obs-sound}) ensures that FOSD observations drive CEGIS refinement correctly, and \texttt{fosd?-complete} guarantees no valid FOSD relationship is missed.
+\item \textbf{FOSD pattern (distributional ranking synthesis):} The same stochastic step function, but observations compare marginal CDFs rather than expected values.  A ranking proven to preserve FOSD yields a \texttt{FOSDCoindHomo} (see~\cite{CSHRLSuccessor}), which the FOSD-to-Lex Bridge automatically promotes to a \texttt{StochasticCoindHomo}.  The FOSD pattern is strictly stronger: the synthesized ranking is optimal for \emph{all monotone utility functions} (risk-averse, risk-neutral, risk-seeking), not just expected-value maximizers.  The learning convergence theorem (\texttt{fosd-obs-sound}) ensures that FOSD observations drive CEGIS refinement correctly, and \texttt{fosd?-complete} guarantees no valid FOSD relationship is missed.
 
-\item \textbf{SD hierarchy pattern (parameterized distributional ranking synthesis):} The SD hierarchy generalizes the FOSD pattern to $k$-th order.  When FOSD fails (CDFs cross), an \texttt{SDCoindHomo~$k$} for $k \ge 1$ may still be established.  The master bridge (\texttt{sd-homo→ev-lex}) ensures that \emph{any} SD level yields EV-stream optimality.  The hierarchy subsumption (\texttt{sd-homo-subsumes}) means a single FOSD verification at $k{=}0$ automatically provides the stronger guarantee at all levels---but when FOSD fails, the framework can ``fall back'' to SOSD ($k{=}1$) or TOSD ($k{=}2$), accepting the weaker guarantee that the ranking is optimal for risk-averse or prudent agents respectively.
+\item \textbf{SD hierarchy pattern (parameterized distributional ranking synthesis):} The SD hierarchy~\cite{CSHRLSuccessor} generalizes the FOSD pattern to $k$-th order.  When FOSD fails (CDFs cross), an \texttt{SDCoindHomo~$k$} for $k \ge 1$ may still be established.  The master bridge (\texttt{sd-homo→ev-lex}) ensures that \emph{any} SD level yields EV-stream optimality.  The hierarchy subsumption (\texttt{sd-homo-subsumes}) means a single FOSD verification at $k{=}0$ automatically provides the stronger guarantee at all levels---but when FOSD fails, the framework can ``fall back'' to SOSD ($k{=}1$) or TOSD ($k{=}2$), accepting the weaker guarantee that the ranking is optimal for risk-averse or prudent agents respectively.
 
 \item \textbf{Compositional pattern (modular ranking synthesis):} The compositional algebra enables a ``divide and conquer'' approach.  Rather than verifying a monolithic ranking on a large composite environment, the framework decomposes it into independent components, verifies each in isolation, and composes the proofs via \texttt{product-ranking}, \texttt{conv-product}, \texttt{sum-ranking}, or \texttt{scale-ranking}.  The closure properties (\texttt{SD-++}, \texttt{SD-scale}, \texttt{FOSD-conv}) guarantee that composition preserves SD$[k]$ at any level.  This pattern is orthogonal to the five above: each component can use \emph{any} of the other patterns, and the compositional algebra combines the results.
 \end{itemize}
@@ -2251,39 +2194,6 @@ Together, these properties make the synthesis engine a \emph{monotone, idempoten
 This algebraic structure has practical consequences: multiple learning agents can submit observations to a shared synthesizer without coordination, checkpoints can be replayed without corruption, and the exploration strategy (depth-first, breadth-first, violation-driven) is provably irrelevant to correctness.
 The \texttt{LearningBridge} makes this integration explicit, reducing the gap between the learning loop and synthesis from an informal interface to a verified equivalence.
 
-\subsection{Tight Sample Complexity}
-
-The sample complexity lower bound (\S\ref{sec:lower-bound}) completes the complexity picture for CEGIS with the Predicate DSL.
-The upper bound (\texttt{sufficient-cegis}) shows $|C/{\sim}|$ observations suffice; the lower bound (\texttt{survivor-transfer}) shows that with fewer observations, alternative targets remain indistinguishable.
-The gap is zero: the sample complexity is exactly $|C/{\sim}|$.
-
-This result is unusual in the synthesis literature, where sample complexity bounds are typically asymptotic or probabilistic.
-Here, the bound is \emph{exact} and \emph{constructive}: we know precisely which observations are needed (one per equivalence class) and can prove that each is individually necessary (via \texttt{covered-agreement}, the missing class admits an alternative target).
-The bound also degrades gracefully: with $k < |C/{\sim}|$ observations, CEGIS is still sound on the $k$ covered classes---only the $|C/{\sim}| - k$ uncovered classes are underdetermined.
-
-\subsection{DSL Completeness and the Fingerprint Construction}
-
-The DSL Completeness theorem (\S\ref{sec:dsl-complete}) resolves a foundational question: before asking \emph{how many} observations CEGIS needs, one must ask whether the DSL \emph{can express} the target at all.
-The fingerprint construction answers affirmatively: the Boolean algebra generated by the features is rich enough to capture every function constant on \texttt{AllFeatAgree} equivalence classes.
-
-The construction is reminiscent of the classical Stone representation theorem, which establishes that every Boolean algebra is isomorphic to a field of sets.
-Here, the feature set generates a Boolean algebra of predicates, and the fingerprint construction explicitly realizes the isomorphism between feature-respecting targets and \texttt{PredProg} terms.
-The \texttt{FeaturesExhaustive} assumption plays the role of ensuring the Stone space has enough points (every feature is observable).
-
-Practically, the fingerprint construction produces a DNF of exponential size---one disjunct per equivalence class where the target is true.
-This is never used as a synthesis algorithm; its role is purely existential.
-The CEGIS enumeration typically finds much smaller programs.
-But the completeness guarantee is essential: it certifies that CEGIS is searching in a space that \emph{provably contains} the answer.
-
-\subsection{Cross-Pair Propagation and Observation Efficiency}
-
-The cross-pair propagation result (\S\ref{sec:cross-pair}) reveals that the Propagation Theorem's power extends beyond spatial generalization (across feature-equivalent states).  When multiple ranking pairs are governed by the same feature structure, a single CEGIS version space simultaneously constrains \emph{all} correlated pairs.  This is not an ad-hoc optimization---it follows directly from the fact that CEGIS operates on \texttt{PredObs} = \texttt{Carrier~$\times$~Bool}, which carries no information about which action pair generated the observation.
-
-The practical implication is substantial.  In environments with $k$ actions, the na\"ive approach requires $\binom{k}{2} \times |C|$ observations (all pairs at all states).  Dissolution reduces this to $\binom{k}{2} \times |C/{\sim}|$.  Cross-pair propagation can further reduce it to as few as $|C/{\sim}|$ observations \emph{total}---when all pairs share the same feature predicate.  The savings factor grows quadratically in $k$.
-
-The partial correlation case is equally important: when some pairs share a predicate and others do not, the savings are proportional to the ``feature correlation'' across the ranking structure.  This can be detected at synthesis time by inspecting whether multiple pairs converge to the same surviving program.
-
-
 \subsection{Demo 15: GamblersRuin --- FOSD Synthesis in a Richer Environment}
 \label{sec:e2e-gamblers-ruin-fosd}
 
@@ -2291,18 +2201,18 @@ We extend FOSD-based synthesis beyond the single-state BiasedBandit to \textbf{G
 From Middle, Bet yields 50\% chance of Goal (reward~1) and 50\% Ruin (reward~0); Quit yields 100\% Middle (reward~0).
 The optimal policy at Middle is Bet (higher expected value and FOSD-dominance).
 
-The \texttt{Synthesis.FOSDStochasticFiniteMDP} module provides the same interface as \texttt{StochasticFiniteMDP} but generates observations via \texttt{fosd-compare} instead of expected-trace comparison.
+The module \texttt{Synthesis.FOSDStochasticFiniteMDP} provides the same interface
+as \texttt{StochasticFiniteMDP} but generates observations via \texttt{fosd-compare} instead of expected-trace comparison.
 FOSD comparison requires equal total weights; GamblersRuin's \texttt{pure} for Quit has weight~1 while Bet has weight~2.
 We use \texttt{step-fosd} that scales Quit to weight~2 (same semantics: 100\%~(Middle,0)) so \texttt{fosd?} can compare.
 
 With feature \texttt{is-middle} (true only at Middle), CEGIS synthesizes a predicate for prefer(Quit, Bet) from the observation \texttt{(Middle, fosd-compare Middle Quit Bet 0)}.
 At depth~0, Quit FOSD$\le$~Bet (Bet dominates); the synthesized predicate holds at Middle, yielding the optimal policy: Bet.
 
-\begin{center}
-\texttt{test-fosd-quit≤bet : fosd-compare Middle Quit Bet 0 $\equiv$ true}\\
-\texttt{test-synth-succeeds : synth-quit≤bet $\equiv$ just truep}
-\end{center}
-
+\begin{spec}
+test-fosd-quit≤bet : fosd-compare Middle Quit Bet 0 ≡ true
+test-synth-succeeds : synth-quit≤bet ≡ just truep
+\end{spec}
 The \texttt{ModelPreservesFOSD} type and \texttt{WithCorrectModel} connect a verified \texttt{RankModel} to \texttt{FOSDCoindHomo}: when a synthesized ranking preserves pointwise FOSD at every timestep, it yields a coinductive homomorphism optimal for \emph{all} monotone utility functions.
 The \texttt{WithLearningBridge} module provides the same learning--synthesis integration as \texttt{StochasticFiniteMDP}: \texttt{sample-to-obs} maps samples to FOSD observations via \texttt{fosd-compare}, \texttt{synth-learn-step} and \texttt{synth-learn-batch} process samples incrementally, and \texttt{extract-rank-model} builds a \texttt{RankModel} from the combined learner state.
 The Learning Bridge is demonstrated end-to-end in GamblersRuin: a sample \texttt{(Middle, Quit, Bet)} is processed by \texttt{synth-learn-batch}, and \texttt{extract-rank-model} yields a \texttt{RankModel} that correctly prefers Bet over Quit at Middle (\texttt{test-extracted-correct}).
@@ -2312,64 +2222,9 @@ The Learning Bridge is demonstrated end-to-end in GamblersRuin: a sample \texttt
 
 The expected-value stochastic synthesis pipeline (\S\ref{sec:stochastic-synthesis}) compares actions by $\mathbb{E}[\text{trace}(s, a)] \le \mathbb{E}[\text{trace}(s, b)]$.
 This suffices for expected-value maximizers, but collapses the full reward distribution to a single scalar.
+A strictly stronger comparison is \textbf{First-Order Stochastic Dominance (FOSD)}: action $a$ FOSD-dominates $b$ at state $s$ iff for all thresholds $r$ and all timesteps $n$, $P(\text{reward}_n(s,a) \le r) \le P(\text{reward}_n(s,b) \le r)$.
 
-A strictly stronger comparison is \textbf{First-Order Stochastic Dominance (FOSD)}: action $a$ FOSD-dominates $b$ at state $s$ iff for all thresholds $r$ and all timesteps $n$:
-\[
-P(\text{reward}_n(s,a) \le r) \le P(\text{reward}_n(s,b) \le r)
-\]
-i.e., $a$'s cumulative distribution lies everywhere below $b$'s.  FOSD implies expected-value dominance ($\mu \ge_\text{FOSD} \nu \Rightarrow \mathbb{E}[\mu] \ge \mathbb{E}[\nu]$) but not conversely.  An action FOSD-dominating another is preferred by \emph{all monotone utility functions}---risk-averse, risk-neutral, and risk-seeking agents agree.
-
-The complete FOSD pipeline is implemented and machine-verified across three modules (\texttt{Probability.FOSD}, \texttt{Core.FOSD}, \texttt{Synthesis.FOSDStochasticFiniteMDP}).
-
-\subsubsection{Foundation: Probability.FOSD}
-
-The base layer provides:
-\begin{itemize}
-\item \textbf{CDF computation} for finite distributions (\texttt{cdf-weight}, \texttt{comp-weight}), with the fundamental identity $\text{CDF}(d,r) + \text{comp}(d,r) = W$ verified.
-\item \textbf{FOSD ordering} (\texttt{\_FOSD$\le$\_}) with preorder properties (reflexivity, transitivity).
-\item \textbf{FOSD $\Rightarrow$ E[X] bridge} (\texttt{fosd→ev}): proved for 0/1 distributions via complement-weight dominance and the tail-sum identity.
-\item \textbf{CDF distributes over concatenation}: \texttt{cdf-weight-++} and \texttt{total-weight-++} prove that CDF and total weight are additive over list concatenation---enabling compositional reasoning about composite distributions.
-\item \textbf{Decidable FOSD} (\texttt{fosd?}): a Boolean decision procedure comparing total weights and CDF values up to $\max(\text{support}(\mu), \text{support}(\nu))$.
-\item \textbf{Soundness and Completeness}: \texttt{fosd?-sound} proves \texttt{fosd?~$\mu$~$\nu$~=~true $\Rightarrow$ $\mu$~FOSD$\le$~$\nu$}; \texttt{fosd?-complete} proves the converse.  The completeness proof derives \texttt{total-weight~$\nu$ $\le$ total-weight~$\mu$} from the FOSD relation via \texttt{cdf-max} and a custom bound lemma \texttt{n$\le$m$\sqcup$n$'$}, then verifies CDF dominance at every threshold up to the joint maximum support.
-\end{itemize}
-
-\noindent Together, \texttt{fosd?-sound} and \texttt{fosd?-complete} establish that \texttt{fosd?} is a \emph{decision procedure}: $\texttt{fosd?}~\mu~\nu~=~\texttt{true} \iff \mu~\text{FOSD}_\le~\nu$.
-
-\subsubsection{Core: Coinductive FOSD and the Bridges}
-
-\texttt{Core.FOSD} lifts FOSD from single distributions to infinite reward streams:
-\begin{itemize}
-\item \textbf{PointwiseFOSD}: $\forall n.\;\text{marginal}(s,b,n)~\text{FOSD}_\le~\text{marginal}(s,a,n)$ --- FOSD at every depth.
-\item \textbf{StreamFOSD} (\texttt{\_$\le_{s}$-fosd\_}): a \emph{coinductive} record on streams of distributions, the distributional analogue of \texttt{$\le_s$-lex}.
-\item \textbf{Stochastic Isomorphism}: \texttt{conjecture-forward} (coinductive $\Rightarrow$ pointwise) and \texttt{conjecture-reverse} (pointwise $\Rightarrow$ coinductive via corecursive \texttt{pointwise-to-stream-fosd}).  This extends the Stream Isomorphism from scalars to distributions.
-\item \textbf{FOSDCoindHomo}: a ranking that preserves \texttt{PointwiseFOSD} at every state---strictly stronger than \texttt{StochasticCoindHomo}:
-\end{itemize}
-
-\begin{spec}
-  record FOSDCoindHomo : Set₁ where
-    field
-      _≤ₐ_ : State → Action → Action → Set
-      preserves-fosd : ∀ a b s →
-        _≤ₐ_ s a b → PointwiseFOSD s b a
-\end{spec}
-
-\noindent Two bridge theorems connect the FOSD and expected-value worlds:
-\begin{itemize}
-\item \textbf{FOSD $\Rightarrow$ E[X] per-timestep} (\texttt{pointwise-ev}): applies \texttt{fosd→ev} at each depth to show $\text{E}[\text{marginal}(s,b,n)] \le \text{E}[\text{marginal}(s,a,n)]$.
-\item \textbf{FOSD-to-Lex Bridge} (\texttt{fosd→lex-stream}): lifts per-timestep EV dominance to lexicographic EV-stream dominance (\texttt{$\le_s$-ev}).  The proof uses \texttt{subst$_2$} with \texttt{iter-tab} equalities to bridge the tabulated stream representation:
-\end{itemize}
-
-\begin{spec}
-  fosd→lex-stream : ∀ s a b →
-    PointwiseFOSD s a b →
-    marginal-ev-stream s b ≤ₛ-ev marginal-ev-stream s a
-
-  fosd-homo→ev-lex : (homo : FOSDCoindHomo) →
-    ∀ a b s → FOSDCoindHomo._≤ₐ_ homo s a b →
-      marginal-ev-stream s a ≤ₛ-ev marginal-ev-stream s b
-\end{spec}
-
-\noindent \texttt{fosd-homo→ev-lex} is the master implication: every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}.  Rankings verified via FOSD simultaneously guarantee expected-value optimality \emph{and} dominance for all monotone utilities.
+The FOSD theory---CDF computation, the decidable FOSD comparator (\texttt{fosd?}) with soundness and completeness, the coinductive lift (\texttt{PointwiseFOSD}, \texttt{StreamFOSD}, Stochastic Isomorphism), the \texttt{FOSDCoindHomo} record, and the FOSD-to-Lex bridge (\texttt{fosd-homo→ev-lex})---is developed in full in the companion paper~\cite{CSHRLSuccessor}.  Here we focus on how this theory connects to the synthesis pipeline.
 
 \subsubsection{Synthesis: FOSD Learning Convergence}
 
@@ -2409,119 +2264,14 @@ Three environments exercise the full FOSD pipeline:
 \subsection{The Stochastic Dominance Hierarchy}
 \label{sec:sd-hierarchy}
 
-FOSD (\S\ref{sec:fosd-synth}) provides the strongest distributional comparison: an action FOSD-dominating another is preferred by \emph{all} monotone utility functions.  But this strength is also a limitation---many distributions that exhibit a clear ``better'' relationship fail the FOSD test because their CDFs cross at some threshold.
+The \textbf{Stochastic Dominance Hierarchy} generalizes FOSD to a parameterized family of orderings SD$[k]$, each capturing a broader class of utility functions: SD$[0]$ = FOSD (all monotone utilities), SD$[1]$ = SOSD (risk-averse agents), SD$[2]$ = TOSD (prudent agents), and so on.  The hierarchy is built on iterated prefix sums of the CDF, with a one-line subsumption proof (SD$[k] \Rightarrow$ SD$[k{+}1]$ via \texttt{prefix-sum-mono}) and a master bridge showing that any SD level implies expected-value optimality.  The full theoretical development---\texttt{Probability.SD}, \texttt{Core.SD}, \texttt{SDCoindHomo}, the subsumption chain, and the strict SOSD-but-not-FOSD separation example---is presented in~\cite{CSHRLSuccessor}.
 
-The \textbf{Stochastic Dominance Hierarchy} generalizes FOSD to a parameterized family of orderings, each capturing a broader class of utility functions.  The $k$-th order SD condition integrates the CDF $k$ times; each additional integration ``smooths out'' CDF crossings, accepting more distribution pairs while restricting to a narrower (but still important) class of agents:
-
-\[
-\text{SD}[0] = \text{FOSD} \;\Rightarrow\; \text{SD}[1] = \text{SOSD} \;\Rightarrow\; \text{SD}[2] = \text{TOSD} \;\Rightarrow\; \cdots
-\]
-
-\subsubsection{Foundation: Probability.SD}
-
-The hierarchy is built on a single operation---\textbf{prefix sum}:
-
-\begin{spec}
-  prefix-sum : (ℕ → ℕ) → ℕ → ℕ
-  prefix-sum f zero    = f 0
-  prefix-sum f (suc r) = f (suc r) + prefix-sum f r
-
-  sd-weight : ℕ → Dist ℕ → ℕ → ℕ
-  sd-weight zero    d = cdf-weight d
-  sd-weight (suc k) d = prefix-sum (sd-weight k d)
-\end{spec}
-
-\noindent \texttt{sd-weight~0} is the CDF itself (FOSD level); \texttt{sd-weight~1} is the integrated CDF (SOSD level); \texttt{sd-weight~$k$} is the $k$-fold prefix sum.  The ordering at each level is:
-
-\begin{spec}
-  _SD[_]≤_ : Dist ℕ → ℕ → Dist ℕ → Set
-  μ SD[ k ]≤ ν = ∀ r → sd-weight k ν r ≤ sd-weight k μ r
-\end{spec}
-
-\paragraph{The one-line subsumption.}
-The crown jewel of the hierarchy is that subsumption is a single application of prefix-sum monotonicity:
-
-\begin{spec}
-  prefix-sum-mono : ∀ {f g} →
-    (∀ r → f r ≤ g r) →
-    ∀ r → prefix-sum f r ≤ prefix-sum g r
-
-  SD-subsumes : ∀ k {μ ν} →
-    μ SD[ k ]≤ ν → μ SD[ suc k ]≤ ν
-  SD-subsumes k sd = prefix-sum-mono sd
-\end{spec}
-
-\noindent If the $k$-th order integrated CDFs are pointwise ordered, their prefix sums (the $(k{+}1)$-th order) are too.  This gives the full chain FOSD $\Rightarrow$ SOSD $\Rightarrow$ TOSD $\Rightarrow \cdots$ in one line.
-
-\paragraph{The SD-to-EV bridge.}
-A key lemma shows that \texttt{sd-weight~$k$~$d$~0 $\equiv$ cdf-weight~$d$~0} for all $k$---prefix-sum at $r{=}0$ is just the function value.  This means SD$[k]$ at $r{=}0$ gives CDF dominance at $r{=}0$, which (for 0/1 distributions with equal total weights) yields expected-value dominance via the existing FOSD$\to$EV bridge:
-
-\begin{spec}
-  sd-at-0 : ∀ k d → sd-weight k d 0 ≡ cdf-weight d 0
-
-  sd→ev : ∀ k μ ν →
-    AllBelow μ 1 → AllBelow ν 1 →
-    total-weight μ ≡ total-weight ν →
-    μ SD[ k ]≤ ν →
-    weighted-sum μ ≤ weighted-sum ν
-\end{spec}
-
-\paragraph{Strict separation.}
-SOSD is \emph{strictly} weaker than FOSD.  Consider $\mu = \{0{:}2, 2{:}1\}$ and $\nu = \{1{:}3\}$.  At $r{=}1$: $\text{CDF}(\nu, 1) = 3 > 2 = \text{CDF}(\mu, 1)$, so FOSD fails.  But the integrated CDFs satisfy $\text{icdf}(\nu, r) \le \text{icdf}(\mu, r)$ at every $r$ (verified by \texttt{refl} at $r = 0, 1, 2$), so SOSD holds---confirmed computationally in \texttt{Probability.SD}.
-
-\subsubsection{Coinductive Lift: Core.SD}
-
-\texttt{Core.SD} lifts the hierarchy to reward streams with three constructs:
-
-\begin{spec}
-  PointwiseSD : ℕ → State → Action → Action → Set
-  PointwiseSD k s a b =
-    ∀ n → marginal-reward s b n SD[ k ]≤ marginal-reward s a n
-
-  record SDCoindHomo (k : ℕ) : Set₁ where
-    field
-      _≤ₐ_ : State → Action → Action → Set
-      preserves-sd : ∀ a b s →
-        _≤ₐ_ s a b → PointwiseSD k s b a
-\end{spec}
-
-\noindent \texttt{SDCoindHomo~0} is \texttt{FOSDCoindHomo}; \texttt{SDCoindHomo~1} is a ranking optimal for all risk-averse agents; \texttt{SDCoindHomo~$k$} captures the $(k{+}1)$-th order utility class.
-
-\paragraph{Hierarchy subsumption on homos.}
-If a ranking preserves SD$[k]$ (the strongest condition), it automatically preserves SD$[k{+}1]$ (the weaker condition):
-
-\begin{spec}
-  sd-homo-subsumes : ∀ k → SDCoindHomo k → SDCoindHomo (suc k)
-\end{spec}
-
-\noindent This means a single FOSD verification ($k{=}0$) simultaneously establishes optimality for \emph{all} levels of the hierarchy.
-
-\paragraph{The master bridge.}
-The \texttt{SDToLexStream} module proves the ultimate connection: any \texttt{SDCoindHomo~$k$} (at any level) yields lexicographic EV-stream dominance:
-
-\begin{spec}
-  sd-homo→ev-lex : (homo : SDCoindHomo k) →
-    ∀ a b s → SDCoindHomo._≤ₐ_ homo s a b →
-      marginal-ev-stream s a ≤ₛ-ev marginal-ev-stream s b
-\end{spec}
-
-\noindent The proof uses \texttt{sd$\to$ev} at each timestep, then lifts to the stream level via \texttt{pw$\to$lex}.  This closes the hierarchy: rankings verified at \emph{any} SD level yield expected-value optimality, while higher levels provide progressively weaker (easier to satisfy) requirements for broader classes of utility functions.
-
-\begin{remark}[Utility Function Classes]
-The SD hierarchy parameterizes the tradeoff between verification strength and agent generality:
-\begin{itemize}
-\item \textbf{SD$[0]$ (FOSD):} optimal for all monotone utilities (risk-seeking, neutral, and averse).
-\item \textbf{SD$[1]$ (SOSD):} optimal for all concave monotone utilities (risk-averse agents).
-\item \textbf{SD$[2]$ (TOSD):} optimal for all utilities with non-increasing absolute risk aversion (prudent agents).
-\item \textbf{SD$[k]$:} each level captures a broader class, with weaker verification requirements.
-\end{itemize}
-When FOSD cannot be established between two distributions (CDF crossing), SOSD may still hold---accepting distributions with the same ``integrated tail behavior.''  The hierarchy lets the framework verify the strongest relationship that exists, rather than giving up when FOSD fails.
-\end{remark}
+For synthesis, the key consequence is that when FOSD fails (CDFs cross), an \texttt{SDCoindHomo~$k$} for $k \ge 1$ may still be established.  The master bridge (\texttt{sd-homo→ev-lex}) ensures that \emph{any} SD level yields EV-stream optimality, so the synthesis engine can ``fall back'' to SOSD or TOSD while retaining correctness guarantees for the corresponding utility-function class.
 
 \subsection{Compositional Ranking Algebra}
 \label{sec:compose}
 
-The SD hierarchy (\S\ref{sec:sd-hierarchy}) establishes a parameterized family of distributional orderings.  The \textbf{Compositional Ranking Algebra} proves that these orderings are closed under natural operations on distributions---enabling \emph{modular verification}: verify each component in isolation, then compose the proofs automatically.
+The SD hierarchy (\S\ref{sec:sd-hierarchy}, see also~\cite{CSHRLSuccessor}) establishes a parameterized family of distributional orderings.  The \textbf{Compositional Ranking Algebra} proves that these orderings are closed under natural operations on distributions---enabling \emph{modular verification}: verify each component in isolation, then compose the proofs automatically.  Here we present the full proof infrastructure; \cite{CSHRLSuccessor} gives the condensed definitions and summary.
 
 \subsubsection{Foundation: Probability.Compose}
 
@@ -2658,44 +2408,11 @@ The portfolio ranking is then upgraded for free: \texttt{ranking-subsumes} lifts
 \subsection{Verified State Abstraction}
 \label{sec:abstraction}
 
-A persistent limitation of the framework has been its restriction to \emph{finite} state spaces: every demo uses enumerable states, and the paper's related-work section acknowledges that ``CSH does not yet address continuous state spaces.''  The \texttt{Core.Abstraction} module resolves this limitation with a single, general theorem.
+A persistent limitation of the framework has been its restriction to \emph{finite} state spaces.  The \texttt{Core.Abstraction} module resolves this with a single, general theorem: \texttt{abstract-lift}.  A \texttt{StateAbstraction} bundles a projection ($\text{Concrete} \to \text{Abstract}$), an embedding ($\text{Abstract} \to \text{Concrete}$), and a section property ($\texttt{project} \circ \texttt{embed} = \text{id}$).  The lifting theorem states that any \texttt{VerifiedRanking} on a finite abstract system lifts to the full (potentially infinite or continuous) concrete system, provided marginal-invariance holds.  Three composition operators (\texttt{product-abstraction}, \texttt{compose-abstraction}, \texttt{abstract-conv-product}) enable modular abstraction.  The full theoretical development, including the connection to Li et al.~(2006), is presented in~\cite{CSHRLSuccessor}.
 
-\subsubsection{The Abstraction Record}
+The feature-based abstraction (\texttt{AllFeatAgree}) from Section~\ref{sec:quotient} is a special case: if $\texttt{project} = \text{feature-vector}$ and marginal-invariance holds, then \texttt{abstract-lift} subsumes the feature-based propagation results.
 
-A \texttt{StateAbstraction} bundles three components:
-
-\begin{itemize}
-\item \textbf{project}: $\text{Concrete} \to \text{Abstract}$---collapses concrete states to abstract classes.
-\item \textbf{embed}: $\text{Abstract} \to \text{Concrete}$---selects a representative for each class.
-\item \textbf{section}: $\texttt{project} \circ \texttt{embed} = \text{id}$---the representatives are consistent.
-\end{itemize}
-
-No finiteness assumption is placed on \texttt{Concrete}: it can be $\mathbb{N}$, $\mathbb{R}^n$, or any type in \texttt{Set}.  The only requirement is that the abstract type is tractable enough for verification.
-
-\subsubsection{The Lifting Theorem}
-
-The central result is \texttt{abstract-lift}:
-
-\begin{quote}
-\emph{Given a state abstraction and a proof that the marginal reward function is constant within each abstract class (marginal-invariance), any \texttt{VerifiedRanking} on the abstract system lifts to a \texttt{VerifiedRanking} on the full concrete system.}
-\end{quote}
-
-The concrete ranking orders actions by their abstract-state ordering: at state~$s$, action~$a$ is ranked against action~$b$ according to the abstract ordering at $\texttt{project}(s)$.  Preservation transfers via marginal-invariance: since all concrete states in a class have identical reward distributions, the SD$[k]$ inequality verified at the representative applies to every member.
-
-This is the standard model-irrelevance condition from the state abstraction literature (Li et al., 2006), but formalized constructively in Agda with a machine-checked lifting proof.
-
-\subsubsection{Composition}
-
-The abstraction module provides three composition operators:
-\begin{itemize}
-\item \texttt{product-abstraction}: given abstractions for two components, the product abstraction works component-wise---enabling modular abstraction of product environments.
-\item \texttt{compose-abstraction}: two-level abstractions chain---if $C \xrightarrow{\alpha_1} M \xrightarrow{\alpha_2} A$, then $C \xrightarrow{\alpha_2 \circ \alpha_1} A$.  This supports hierarchical refinement: start coarse, refine where needed.
-\item \texttt{abstract-conv-product}: the full pipeline for continuous-state product MDPs with additive rewards---abstract each component, verify FOSD on abstract systems, compose via convolution, and lift to the concrete product.
-\end{itemize}
-
-\subsubsection{Connection to AllFeatAgree}
-
-The feature-based abstraction (\texttt{AllFeatAgree}) from Section~\ref{sec:quotient} is a special case.  If $\texttt{project} = \text{feature-vector}$ and marginal-invariance holds (the target respects features), then \texttt{abstract-lift} subsumes the feature-based propagation results.  The general framework extends this beyond features to any abstraction function satisfying the section property.
+We now demonstrate the abstraction framework on a progression of increasingly realistic environments:
 
 \subsubsection{Demonstration: Infinite-State Regional Policy}
 
@@ -3431,17 +3148,7 @@ Hyperparameters & 0 & ${\sim}$8+ (lr, $\varepsilon$, $\gamma$, depth, \ldots) \\
 \end{tabular}
 \end{table}
 
-\paragraph{DQN comparison.}
-Figure~\ref{fig:dqn-comparison} provides an empirical comparison of the CSHRL-extracted controllers against DQN~\cite{Mnih2015} trained with \texttt{stable-baselines3} on all three environments.  The comparison here uses the CSHRL model-based controllers, which exploit the dynamics equations (reimplemented in Agda from the environment's published source code) and require zero training episodes; DQN treats the environment as a black box and learns from interaction.  To give DQN a fair chance, we train with generous budgets (100K steps for CartPole, 1M for MountainCar, 500K for Acrobot) and report the best result across three random seeds.  On CartPole-v1, CSHRL achieves 500/500 on all 500 test episodes, while the best DQN seed averages ${\sim}$230/500.  On MountainCar-v0, CSHRL reaches the goal in all 500 episodes (avg.\ 120 steps), while DQN is extremely seed-sensitive: one seed achieves near-perfect performance, while the other two fail completely.  On Acrobot-v1, CSHRL solves 500/500 episodes (avg.\ 88 steps), while the best DQN seed solves 411/500 (avg.\ 117 steps).  The key distinction is not raw performance---a well-tuned DQN can eventually match CSHRL on these environments---but the \emph{nature} of the obtained policy.  The CSHRL policy is a compact, interpretable lookup table (${\leq}25$ entries) with a formal correctness proof; the DQN policy is an opaque neural network whose performance varies across random seeds, with no guarantees.  CSHRL achieves this with \emph{zero training episodes}.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{dqn_comparison.pdf}
-\caption{CSHRL (verified, zero training) vs.\ DQN (best of 3 seeds, 100K--1M training steps) on CartPole-v1, MountainCar-v0, and Acrobot-v1.  CSHRL achieves optimal performance deterministically on all three benchmarks.  DQN performance varies across random seeds and training budgets.  The CSHRL policy is a compact lookup table extracted directly from Agda with formal SD$[0]$ guarantees.}
-\label{fig:dqn-comparison}
-\end{figure}
-
-\paragraph{Verified RL.}  Lesage and Ong~\cite{Lesage2020} formalize value and policy iteration convergence in Coq but do not address synthesis.  The CSHRL framework~\cite{CSHRL2026} provides the coinductive homomorphism theory we build upon.  To our knowledge, no prior work combines formal verification of RL with program synthesis, let alone with propagation and cross-pair observation transfer.
+\paragraph{Verified RL.}  Vajjha et~al.~\cite{Vajjha2021} formalize value and policy iteration convergence in Coq but do not address synthesis.  The CSHRL framework~\cite{CSHRL2026} provides the coinductive homomorphism theory we build upon.  To our knowledge, no prior work combines formal verification of RL with program synthesis, let alone with propagation and cross-pair observation transfer.
 
 \begin{table}[t]
 \centering
@@ -3561,7 +3268,15 @@ The paper is a literate Agda document.  Building the PDF type-checks all embedde
 \item \textbf{Tested toolchain:} Agda 2.7.x (2.7.0 recommended), Agda StdLib 2.0, Lua\LaTeX.
 \item \textbf{Build commands:} In \texttt{literate/}, run \texttt{make synthesis} (or \texttt{agda --latex CSHRLSynthesis.lagda.tex} followed by \texttt{lualatex} on the generated \texttt{CSHRLSynthesis.tex}).
 \item \textbf{Fonts:} The document uses \texttt{fontspec} and Unicode math fonts (see preamble for \texttt{DejaVu} and \texttt{STIX Two Math}).
-\item \textbf{Full codebase:} The complete synthesis framework resides in \fpath{src/CSHRL/Synthesis/} with end-to-end demos in \fpath{src/CSHRL/Tasks/Synthesized/}.  The fragility analysis module is at \fpath{src/CSHRL/Analysis/Fragility.agda}; the \texttt{ContinuousControlMDP} EC is at \fpath{src/CSHRL/EnvironmentClass/ContinuousControlMDP.agda}; the \texttt{DirectRewardMDP} EC is at \fpath{src/CSHRL/EnvironmentClass/DirectRewardMDP.agda}; the autonomous CartPole controller is at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleAutoController.agda}; the autonomous MountainCar controller is at \fpath{src/CSHRL/Tasks/Stochastic/MountainCarAutoController.agda}; the autonomous Acrobot controller is at \fpath{src/CSHRL/Tasks/Stochastic/AcrobotAutoController.agda}; the Python extractions are at \fpath{scripts/cartpole\_cshrl.py}, \fpath{scripts/mountaincar\_cshrl.py}, and \fpath{scripts/acrobot\_cshrl.py}; the grid refinement theory is at \fpath{src/CSHRL/Analysis/GridRefinement.agda}; the model-free continuous synthesis bridge is at \fpath{src/CSHRL/Synthesis/AbstractSynthesis.agda}; the model-free learning demos are at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleSynthDemo.agda}, \fpath{src/CSHRL/Tasks/Stochastic/MountainCarSynthDemo.agda}, and \fpath{src/CSHRL/Tasks/Stochastic/AcrobotSynthDemo.agda}; the gridless continuous feature template is at \fpath{src/CSHRL/Synthesis/ContinuousFeatures.agda}; the generic CSHRL policy iteration loop is at \fpath{src/CSHRL/Synthesis/CSHRLLoop.agda}; the gridless continuous learning loops are at \fpath{src/CSHRL/Tasks/Stochastic/CartPoleLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/PendulumLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/MountainCarLoop.agda}, \fpath{src/CSHRL/Tasks/Stochastic/AcrobotLoop.agda}, the depth-1 modules at \fpath{src/CSHRL/Tasks/Stochastic/MountainCarD1.agda} and \fpath{src/CSHRL/Tasks/Stochastic/AcrobotD1.agda}; the 3-action decision chain and full ranking demo is at \fpath{src/CSHRL/Tasks/Stochastic/Pendulum3Loop.agda}; the pairwise restricted preservation theorem is at \fpath{src/CSHRL/Synthesis/PairwiseRanking.agda}; the oracle bridge connecting self-consistency to CoindHomo is at \fpath{src/CSHRL/Synthesis/CoindHomoBridge.agda}; the gridless deployment scripts are at \fpath{scripts/record\_cartpole\_gridless.py}, \fpath{scripts/record\_pendulum\_gridless.py}, \fpath{scripts/record\_pendulum3\_gridless.py}, \fpath{scripts/record\_mountaincar\_gridless.py}, and \fpath{scripts/record\_acrobot\_gridless.py}; and the DQN comparison script is at \fpath{scripts/dqn\_comparison.py}.
+\item \textbf{Full codebase:} The complete synthesis framework resides in \fpath{src/CSHRL/Synthesis/} with end-to-end demos in \fpath{src/CSHRL/Tasks/Synthesized/}. Key components include:
+  \begin{itemize}
+    \item \textbf{Environment Classes:} \fpath{src/CSHRL/EnvironmentClass/ContinuousControlMDP.agda}, \fpath{DirectRewardMDP.agda}
+    \item \textbf{Grid-based Controllers:} \fpath{src/CSHRL/Tasks/Stochastic/CartPoleAutoController.agda}, \fpath{MountainCarAutoController.agda}, \fpath{AcrobotAutoController.agda}
+    \item \textbf{Gridless Infrastructure:} \fpath{src/CSHRL/Synthesis/ContinuousFeatures.agda}, \fpath{CSHRLLoop.agda}, \fpath{StateCEGARLoop.agda}
+    \item \textbf{Gridless Searches:} \fpath{src/CSHRL/Tasks/Stochastic/CartPoleLoop.agda}, \fpath{MountainCarLoop.agda}, \fpath{AcrobotLoop.agda}, \fpath{PongLoop.agda}
+    \item \textbf{Theory Bridges:} \fpath{src/CSHRL/Synthesis/PairwiseRanking.agda} (unavailability), \fpath{CoindHomoBridge.agda} (oracle substitution)
+    \item \textbf{Python Extractions:} \fpath{scripts/record\_cartpole\_gridless.py}, \fpath{scripts/record\_pong\_gridless.py}
+  \end{itemize}
 \end{itemize}
 
 \appendix
@@ -3600,7 +3315,7 @@ Jha, S. and Seshia, S.~A. (2017).
 A theory of formal synthesis via inductive learning.
 \textit{Acta Informatica}, 54(7):693--726.
 
-\bibitem{Lesage2020}
+\bibitem{Vajjha2021}
 Lesage, B. and Ong, C.~H.~L. (2020).
 CertRL: Formalizing convergence proofs for value and policy iteration in Coq.
 \textit{arXiv preprint arXiv:2009.11403}.
@@ -3683,6 +3398,16 @@ In \textit{Proceedings of SSS}, LNCS 6976, pp.~386--400.
 Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.~A., Veness, J., Bellemare, M.~G., Graves, A., Riedmiller, M., Fidjeland, A.~K., Ostrovski, G., et~al. (2015).
 Human-level control through deep reinforcement learning.
 \textit{Nature}, 518(7540):529--533.
+
+\bibitem{CSHRLSuccessor}
+Corral-Corral, R. (2026).
+Coinductive Symmetric Homomorphism Reinforcement Learning: Successor.
+\textit{Manuscript}.
+
+\bibitem{dietterich2000hierarchical}
+Dietterich, T.~G. (2000).
+Hierarchical reinforcement learning with the MAXQ value function decomposition.
+\textit{Journal of Artificial Intelligence Research}, 13:227--303.
 
 \end{thebibliography}
 
