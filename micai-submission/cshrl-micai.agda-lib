@@ -1,0 +1,3 @@
+name: cshrl-micai
+include: .
+depend: standard-library

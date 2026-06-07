@@ -1,0 +1,4 @@
+latex/
+_build/
+*.agdai
+_agda_build.log

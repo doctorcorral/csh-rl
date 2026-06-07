@@ -1,8 +1,7 @@
-\documentclass[9pt,a4paper]{article}
+\documentclass[runningheads]{llncs}
 
 % Basic packages
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb,amsthm}
+\usepackage{amsmath,amssymb}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes,graphs,calc}
 \usepackage{pgfplots}
@@ -75,20 +74,14 @@
 \urlstyle{tt}
 \newcommand{\fpath}[1]{\nolinkurl{#1}}
 
-\theoremstyle{plain}
-\newtheorem{theorem}{Theorem}
-\newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
-\theoremstyle{definition}
-\newtheorem{definition}{Definition}
-\theoremstyle{remark}
-\newtheorem{remark}{Remark}
+% Theorem environments (theorem, lemma, corollary, definition, remark)
+% are predefined by the llncs class.
 
-\title{\textbf{Coinductive Homomorphism Reinforcement Learning} \\
+\title{Coinductive Homomorphism Reinforcement Learning:\\
 Optimality as Structure Preservation}
 
-\author{Ricardo Corral-Corral}
-\date{April 2026}
+\author{Anonymous Author(s)}
+\institute{Anonymous Institution}
 
 \begin{document}
 
@@ -121,7 +114,7 @@ We prove seven main results, all machine-verified in Agda:
 \textbf{(7)}~State abstraction: rankings verified on finite abstract systems lift to arbitrary concrete state spaces;
 \textbf{(8)}~Scalable verification: a modular Environment Class architecture provides automatic trace-to-stream bridges, demonstrated with a full coinductive homomorphism for $8$-Queens ($8^8$ search space, zero postulates).
 
-This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code while producing this PDF.
+\keywords{Reinforcement learning \and Coinduction \and Formal verification \and Agda \and Optimality \and Stochastic dominance}
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -338,12 +331,12 @@ When immediate rewards are aligned with the ranking---as they are in environment
 
 \section{The Agda Core}\label{sec:agda-core}
 
-We now present the verified implementation.  This code is \emph{literate}---compiling this file with \texttt{agda --latex} type-checks everything while producing this PDF.
+We now present the verified implementation.  Every code listing shown below is type-checked by Agda; the snippets are rendered directly from the checked source.
 
-\begin{code}
+\begin{code}[hide]
 {-# OPTIONS --safe --guardedness #-}
 
-module CSHRL-Successor where
+module paper where
 
 open import Data.List using (List; map; foldr; []; _∷_)
 open import Codata.Guarded.Stream using (Stream; head; tail; _∷_; tabulate)
@@ -357,7 +350,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 
 The \texttt{Core} module is parameterized by the environment:
 
-\begin{code}
+\begin{code}[hide]
 module Core
   (State Action Reward : Set)
   (step                : State → Action → State × Reward)
@@ -716,7 +709,7 @@ module CoreWithArithmetic
     +ᵣ-mono-≤ (pw zero) (partial-sum-mono n (tail x) (tail y) (pointwise-tail pw))
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   subsumes-successor-return : (ch : CoinductiveHomomorphism) →
     ∀ s a b N →
     CoinductiveHomomorphism._≤ₐ_ ch s a b →
@@ -822,7 +815,7 @@ module IsoSketch
   pointwise-tail pw n = pw (suc n)
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   pointwise-to-≤ₛ : ∀ {x y} → PointwiseDominance x y → x ≤ₛ y
   head≤ (pointwise-to-≤ₛ pw) = pw zero
   tail≤ (pointwise-to-≤ₛ pw) = pointwise-to-≤ₛ (pointwise-tail pw)
@@ -847,7 +840,7 @@ The isomorphism applies equally to both CoinductiveHomomorphism and CoindHomo: b
 
 The preceding sections established what an optimal ranking \emph{is}.  We now turn to how to \emph{compute} one.  The Finder algorithm uses lexicographic trace comparison and requires no discount factor.
 
-\begin{code}
+\begin{code}[hide]
 module Finder
   (State Action Reward : Set)
   (step                : State → Action → State × Reward)
@@ -866,7 +859,7 @@ module Finder
 
 Compare traces element-by-element---the first difference decides:
 
-\begin{code}
+\begin{code}[hide]
   _≤ₜ_ : Trace → Trace → Bool
   []       ≤ₜ []       = true
   []       ≤ₜ (_ ∷ _)  = true
@@ -884,7 +877,7 @@ Compare traces element-by-element---the first difference decides:
 
 Given the comparator, we need the traces themselves.  For a deterministic MDP, the trace of action~$a$ at state~$s$ to depth~$k$ is the finite prefix of the reward stream: take action~$a$, record the reward, then act optimally (according to all actions, greedily at each step) for the remaining~$k{-}1$ steps.  \texttt{best-trace} computes this optimal continuation; \texttt{trace-action} prepends the immediate reward of a specific action:
 
-\begin{code}
+\begin{code}[hide]
   mutual
     best-trace : State → ℕ → Trace
     best-trace s zero    = []
@@ -914,7 +907,7 @@ Given the comparator, we need the traces themselves.  For a deterministic MDP, t
 
 With traces and a comparator in hand, producing a ranking is straightforward: compute each action's trace at the desired depth, then sort by lexicographic dominance.  The head of the sorted list is the optimal action; the full list is the total ranking used by the adaptation layer (\S\ref{sec:adaptation}).
 
-\begin{code}
+\begin{code}[hide]
   insert : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
   insert x [] = x ∷ []
   insert (a₁ , t₁) ((a₂ , t₂) ∷ xs) =
@@ -956,20 +949,9 @@ In aligned environments (Section~\ref{sec:landscape}), both comparisons yield th
 
 The Finder produces rankings; the Stream Isomorphism connects them to coinductive stream dominance.  But each task still needs its own bridge lemma---a potentially tedious and error-prone process.  The \textbf{Environment Class} (EC) abstraction eliminates this boilerplate.  Rather than proving preservation from scratch for each task, we factor out common structure into reusable modules.
 
-\subsection{The Problem: Boilerplate and Trust}
+\subsection{Parameterized Modules}
 
-Without environment classes, every task would need:
-\begin{enumerate}
-\item Its own Finder algorithm implementation
-\item Its own trace-to-stream bridge lemma
-\item Its own preservation proof skeleton
-\end{enumerate}
-
-This leads to code duplication and, worse, \emph{trust issues}: which parts can be trusted vs.\ which need re-verification?
-
-\subsection{The Solution: Parameterized Modules}
-
-Environment classes provide \textbf{verified infrastructure} that task instances inherit.  A task author fills in a parameter record (types, step function, reward order), and the class automatically provides the Finder, trace types, stream bridges, and proof scaffolding.  The full implementation is in \fpath{src/CSHRL/EnvironmentClass/}; here we show the parameter record that a task must instantiate:
+Without environment classes, every task would need its own Finder, trace-to-stream bridge, and preservation skeleton---duplication that also raises trust questions about which parts are verified.  Environment classes instead provide \textbf{verified infrastructure} that task instances inherit: a task author fills in a parameter record (\texttt{ECParameters}: types, step function, reward order with decidability and extrema, and finiteness witnesses), and the class automatically supplies the Finder, trace types, stream bridges, and proof scaffolding (full implementation in \fpath{src/CSHRL/EnvironmentClass/}).
 
 \begin{code}[hide]
 module FiniteDeterministicMDPSignature where
@@ -977,7 +959,7 @@ module FiniteDeterministicMDPSignature where
   open import Data.Empty using (⊥)
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   record ECParameters : Set₁ where
     field
       State Action Reward : Set
@@ -1006,11 +988,9 @@ module FiniteDeterministicMDPSignature where
     (r₁ ∷ t₁) ≤ₜ (r₂ ∷ t₂) = (r₁ ≤ᵣ r₂) × ((r₂ ≤ᵣ r₁) → t₁ ≤ₜ t₂)
 \end{code}
 
-\noindent The fields divide into three groups.  The \emph{domain} group (\texttt{State}, \texttt{Action}, \texttt{step}) specifies the MDP.  The \emph{algebraic} group (\texttt{\_$\le$ᵣ\_}, \texttt{\_$\le$?\_}, \texttt{max}, \texttt{bottom}) provides the ordered semiring structure on rewards, ensuring comparability and bounded extrema.  The \emph{enumeration} group (\texttt{all-actions}, \texttt{default-action}, \texttt{horizon}) supplies finiteness witnesses needed by the Finder's brute-force search.
+\noindent The fields divide into a \emph{domain} group (\texttt{State}, \texttt{Action}, \texttt{step}), an \emph{algebraic} group (the ordered reward structure \texttt{\_$\le$ᵣ\_}, \texttt{\_$\le$?\_}, \texttt{max}, \texttt{bottom}), and an \emph{enumeration} group (\texttt{all-actions}, \texttt{horizon}) supplying the finiteness witnesses the Finder needs.  From these, the EC derives the trace orderings, the Finder, the ranking relation, the trace-to-stream bridge, and---for specialised ECs---a full \texttt{CoindHomo}.
 
-Given these parameters, the environment class automatically provides:
-
-\begin{code}
+\begin{code}[hide]
   -- AUTOMATICALLY PROVIDED by the EC:
   -- • Trace type and orderings (_≤ₜ_, _≤ₜᵇ_)
   -- • Finder algorithm (best-trace, find-ranking, find-policy)
@@ -1022,23 +1002,13 @@ Given these parameters, the environment class automatically provides:
 
 \subsection{What Task Instances Must Provide}\label{sec:task-provide}
 
-The burden on a task instance depends on which environment class it instantiates.
-
-\paragraph{FiniteDeterministicMDP (general case).}
-A task provides:
-\begin{enumerate}
-\item \textbf{Domain specifics:} The \texttt{State}, \texttt{Action}, \texttt{step} function.
-\item \textbf{A direct preservation proof:} A proof that the Finder's ranking preserves action-value ordering---the full bridge from finite traces to infinite streams.
-\end{enumerate}
-
-\paragraph{CombinatorialPlacementMDP (placement problems).}\label{sec:cpmdp}
-A specialised EC for placement problems (N-Queens, Sudoku, Graph Coloring), extending FiniteDeterministicMDP with domain-specific structure.  The full implementation is in \fpath{src/CSHRL/EnvironmentClass/CombinatorialPlacementMDP.agda}:
+For the general \textbf{FiniteDeterministicMDP}, a task supplies the domain (\texttt{State}, \texttt{Action}, \texttt{step}) plus a direct proof that the Finder's ranking preserves action-value ordering.  The specialised \textbf{CombinatorialPlacementMDP}\label{sec:cpmdp} (for placement problems such as N-Queens, Sudoku, Graph Coloring) reduces this burden further; full implementation in \fpath{src/CSHRL/EnvironmentClass/CombinatorialPlacementMDP.agda}.
 
 \begin{code}[hide]
 module CombinatorialPlacementSignature where
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   record PlacementParameters : Set₁ where
     field
       Config : Set
@@ -1057,30 +1027,10 @@ module CombinatorialPlacementSignature where
     Solved  : Config → PlacementState Config
 \end{code}
 
-\noindent The three constructors model the life cycle of a placement problem: \texttt{Ongoing}~wraps an active configuration where pieces can still be placed; \texttt{Dead} is an absorbing failure state (e.g., two queens attacking each other with no remaining fix); \texttt{Solved} wraps a completed valid configuration.  The key structural property is that Dead states produce stream~$[0, 0, 0, \ldots]$ and Solved states produce~$[R, R, R, \ldots]$.  Any path reaching Solved therefore dominates any path reaching Dead at every timestep---precisely the condition required by the coinductive order.
+\noindent The three constructors model a placement problem's life cycle: \texttt{Ongoing} wraps an active configuration, \texttt{Dead} is an absorbing failure (stream~$[0,0,\ldots]$), and \texttt{Solved} a completed configuration (stream~$[R,R,\ldots]$).  Any path reaching Solved thus dominates any path reaching Dead at every timestep---exactly the coinductive order's requirement.  The EC factors preservation into three reusable layers---\texttt{WithAbsorbingLemmas} (absorbing-state domination), \texttt{WithBinaryStructure} (every value is $0$ or $R$, with monotonicity), and \texttt{WithTraceBridge} (horizon sufficiency $\Rightarrow$ full \texttt{CoindHomo})---so the task author supplies at most four simple ingredients while the machinery handles the finite-trace-to-infinite-stream bridge.
 
-The EC factors the preservation proof into reusable layers:
-
-\begin{enumerate}
-\item \texttt{WithAbsorbingLemmas} (parameters: \texttt{solve-Dead-0}, \texttt{solve-Solved-R}).  Derives stream-level domination lemmas for absorbing states.
-
-\item \texttt{WithBinaryStructure} (adds: \texttt{0\textless{}R}).  Proves that \texttt{solve} is \emph{binary}---every value is either $0$ or $R$---and derives monotonicity.
-
-\item \texttt{WithTraceBridge} (adds: \texttt{solve-horizon-suf}).  Combines binary structure with horizon sufficiency to construct the full \texttt{CoindHomo}: the Finder's trace-based ranking preserves the coinductive ordering of action-value streams.
-\end{enumerate}
-
-\noindent The task author supplies at most four simple ingredients (the placement parameters, two absorbing-state lemmas, and horizon sufficiency), while the EC machinery handles the entire bridge from finite traces to infinite streams.
-
-\paragraph{Validation: 8-Queens ($N = 8$).}
-The \texttt{Queens8} module (\fpath{src/CSHRL/Tasks/Verified/Queens8.agda}) instantiates the EC for the $8$-Queens problem with \texttt{--safe} and zero postulates.  With \texttt{solve-horizon-suf} discharged, opening \texttt{WithTraceBridge} yields a complete \texttt{CoindHomo}: for every state~$s$ and actions~$a, b$, if the Finder ranks $a \le b$, then the infinite reward stream of~$a$ is dominated by that of~$b$ at every time step.  This is achieved for a combinatorial search space ($8^8 = 16{,}777{,}216$ candidate placements) where direct stream enumeration is infeasible.
-
-\subsection{Why This Matters: Postulate-Free Verification}
-
-\begin{itemize}
-\item \textbf{Verified tasks} (like TwoState, Queens1, and Queens8) have \textbf{no postulates}---every claim is machine-checked.
-\item \textbf{Classic tasks} (like Maze, KeyDoor) can use postulates for properties that are difficult to formalise, but the \emph{structural} preservation proof is still verified.
-\item \textbf{New tasks} inherit all the machinery---just instantiate the module parameters.
-\end{itemize}
+\paragraph{Validation: 8-Queens.}
+The \texttt{Queens8} module (\fpath{src/CSHRL/Tasks/Verified/Queens8.agda}) instantiates the EC with \texttt{--safe} and zero postulates: discharging \texttt{solve-horizon-suf} and opening \texttt{WithTraceBridge} yields a complete \texttt{CoindHomo} over a combinatorial search space ($8^8 = 16{,}777{,}216$ candidate placements) where direct stream enumeration is infeasible.  More broadly, verified tasks (TwoState, Queens1, Queens8) carry no postulates; classic tasks may postulate hard-to-formalise properties while keeping the \emph{structural} preservation proof verified; and new tasks inherit all machinery by instantiating the parameter record.
 
 \begin{figure}[H]
 \centering
@@ -1160,7 +1110,7 @@ module StochasticExtension where
 
 A distribution over type~$A$ is represented as a list of outcome--weight pairs, where weights are natural numbers encoding unnormalized probability mass.  For example, a fair coin flip producing \texttt{Won} or \texttt{Lost} is \texttt{(Won,\,1)\,∷\,(Lost,\,1)\,∷\,[]}---each outcome has weight~$1$ out of total weight~$2$.  This ``poor man's measure theory'' suffices for finite MDPs and supports exact arithmetic with no rounding.
 
-\begin{code}
+\begin{code}[hide]
   Dist : Set → Set
   Dist A = List (A × ℕ)
 
@@ -1191,7 +1141,7 @@ The key change: the step function returns a distribution over outcomes.
 
 \noindent\textbf{Example (CoinFlip):}
 
-\begin{code}
+\begin{code}[hide]
   data CoinState : Set where
     Ready Won Lost : CoinState
 
@@ -1210,11 +1160,9 @@ The key change: the step function returns a distribution over outcomes.
 
 \subsection{Lexicographic Coinductive Comparison}
 
-In deterministic MDPs, the value stream from a state is a single fixed sequence---pointwise comparison works perfectly.  In stochastic MDPs, however, the ``value'' at each depth is an \emph{expected} reward, computed by marginalizing over all possible trajectories.  The problem is that two actions can have identical expected rewards at depth~$0$ but different distributions.  Pointwise comparison $\le_s$ would demand dominance at \emph{every} depth, which is too strict: if action~$a$ already wins at depth~$0$, requiring it to also win at depth~$1, 2, \ldots$ rules out many valid rankings.
+In stochastic MDPs the ``value'' at each depth is an \emph{expected} reward.  Pointwise comparison $\le_s$ is too strict here: if action~$a$ already wins at depth~$0$, demanding it also win at every later depth rules out valid rankings.  The correct notion is \textbf{lexicographic coinductive comparison} ($\le_{lex}$): compare expected heads, and recurse to tails only when heads are equal.  This remains coinductive but lets earlier rewards break ties:
 
-The correct notion is \textbf{lexicographic coinductive comparison}: compare expected heads; if they differ, the comparison is decided.  Only recurse to tails when heads are equal:
-
-\begin{code}
+\begin{code}[hide]
   record _≤ₛ-lex_ {Reward : Set} (_≤ᵣ_ : Reward → Reward → Set) 
                   (x y : Stream Reward) : Set where
     coinductive
@@ -1223,47 +1171,20 @@ The correct notion is \textbf{lexicographic coinductive comparison}: compare exp
       tail≤ : head x ≡ head y → _≤ₛ-lex_ _≤ᵣ_ (tail x) (tail y)
 \end{code}
 
-\noindent This is still coinductive---the infinite tower structure is preserved---but captures the correct semantics: earlier rewards break ties, and only equal heads require recursive comparison.
+\subsection{Verification Pattern}
 
-\subsection{Why Lexicographic Works}
+All four verified stochastic examples (CoinFlip, GamblersRuin, RandomWalk, BiasedBandit) share one pattern: one action dominates in expected immediate reward, so \texttt{head$\le$} follows from the ranking hypothesis, while the tail obligation requires the two expected heads to be \emph{equal}---an absurdity (e.g. $0 \equiv 1$ for CoinFlip) discharged by the empty pattern \texttt{()}.  All four are thus fully verified with no postulates.
 
-Consider the CoinFlip example at state \texttt{Ready}:
-\begin{itemize}
-\item \texttt{Stay}: expected head $= 0$
-\item \texttt{Flip}: expected head $= 1$ (unnormalized)
-\end{itemize}
-
-\noindent For the ranking \texttt{Stay} $\le$ \texttt{Flip}:
-\begin{itemize}
-\item \texttt{head$\le$}: $0 \le 1$ \checkmark
-\item \texttt{tail$\le$}: requires $0 \equiv 1$, which is \textbf{impossible}
-\end{itemize}
-
-\noindent Since the condition $0 \equiv 1$ has no inhabitants, the tail proof is trivially satisfied via absurd pattern matching---no recursive argument needed.  This makes CoinFlip \textbf{fully verified with no postulates}.
-
-\subsection{The Proof Pattern}
-
-All four verified stochastic examples (CoinFlip, GamblersRuin, RandomWalk, BiasedBandit) follow the same pattern:
-
-\begin{enumerate}
-\item One action dominates in expected immediate reward
-\item Head preservation is trivial from the ranking hypothesis
-\item The tail obligation requires $\text{head}(a) \equiv \text{head}(b)$, which is absurd
-\item The empty pattern \texttt{()} completes the proof
-\end{enumerate}
-
-\begin{code}
+\begin{code}[hide]
   coinflip-tail-example : ∀ {A : Set} → 0 ≡ 1 → A
   coinflip-tail-example ()
 \end{code}
-
-\noindent This makes CoinFlip---and all four examples---\textbf{fully verified with no postulates}.
 
 \subsection{The Stochastic Coinductive Homomorphism}
 
 We can now assemble the stochastic analogue of the deterministic \texttt{CoindHomo} record from \S\ref{sec:agda-core}.  The structure is identical---a ranking paired with a preservation proof---but the codomain changes: instead of comparing deterministic reward streams with pointwise $\le_s$, we compare \emph{expected} reward streams with lexicographic $\le_{lex}$.
 
-\begin{code}
+\begin{code}[hide]
   record StochasticCoindHomo 
     (State Action : Set) (StreamR : Set)
     (expected-action-value : State → Action → Stream StreamR)
@@ -1297,24 +1218,7 @@ The FOSD and SD$[k]$ extensions (\S\ref{sec:fosd}--\ref{sec:sd-hierarchy}) are \
 In the deterministic case, $\le_s$ is unconditionally pointwise (head~$\le$ AND tail~$\le_s$, no equality guard), so the Stream Isomorphism (\S\ref{sec:stream-iso}) recovers per-depth dominance.  The stochastic split---$\le_{lex}$ guards tail recursion on head equality---is what creates the gap.
 \end{remark}
 
-\subsection{Relationship Between Orderings}
-
-\begin{itemize}
-\item \textbf{Pointwise} $\Rightarrow$ \textbf{Lexicographic}: If $x \le_s y$ at every timestep, then $x \le_{lex} y$.
-\item \textbf{Lexicographic} $\not\Rightarrow$ \textbf{Pointwise}: Lexicographic is more permissive.
-\item \textbf{Deterministic case}: Both coincide, since trajectories are fixed and the comparison is deterministic.
-\end{itemize}
-
-\noindent\textbf{Why lexicographic is correct for stochastic:} Expected values collapse distributions to scalars.  When $\mathbb{E}[\text{head}(a)] < \mathbb{E}[\text{head}(b)]$, action~$b$ is already established as better---demanding further tail proofs adds no information.  Lexicographic comparison captures exactly this semantics.
-
-\subsection{Subsumption of Classical RL}
-
-By linearity of expectation:
-\[
-\mathbb{E}\left[\sum_{t=0}^{N-1} r_t\right] = \sum_{t=0}^{N-1} \mathbb{E}[r_t]
-\]
-
-\noindent Comparing partial sums of expected rewards is equivalent to comparing expected partial sums---exactly what classical RL optimizes.  The stochastic subsumption proof is in \fpath{appendix/StochasticSubsumption.agda}.
+Pointwise dominance implies lexicographic (but not conversely), and the two coincide in the deterministic case.  Lexicographic comparison is the correct stochastic notion: when $\mathbb{E}[\text{head}(a)] < \mathbb{E}[\text{head}(b)]$, action~$b$ is already established as better and further tail proofs add no information.  Classical RL is subsumed by linearity of expectation, $\mathbb{E}[\sum_{t<N} r_t] = \sum_{t<N} \mathbb{E}[r_t]$: comparing partial sums of expected rewards is comparing expected partial sums (proof in \fpath{appendix/StochasticSubsumption.agda}).
 
 The stochastic framework so far compares actions by their expected reward streams.  But expected values are themselves a lossy summary---they collapse an entire distribution to a single number.  Can we do better?  The next two sections develop a hierarchy of distributional comparisons, from FOSD (the strongest) through progressively weaker SD$[k]$ orderings, each capturing a broader class of rational agents.
 
@@ -1328,60 +1232,11 @@ P(\text{reward}_n(s,a) \le r) \le P(\text{reward}_n(s,b) \le r)
 \]
 i.e., $a$'s cumulative distribution lies everywhere below~$b$'s.  FOSD implies expected-value dominance ($\mu \ge_\text{FOSD} \nu \Rightarrow \mathbb{E}[\mu] \ge \mathbb{E}[\nu]$) but not conversely.  An action FOSD-dominating another is preferred by \emph{all monotone utility functions}---risk-averse, risk-neutral, and risk-seeking agents agree.
 
-The complete FOSD pipeline is implemented and machine-verified across three modules (\texttt{Probability.FOSD}, \texttt{Core.FOSD}, \texttt{Synthesis.FOSDStochasticFiniteMDP}).
+The complete FOSD pipeline is machine-verified across \texttt{Probability.FOSD} (distribution level) and \texttt{Core.FOSD} (stream level).
 
-\subsection{Foundation: Probability.FOSD}
+At the distribution level, \texttt{cdf-weight} computes the CDF of a list-based distribution and the FOSD ordering is pointwise CDF dominance (reflexive, transitive).  The bridge \texttt{fosd→ev} shows FOSD implies expected-value dominance at equal total weight, and a decidable \texttt{fosd?} is proved sound and complete.  At the stream level, \textbf{PointwiseFOSD} requires FOSD dominance at every depth~$n$, and its coinductive reformulation \texttt{StreamFOSD} is proved equivalent by the \textbf{Stochastic Isomorphism}---the distributional analogue of the Stream Isomorphism (\S\ref{sec:stream-iso}).
 
-To verify FOSD in Agda, we need to compute and compare CDFs over our finite distributions.  Consider two distributions: $\mu = \{0{:}1, 1{:}2\}$ (outcome~$0$ with weight~$1$, outcome~$1$ with weight~$2$) and $\nu = \{0{:}2, 1{:}1\}$.  Distribution~$\mu$ FOSD-dominates~$\nu$ iff $\text{CDF}(\mu, r) \le \text{CDF}(\nu, r)$ for every threshold~$r$: at $r{=}0$, $\text{CDF}(\mu, 0) = 1 \le 2 = \text{CDF}(\nu, 0)$~\checkmark; at $r{=}1$, both CDFs equal $3$~\checkmark.  So $\mu \ge_\text{FOSD} \nu$: the ``$\mu$-agent'' is more likely to achieve higher rewards.
-
-The \texttt{Probability.FOSD} module mechanizes this reasoning:
-
-\paragraph{CDF and ordering.}
-Functions \texttt{cdf-weight} and \texttt{comp-weight} compute the CDF and complementary CDF for our list-based distributions, with the identity $\text{CDF}(d,r) + \text{comp}(d,r) = W$ verified.  The FOSD ordering (\texttt{\_FOSD$\le$\_}) is defined as pointwise CDF dominance, with reflexivity and transitivity proved.
-
-\paragraph{Bridges.}
-The theorem \texttt{fosd→ev} connects FOSD to expected values: if $\mu \ge_\text{FOSD} \nu$ and both have equal total weight, then $\mathbb{E}[\mu] \ge \mathbb{E}[\nu]$.  The CDF-over-concatenation lemmas (\texttt{cdf-weight-++}, \texttt{total-weight-++}) establish that CDF and total weight are additive---enabling compositional reasoning when distributions are combined.
-
-\paragraph{Decidability.}
-The Boolean function \texttt{fosd?} compares total weights and CDF values up to the joint maximum support.  Machine-verified \textbf{soundness} (\texttt{fosd?-sound}: $\texttt{fosd?}~\mu~\nu = \texttt{true} \Rightarrow \mu~\text{FOSD}_\le~\nu$) and \textbf{completeness} (\texttt{fosd?-complete}: the converse) establish it as a decision procedure.
-
-\subsection{Coinductive FOSD and the Bridges}
-
-A single FOSD comparison between two distributions answers: ``is one unambiguously better?''  But an RL agent faces a sequence of reward distributions, one per timestep.  \texttt{Core.FOSD} lifts FOSD from individual distributions to this infinite sequence.
-
-\textbf{PointwiseFOSD} requires FOSD dominance at every depth: $\forall n.\;\text{marginal}(s,b,n)~\text{FOSD}_\le~\text{marginal}(s,a,n)$.  In words: at timestep~$0$, action~$a$'s marginal reward distribution FOSD-dominates $b$'s; at timestep~$1$, again; and so on forever.
-
-\textbf{StreamFOSD} (\texttt{\_$\le_{s}$-fosd\_}) is the coinductive reformulation: a record that unfolds one depth at a time, just like the deterministic $\le_s$.  The \textbf{Stochastic Isomorphism} proves these two formulations are equivalent---extending the Stream Isomorphism (\S\ref{sec:stream-iso}) from scalar streams to distribution streams.  (The Agda identifiers \texttt{conjecture-forward} and \texttt{conjecture-reverse} retain their historical names; both directions are now machine-verified.)
-
-With these tools in hand, we define \texttt{FOSDCoindHomo}: a ranking that preserves \texttt{PointwiseFOSD} at every state.  This is strictly stronger than \texttt{StochasticCoindHomo}---it guarantees optimality not just for expected-value agents, but for all agents with monotone utility functions:
-
-\begin{spec}
-  record FOSDCoindHomo : Set₁ where
-    field
-      _≤ₐ_ : State → Action → Action → Set
-      preserves-fosd : ∀ a b s →
-        _≤ₐ_ s a b → PointwiseFOSD s b a
-\end{spec}
-
-\noindent Two bridge theorems connect the FOSD and expected-value worlds:
-\begin{itemize}
-\item \textbf{FOSD $\Rightarrow$ E[X] per-timestep} (\texttt{pointwise-ev}): applies \texttt{fosd→ev} at each depth.
-\item \textbf{FOSD-to-Lex Bridge} (\texttt{fosd→lex-stream}): lifts per-timestep EV dominance to lexicographic EV-stream dominance.
-\end{itemize}
-
-\begin{spec}
-  fosd→lex-stream : ∀ s a b →
-    PointwiseFOSD s a b →
-    marginal-ev-stream s b ≤ₛ-ev marginal-ev-stream s a
-
-  fosd-homo→ev-lex : (homo : FOSDCoindHomo) →
-    ∀ a b s → FOSDCoindHomo._≤ₐ_ homo s a b →
-      marginal-ev-stream s a ≤ₛ-ev marginal-ev-stream s b
-\end{spec}
-
-\noindent \texttt{fosd-homo→ev-lex} establishes the key implication: every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}.  Rankings verified via FOSD simultaneously guarantee expected-value optimality \emph{and} dominance for all monotone utilities.
-
-Full implementation: \fpath{src/CSHRL/Probability/FOSD.agda} and \fpath{src/CSHRL/Core/FOSD.agda}.
+We then define \texttt{FOSDCoindHomo}: a ranking preserving \texttt{PointwiseFOSD} at every state.  Two machine-verified bridges (\texttt{pointwise-ev}, \texttt{fosd→lex-stream}) establish the key implication \texttt{fosd-homo→ev-lex}: every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}, so FOSD verification simultaneously guarantees expected-value optimality \emph{and} dominance for all monotone utilities (full implementation in \fpath{src/CSHRL/Probability/FOSD.agda}, \fpath{src/CSHRL/Core/FOSD.agda}).
 
 \section{The Stochastic Dominance Hierarchy}\label{sec:sd-hierarchy}
 
@@ -1392,116 +1247,15 @@ The \textbf{Stochastic Dominance Hierarchy} generalizes FOSD to a parameterized 
 \text{SD}[0] = \text{FOSD} \;\Rightarrow\; \text{SD}[1] = \text{SOSD} \;\Rightarrow\; \text{SD}[2] = \text{TOSD} \;\Rightarrow\; \cdots
 \]
 
-\subsection{Foundation: Probability.SD}
+The hierarchy is built on a single operation: \textbf{prefix sum} (the discrete analogue of integration).  Define \texttt{sd-weight~0} as the CDF (\texttt{cdf-weight}) and \texttt{sd-weight~(suc~k)} as the prefix sum of \texttt{sd-weight~k}; the level-$k$ ordering is $\mu \mathrel{\texttt{SD[}k\texttt{]}\le} \nu \;=\; \forall r.\;\texttt{sd-weight}~k~\nu~r \le \texttt{sd-weight}~k~\mu~r$.  Three facts are machine-verified at the distribution level (\texttt{Probability.SD}):
 
-The idea behind the hierarchy is elegant: instead of comparing CDFs directly (which may cross), compare their \emph{integrals}.  Integrating a CDF smooths out local crossings; integrating again smooths further.  At each level, more distribution pairs become comparable---at the cost of a narrower class of agents who would unanimously prefer one over the other.
+\begin{itemize}
+\item \textbf{One-line subsumption} (\texttt{SD-subsumes}): $\mu \mathrel{\texttt{SD[}k\texttt{]}\le} \nu \Rightarrow \mu \mathrel{\texttt{SD[}k{+}1\texttt{]}\le} \nu$, a direct application of prefix-sum monotonicity---giving the full chain FOSD $\Rightarrow$ SOSD $\Rightarrow$ TOSD $\Rightarrow \cdots$ in one step.
+\item \textbf{SD-to-EV bridge} (\texttt{sd→ev}): since \texttt{sd-weight~$k$~$d$~0~$\equiv$~cdf-weight~$d$~0}, SD$[k]$ implies expected-value dominance at equal total weight, for every~$k$.
+\item \textbf{Strict separation:} SOSD is strictly weaker than FOSD (e.g. $\mu=\{0{:}2,2{:}1\}$, $\nu=\{1{:}3\}$: FOSD fails at $r{=}1$, but the integrated CDFs are ordered---confirmed by \texttt{refl}).
+\end{itemize}
 
-The hierarchy is built on a single operation---\textbf{prefix sum} (the discrete analogue of integration):
-
-\begin{spec}
-  prefix-sum : (ℕ → ℕ) → ℕ → ℕ
-  prefix-sum f zero    = f 0
-  prefix-sum f (suc r) = f (suc r) + prefix-sum f r
-
-  sd-weight : ℕ → Dist ℕ → ℕ → ℕ
-  sd-weight zero    d = cdf-weight d
-  sd-weight (suc k) d = prefix-sum (sd-weight k d)
-\end{spec}
-
-\noindent \texttt{sd-weight~0} is the CDF itself (FOSD level); \texttt{sd-weight~1} is the integrated CDF (SOSD level); \texttt{sd-weight~$k$} is the $k$-fold prefix sum.  The ordering at each level is:
-
-\begin{spec}
-  _SD[_]≤_ : Dist ℕ → ℕ → Dist ℕ → Set
-  μ SD[ k ]≤ ν = ∀ r → sd-weight k ν r ≤ sd-weight k μ r
-\end{spec}
-
-\paragraph{The one-line subsumption.}
-The key property of the hierarchy is that subsumption is a single application of prefix-sum monotonicity:
-
-\begin{spec}
-  prefix-sum-mono : ∀ {f g} →
-    (∀ r → f r ≤ g r) →
-    ∀ r → prefix-sum f r ≤ prefix-sum g r
-
-  SD-subsumes : ∀ k {μ ν} →
-    μ SD[ k ]≤ ν → μ SD[ suc k ]≤ ν
-  SD-subsumes k sd = prefix-sum-mono sd
-\end{spec}
-
-\noindent If the $k$-th order integrated CDFs are pointwise ordered, their prefix sums (the $(k{+}1)$-th order) are too.  This gives the full chain FOSD $\Rightarrow$ SOSD $\Rightarrow$ TOSD $\Rightarrow \cdots$ in one line.
-
-\paragraph{The SD-to-EV bridge.}
-A key lemma shows that \texttt{sd-weight~$k$~$d$~0 $\equiv$ cdf-weight~$d$~0} for all~$k$---prefix-sum at $r{=}0$ is just the function value.  This means SD$[k]$ at $r{=}0$ gives CDF dominance at $r{=}0$, which yields expected-value dominance via the existing FOSD$\to$EV bridge:
-
-\begin{spec}
-  sd-at-0 : ∀ k d → sd-weight k d 0 ≡ cdf-weight d 0
-
-  sd→ev : ∀ k μ ν →
-    AllBelow μ 1 → AllBelow ν 1 →
-    total-weight μ ≡ total-weight ν →
-    μ SD[ k ]≤ ν →
-    weighted-sum μ ≤ weighted-sum ν
-\end{spec}
-
-\paragraph{Strict separation.}
-SOSD is \emph{strictly} weaker than FOSD.  Consider $\mu = \{0{:}2, 2{:}1\}$ and $\nu = \{1{:}3\}$.  At $r{=}1$: $\text{CDF}(\nu, 1) = 3 > 2 = \text{CDF}(\mu, 1)$, so FOSD fails.  But the integrated CDFs satisfy $\text{icdf}(\nu, r) \le \text{icdf}(\mu, r)$ at every~$r$---confirmed computationally by \texttt{refl}.
-
-\subsection{Coinductive Lift: Core.SD}
-
-Just as FOSD was lifted from single distributions to infinite streams (\S\ref{sec:fosd}), the entire SD hierarchy lifts to reward streams.  The pattern is the same: require the distributional ordering at every timestep, then package this into a coinductive homomorphism record parameterized by the SD level~$k$.
-
-\texttt{Core.SD} provides:
-
-\begin{spec}
-  PointwiseSD : ℕ → State → Action → Action → Set
-  PointwiseSD k s a b =
-    ∀ n → marginal-reward s b n SD[ k ]≤ marginal-reward s a n
-
-  record SDCoindHomo (k : ℕ) : Set₁ where
-    field
-      _≤ₐ_ : State → Action → Action → Set
-      preserves-sd : ∀ a b s →
-        _≤ₐ_ s a b → PointwiseSD k s b a
-\end{spec}
-
-\noindent \texttt{SDCoindHomo~0} is \texttt{FOSDCoindHomo}; \texttt{SDCoindHomo~1} is a ranking optimal for all risk-averse agents; \texttt{SDCoindHomo~$k$} captures the $(k{+}1)$-th order utility class.
-
-\paragraph{Hierarchy subsumption on homos.}
-If a ranking preserves SD$[k]$ (the strongest condition), it automatically preserves SD$[k{+}1]$ (the weaker condition):
-
-\begin{spec}
-  sd-homo-subsumes : ∀ k → SDCoindHomo k → SDCoindHomo (suc k)
-\end{spec}
-
-\noindent A single FOSD verification ($k{=}0$) simultaneously establishes optimality for \emph{all} levels of the hierarchy.
-
-\paragraph{The SD Isomorphism.}
-The coinductive/pointwise equivalence established for FOSD (\S\ref{sec:fosd}) generalizes to the full hierarchy.  We define a coinductive \texttt{StreamSD~$k$}---a record with \texttt{head-sd} (SD$[k]$ at the current depth) and \texttt{tail-sd} (coinductively for subsequent depths)---and prove the isomorphism:
-
-\begin{spec}
-  sd-iso-forward : ∀ k s a b →
-    StreamSD k (marginal-stream s a) (marginal-stream s b)
-    → PointwiseSD k s a b
-
-  sd-iso-reverse : ∀ k s a b →
-    PointwiseSD k s a b
-    → StreamSD k (marginal-stream s a) (marginal-stream s b)
-
-  sd-isomorphism : ∀ k → SD-Isomorphism k
-\end{spec}
-
-\noindent The proof is purely structural---the same head/tail decomposition that works for FOSD ($k{=}0$) works uniformly for all $k$, since the argument never inspects the relation on distributions.  This unifies the distributional and coinductive views at every level of the hierarchy: the Stochastic Isomorphism from \S\ref{sec:fosd} is the special case $k{=}0$.  Full implementation in \fpath{src/CSHRL/Core/SD.agda}.
-
-\paragraph{The master bridge.}
-The central theorem: any \texttt{SDCoindHomo~$k$} (at any level) yields lexicographic EV-stream dominance:
-
-\begin{spec}
-  sd-homo→ev-lex : (homo : SDCoindHomo k) →
-    ∀ a b s → SDCoindHomo._≤ₐ_ homo s a b →
-      marginal-ev-stream s a ≤ₛ-ev marginal-ev-stream s b
-\end{spec}
-
-\noindent The proof uses \texttt{sd$\to$ev} at each timestep, then lifts to the stream level via \texttt{pw$\to$lex}.  This closes the hierarchy: rankings verified at \emph{any} SD level yield expected-value optimality, while higher levels provide progressively weaker (easier to satisfy) requirements for broader classes of utility functions.
+\noindent At the stream level (\texttt{Core.SD}), \textbf{PointwiseSD~$k$} requires SD$[k]$ dominance at every depth, and \texttt{SDCoindHomo~$k$} is a ranking preserving it.  Then \texttt{SDCoindHomo~0} is \texttt{FOSDCoindHomo}, and \texttt{sd-homo-subsumes} shows a level-$k$ ranking is automatically a level-$(k{+}1)$ ranking---so a single FOSD verification establishes optimality at \emph{all} levels.  The \textbf{SD Isomorphism} (\texttt{sd-isomorphism}) lifts the FOSD coinductive/pointwise equivalence uniformly to every~$k$: the proof never inspects the relation on distributions, so the same head/tail decomposition works at all levels, with the Stochastic Isomorphism of \S\ref{sec:fosd} as the case $k{=}0$.  Finally, the master bridge \texttt{sd-homo→ev-lex} shows any \texttt{SDCoindHomo~$k$} yields lexicographic EV-stream dominance: rankings verified at any SD level yield expected-value optimality, while higher levels relax the requirement for broader utility classes.
 
 \begin{remark}[Utility Function Classes]
 The SD hierarchy parameterizes the tradeoff between verification strength and agent generality:
@@ -1520,47 +1274,7 @@ When FOSD cannot be established between two distributions (CDF crossing), SOSD m
 
 As environments grow in complexity, monolithic verification becomes impractical.  Consider a warehouse robot that must navigate (an MDP with 20~states) \emph{and} pick items (an MDP with 50~configurations).  Verifying the product MDP ($20 \times 50 = 1000$ states, $O(|A|^2)$ pairs per state) is far more expensive than verifying each component independently.  The Compositional Ranking Algebra proves that verified rankings \emph{compose}---enabling a ``divide and conquer'' strategy: verify navigation and picking separately, then combine.
 
-The mathematical foundation is that \texttt{prefix-sum} is a \emph{linear operator}: it distributes over addition and scalar multiplication.  Since the distributional ordering SD$[k]$ is built from iterated prefix sums, this linearity yields closure properties:
-
-\begin{spec}
-  SD-++ : ∀ k {μ₁ ν₁ μ₂ ν₂ : Dist ℕ} →
-    μ₁ SD[ k ]≤ ν₁ → μ₂ SD[ k ]≤ ν₂ →
-    (μ₁ ++ μ₂) SD[ k ]≤ (ν₁ ++ ν₂)
-
-  SD-scale : ∀ k c {μ ν : Dist ℕ} →
-    μ SD[ k ]≤ ν → scale c μ SD[ k ]≤ scale c ν
-\end{spec}
-
-\noindent Both proofs are one-liners after rewriting.  Distribution concatenation preserves SD$[k]$ because addition is monotone; scaling preserves it because multiplication by a non-negative constant is monotone.
-
-\subsection{Verified Rankings and Composition}
-
-The algebra centers on a single data structure: a \texttt{VerifiedRanking} bundles a ranking with a machine-checked proof that it preserves SD$[k]$ at every state and timestep.  Once two components each carry a \texttt{VerifiedRanking}, the algebra provides operations to produce a \texttt{VerifiedRanking} for their combination---with no additional proof burden on the user.
-
-\begin{spec}
-  record VerifiedRanking
-    (State Action : Set)
-    (marginal : State → Action → ℕ → Dist ℕ)
-    (k : ℕ) : Set₁ where
-    field
-      _≤ₐ_     : State → Action → Action → Set
-      preserves : ∀ a b s → _≤ₐ_ s a b →
-                  ∀ n → marginal s a n SD[ k ]≤ marginal s b n
-\end{spec}
-
-\noindent The algebra provides five operations, all machine-verified.  To illustrate: suppose we have verified that ``navigate left'' dominates ``navigate right'' in a navigation sub-MDP ($\texttt{vr}_1$), and that ``pick item A'' dominates ``pick item B'' in a picking sub-MDP ($\texttt{vr}_2$).  \texttt{++-product} produces a verified ranking for the product MDP (navigate \emph{and} pick), where ``left + A'' dominates ``right + B''.  The proof obligation is zero---the algebra handles it internally.
-
-\begin{itemize}
-\item \textbf{Hierarchy subsumption:} Any ranking verified at level~$k$ is automatically verified at the weaker level~$k{+}1$.
-\item \textbf{Product composition} (\texttt{++-product}): Two independently-verified components yield a verified product via distribution concatenation.
-\item \textbf{Convolution product} (\texttt{conv-product}): For product MDPs with additive rewards, the independent sum of FOSD-dominated distributions is FOSD-dominated---proved via discrete Abel summation.
-\item \textbf{Sum composition:} Disjoint environments compose with dispatched rankings.
-\item \textbf{Scaling:} Reward amplification preserves verification.
-\end{itemize}
-
-\noindent These operations compose freely: for instance, \texttt{scaled-product~c~vr₁~vr₂ = scale-ranking~c~(++-product~vr₁~vr₂)} scales a product ranking in one expression.  This algebraic structure enables modular, ``divide and conquer'' verification of complex multi-component MDPs.
-
-Full implementation: \fpath{src/CSHRL/Probability/Compose.agda} and \fpath{src/CSHRL/Core/Compose.agda}.
+The foundation is that \texttt{prefix-sum} is a \emph{linear operator}, so the SD$[k]$ ordering (built from iterated prefix sums) is closed under distribution concatenation (\texttt{SD-++}) and non-negative scaling (\texttt{SD-scale})---both one-line proofs by monotonicity.  A \texttt{VerifiedRanking} bundles a ranking with a machine-checked proof that it preserves SD$[k]$ at every state and timestep, and the algebra provides five verified operations that combine \texttt{VerifiedRanking}s with \emph{zero} additional proof burden: hierarchy subsumption ($k \to k{+}1$), product composition (\texttt{++-product}), convolution product (\texttt{conv-product}, for additive-reward products, via discrete Abel summation), sum composition (disjoint environments), and scaling.  They compose freely---e.g. \texttt{scaled-product~c~vr₁~vr₂}---enabling divide-and-conquer verification of multi-component MDPs (full implementation in \fpath{src/CSHRL/Probability/Compose.agda}, \fpath{src/CSHRL/Core/Compose.agda}).
 
 \section{Verified State Abstraction}\label{sec:abstraction}
 
@@ -1586,18 +1300,7 @@ The central result is \texttt{abstract-lift}:
 
 \noindent This is the standard model-irrelevance condition from the state abstraction literature \cite{Li2006}, but formalized constructively in Agda with a machine-checked proof.  The verification cost is $O(|\text{Abstract}|)$ regardless of the concrete space's cardinality.
 
-\subsection{Composition}
-
-Three composition operators extend the framework:
-\begin{itemize}
-\item \texttt{product-abstraction}: component-wise abstraction of product environments.
-\item \texttt{compose-abstraction}: two-level abstractions chain ($C \xrightarrow{\alpha_1} M \xrightarrow{\alpha_2} A$).
-\item \texttt{abstract-conv-product}: the full pipeline---abstract each component, verify FOSD on abstract systems, compose via convolution, and lift to the concrete product.
-\end{itemize}
-
-\noindent Validated on infinite-state environments: Regional Policy ($\mathbb{N}$ states, \texttt{Bool} abstraction), Three-Zone ($\mathbb{N}$ states, 3-class abstraction), and CartPole ($\mathbb{N}^4$ discretized states, angle-based abstraction)---all postulate-free.
-
-Full implementation: \fpath{src/CSHRL/Core/Abstraction.agda}.
+Three composition operators extend the framework: \texttt{product-abstraction} (component-wise), \texttt{compose-abstraction} (chaining two-level abstractions $C \xrightarrow{\alpha_1} M \xrightarrow{\alpha_2} A$), and \texttt{abstract-conv-product} (the full pipeline: abstract each component, verify FOSD abstractly, compose via convolution, lift to the concrete product).  Validated postulate-free on infinite-state environments---Regional Policy ($\mathbb{N}$ states), Three-Zone ($\mathbb{N}$ states), and CartPole ($\mathbb{N}^4$ discretized, angle-based abstraction).  Full implementation: \fpath{src/CSHRL/Core/Abstraction.agda}.
 
 \section{Learning as Symmetry Restoration}\label{sec:learning}
 
@@ -1652,7 +1355,7 @@ module LearningBase
   ExplicitRanking = State → List Action
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   record Violation : Set where
     constructor violation
     field
@@ -1683,7 +1386,7 @@ module LearningBase
   ... | no  _ = x ∷ remove-action a xs
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   swap-in-list : Action → Action → List Action → List Action
   swap-in-list _ _ [] = []
   swap-in-list better worse (x ∷ xs) with x ≟ₐ worse
@@ -1708,7 +1411,7 @@ Let $v$ be a violation with actions $(better, worse)$. After swapping:
 
 \noindent In Agda, part~(1) is \texttt{SwapFixesPair}: after swapping, the oracle confirms the pair is correctly ordered.  Part~(2) is \texttt{SwapPreservesUnrelated}: for any pair $(a, b)$ where neither $a$ nor $b$ is involved in the swap, their relative order is unchanged.  Together, these guarantee that each swap reduces the violation count by exactly one without introducing new violations.
 
-\begin{code}
+\begin{code}[hide]
   SwapFixesPair : Set
   SwapFixesPair = ∀ (better worse : Action) (xs : List Action) →
     (better ≡ worse → ⊥) →
@@ -1772,7 +1475,7 @@ Let $v$ be a violation with actions $(better, worse)$. After swapping:
 
 \noindent The \texttt{ConvergenceTheorem} packages the full guarantee: given a valid violation finder and a ground-truth oracle, iterated swapping from any initial ranking reaches zero violations in at most \texttt{max-violations} steps.  Reading the type: the hypotheses require (i)~\texttt{StrictDecrease}---each swap reduces the count; (ii)~\texttt{FindViolValid}---the finder only reports genuine violations; (iii)~oracle soundness---reported better actions truly dominate; and (iv)~completeness---when no violation is found, the count is zero.
 
-\begin{code}
+\begin{code}[hide]
   ConvergenceTheorem : DominanceOracle → List State → Set
   ConvergenceTheorem oracle all-states = 
     StrictDecrease oracle all-states →
@@ -1826,7 +1529,7 @@ If ranking $R$ satisfies the homomorphism property for actions $\mathcal{A}$, an
 
 \noindent The preservation property is pairwise: the fact that $a \le_a b$ implies stream dominance does not depend on which other actions exist.  Removing unavailable actions leaves the relative order of remaining actions unchanged.
 
-\begin{code}
+\begin{code}[hide]
   Available : Set
   Available = Action → Bool
 
@@ -1841,7 +1544,7 @@ If ranking $R$ satisfies the homomorphism property for actions $\mathcal{A}$, an
 
 \noindent Beyond filtering, actions can be \textbf{demoted} rather than removed---pushed to the end of the ranking so they are used only as a last resort:
 
-\begin{code}
+\begin{code}[hide]
   filter-bool : (Action → Bool) → List Action → List Action
   filter-bool _ [] = []
   filter-bool p (x ∷ xs) =
@@ -1865,7 +1568,7 @@ If ranking $R$ satisfies the homomorphism property for actions $\mathcal{A}$, an
       kept = filter-bool is-eq xs
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   make-action-unavailable : Action → ExplicitRanking → ExplicitRanking
   make-action-unavailable forbidden ranking s = demote-to-end forbidden (ranking s)
 \end{code}
@@ -1893,7 +1596,7 @@ The examples in this section validate that the formal machinery instantiates cor
 
 \subsection{TwoState: Minimal Working Example}
 
-\begin{code}
+\begin{code}[hide]
 module TwoStateExample where
   open import Data.Nat using (_≤_; z≤n; s≤s)
   open import Data.Nat.Properties using (≤-refl)
@@ -1919,117 +1622,28 @@ module TwoStateExample where
 
 \noindent At \texttt{Start}, \texttt{Go}'s future is $(1, 1, 1, \ldots)$ and \texttt{Stay}'s is $(0, 0, 0, \ldots)$; the ranking \texttt{[Go, Stay]} satisfies both CoinductiveHomomorphism and CoindHomo (the conditions coincide here since the immediate rewards are aligned).  Full preservation proof in \fpath{src/CSHRL/Tasks/Verified/TwoState.agda}, with no postulates.
 
-\subsection{Delayed Gratification: Depth-Discovery}
+\noindent Beyond TwoState, a range of tasks instantiate the framework, each isolating a distinct phenomenon (Table~\ref{tab:instantiations}).  \textbf{Delayed Gratification} requires depth~$2$ to separate two paths with equal immediate reward ($\texttt{GoA}\to[0,0]$ vs.\ $\texttt{GoB}\to[0,1]$), illustrating depth-discovery, while \textbf{Trap Sparse} resolves at depth~$1$.  \textbf{Key-Door-Treasure} exhibits a \emph{state-dependent} ranking flip: before the key is held \texttt{GoRight} yields the blocked stream $[0,0,0,\ldots]$, but once held it yields $[0,0,100,100,\ldots]$, inverting the ranking---a phase transition encoded directly in the traces rather than via gradual value propagation.
 
-\begin{code}[hide]
-module DelayedGratificationExample where
-  open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
-  open import Data.List using (List; _∷_; [])
-  open import Data.Product using (_×_; _,_)
-  open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-\end{code}
-\begin{code}
-  data DGState : Set where
-    Start : DGState
-    PathA : DGState
-    PathB : DGState
-    End   : DGState
-
-  data DGAction : Set where
-    GoA  : DGAction
-    GoB  : DGAction
-    Wait : DGAction
-
-  dg-step : DGState → DGAction → DGState × ℕ
-  dg-step Start GoA = (PathA , 0)
-  dg-step Start GoB = (PathB , 0)
-  dg-step PathA _   = (PathA , 0)
-  dg-step PathB _   = (End , 1)
-  dg-step End   _   = (End , 1)
-  dg-step _     _   = (End , 0)
-
-  all-actions : List DGAction
-  all-actions = GoA ∷ GoB ∷ []
-
-  open Core DGState DGAction ℕ dg-step _≤_ _⊔_ 0 all-actions
-\end{code}
-
-\noindent At depth~1 both actions yield trace~$[0]$---indistinguishable.  At depth~2 the traces diverge: \texttt{GoA}~$\to [0,0]$, \texttt{GoB}~$\to [0,1]$.  The conditions again coincide (equal immediate rewards).  Full implementation in \fpath{src/CSHRL/Tasks/Classic/DelayedGratification.agda}.
-
-A complementary example is \textbf{Trap Sparse}: three actions at Start, one of which leads to a terminal reward via a trap state.  Unlike Delayed Gratification, the discriminating action has a \emph{different} immediate reward, so depth~1 suffices.  Full implementation in \fpath{src/CSHRL/Tasks/Classic/TrapSparse.agda}.
-
-\begin{figure}[H]
+\begin{table}[ht]
 \centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=9cm,height=4.5cm,
-    xlabel={Depth},
-    ylabel={Violations (at Start state)},
-    ymin=0,ymax=2,
-    xmin=0,xmax=5,
-    xtick={0,1,2,3,4,5},
-    ytick={0,1,2},
-    grid=major,
-    grid style={nord4,thin},
-    axis line style={nord3},
-    tick style={nord3},
-    legend pos=north east,
-    legend style={font=\footnotesize,draw=nord4}
-]
-\addplot[thick,mark=*,nord10] coordinates {(0,1) (1,1) (2,0) (3,0) (4,0) (5,0)};
-\addlegendentry{Delayed Gratification (2 actions)}
-\addplot[thick,mark=square,nord7] coordinates {(0,1) (1,0) (2,0) (3,0) (4,0) (5,0)};
-\addlegendentry{Trap Sparse (3 actions)}
-\end{axis}
-\end{tikzpicture}
-\caption{Violations at Start state drop to zero as depth increases.  Delayed Gratification requires depth~2 to distinguish equal-immediate-reward paths; Trap Sparse resolves at depth~1.  Both are verified in \protect\fpath{src/CSHRL/Tasks/Classic/}.}
-\label{fig:violations}
-\end{figure}
-
-\subsection{Key-Door-Treasure: State-Dependent Rankings}
-
-A robot must collect a key, unlock a door, then reach treasure.
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[node distance=1.4cm]
-  \node[draw,circle,fill=nord13!40,font=\small] (key) {Key};
-  \node[draw,circle,right=of key,fill=nord4,font=\small] (start) {Start};
-  \node[draw,circle,right=of start,fill=nord4,font=\small] (hall) {Hall};
-  \node[draw,circle,right=of hall,fill=nord11!25,font=\small] (door) {Door};
-  \node[draw,circle,right=of door,fill=nord14!35,font=\small] (Goal) {Goal};
-  \draw[->] (key) -- (start);
-  \draw[->] (start) -- (hall);
-  \draw[->] (hall) -- (door) node[midway,above,font=\scriptsize] {Need key};
-  \draw[->] (door) -- (Goal);
-  \draw[->,dashed,bend left=35] (start) to node[above,font=\scriptsize] {PickUp} (key);
-  \draw[->,bend right=35] (start) to node[below,font=\scriptsize] {GoRight} (hall);
-\end{tikzpicture}
-\caption{Key--Door--Treasure: the optimal action depends on whether the key is held.}
-\label{fig:key-door}
-\end{figure}
-
-\noindent This demonstrates \emph{state-dependent} rankings and the ``ranking flip'' phenomenon:
-
-\begin{center}
 \small
-\begin{tabular}{l|l|l}
-\textbf{State} & \textbf{Without Key} & \textbf{With Key} \\
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|l|l|X|}
 \hline
-Start & [PickUp, GoRight, GoLeft] & [GoRight, GoLeft, PickUp] \\
-Hall  & [GoLeft, GoRight, Wait] & [GoRight, Wait, GoLeft] \\
-\end{tabular}
-\end{center}
-
-The moment the key is acquired, the ranking inverts---a phase transition encoded directly in the traces rather than via gradual value propagation:
-\begin{itemize}
-\item Without key: \texttt{GoRight} $\to$ $[0, 0, 0, \ldots]$ (blocked)
-\item With key: \texttt{GoRight} $\to$ $[0, 0, 100, 100, \ldots]$ (treasure)
-\end{itemize}
-
-\begin{sloppypar}
-\noindent This validates that state-dependent rankings instantiate correctly under the \texttt{FiniteDeterministicMDP} environment class.  The conditions coincide for this environment (uniform step costs).  Full implementation in \fpath{src/CSHRL/Tasks/Classic/KeyDoor.agda}.
-\end{sloppypar}
+\textbf{Task} & \textbf{Environment class} & \textbf{Phenomenon demonstrated} \\
+\hline
+TwoState & FiniteDeterministicMDP & minimal aligned case; postulate-free \\
+Delayed Gratification & FiniteDeterministicMDP & depth-discovery (depth~2 needed) \\
+Trap Sparse & FiniteDeterministicMDP & discrimination at depth~1 \\
+Key-Door-Treasure & FiniteDeterministicMDP & state-dependent ranking flip \\
+8-Queens & CombinatorialPlacementMDP & scalable verification ($8^8$); postulate-free \\
+BinarySacrifice, SkillInvestment, PreparationDilemma & FiniteDeterministicMDP & separate the two conditions (\S\ref{sec:strict-generality}) \\
+CoinFlip, GamblersRuin, RandomWalk, BiasedBandit & StochasticFiniteMDP & lexicographic stochastic verification; postulate-free \\
+\hline
+\end{tabularx}
+\caption{Verified instantiations across the three environment classes.  All are machine-checked; classic tasks use the general FiniteDeterministicMDP, while structurally specialised classes discharge the bridge automatically.}
+\label{tab:instantiations}
+\end{table}
 
 \subsection{8-Queens: Scalable Verification}
 
@@ -2064,7 +1678,7 @@ The \texttt{Queens8Learning} module validates the full pipeline end-to-end: lear
   open Queens8LearningResult
 \end{code}
 
-\begin{code}
+\begin{code}[hide]
   test-solution : run-policy policy horizon (Ongoing []) horizon
                 ≡ C0 ∷ C4 ∷ C7 ∷ C5 ∷ C2 ∷ C6 ∷ C1 ∷ C3 ∷ []
   test-solution = refl
@@ -2196,108 +1810,74 @@ The framework is supported by machine-verified results in Agda:
 \item \textbf{Scalable verification:} The Environment Class architecture provides automatic trace-to-stream bridges; 8-Queens achieves a full CoindHomo for $8^8$ candidate placements with zero postulates.
 \end{enumerate}
 
-\noindent This document is itself the proof: compiling it type-checks all embedded code while producing this PDF.
+\noindent All Agda code shown in this paper is machine-checked: the literate source type-checks under Agda while producing this document.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Reproducibility and Build}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{itemize}
-\item \textbf{Tested toolchain:} Agda 2.7.x, Agda StdLib 2.0, Lua\LaTeX.
-\item \textbf{Build commands:} In \texttt{literate/}, run \texttt{make successor} (or \texttt{agda --latex CSHRL-Successor.lagda.tex} followed by \texttt{lualatex}).
+\item \textbf{Tested toolchain:} Agda 2.8.0, Agda Standard Library 2.0, Lua\LaTeX.
+\item \textbf{Build:} Compiling the literate source with \texttt{agda --latex} type-checks every embedded definition and emits the \LaTeX{} rendered here; \texttt{lualatex} then produces the PDF. The full verified development accompanies this submission as supplementary material.
 \item \textbf{Fonts:} The document uses \texttt{fontspec} and Unicode math fonts (DejaVu, STIX Two Math).
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{thebibliography}{20}
-
-\bibitem{Sutton2018}
-Sutton, R.~S. and Barto, A.~G. (2018).
-\textit{Reinforcement Learning: An Introduction}, 2nd~ed. MIT Press.
-
-\bibitem{Williams1992}
-Williams, R.~J. (1992).
-Simple statistical gradient-following algorithms for connectionist reinforcement learning.
-\textit{Machine Learning}, 8(3--4):229--256.
-
-\bibitem{Haarnoja2018}
-Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. (2018).
-Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor.
-In \textit{Proceedings of ICML}, pp.~1861--1870.
-
-\bibitem{Hutter2005}
-Hutter, M. (2005).
-\textit{Universal Artificial Intelligence: Sequential Decisions Based on Algorithmic Probability}. Springer.
-
-\bibitem{Rutten2000}
-Rutten, J.~J.~M.~M. (2000).
-Universal coalgebra: A theory of systems.
-\textit{Theoretical Computer Science}, 249(1):3--80.
-
-\bibitem{vanderPol2020}
-van der Pol, E., Worrall, D., van Hoof, H., Oliehoek, F., and Welling, M. (2020).
-MDP homomorphic networks: Group symmetries in reinforcement learning.
-In \textit{NeurIPS}.
-
-\bibitem{Giry1982}
-Giry, M. (1982).
-A categorical approach to probability theory.
-In \textit{Categorical Aspects of Topology and Analysis}, LNCS vol.~915, pp.~68--85. Springer.
-
-\bibitem{Skalse2022}
-Skalse, J., Hammond, L., Griffin, C., and Abate, A. (2022).
-Lexicographic multi-objective reinforcement learning.
-In \textit{IJCAI}, pp.~3430--3436.
-
-\bibitem{Tercan2024}
-Tercan, H. and Prabhu, S. (2024).
-Thresholded lexicographic ordered multiobjective reinforcement learning.
-In \textit{ECAI}.
-
-\bibitem{Wirth2017}
-Wirth, C., Akrour, R., Neumann, G., and F{\"u}rnkranz, J. (2017).
-A survey of preference-based reinforcement learning methods.
-\textit{JMLR}, 18(136):1--46.
-
-\bibitem{Rafailov2023}
-Rafailov, R., Sharma, A., Mitchell, E., Ermon, S., Manning, C.~D., and Finn, C. (2023).
-Direct preference optimization: Your language model is secretly a reward model.
-In \textit{NeurIPS}.
-
-\bibitem{Vajjha2021}
-Vajjha, K., Shinnar, A., Trager, B., Pestun, V., and Fulton, N. (2021).
-CertRL: Formalizing convergence proofs for value and policy iteration in Coq.
-In \textit{CPP '21: Certified Programs and Proofs}, pp.~18--31. ACM.
-
-\bibitem{Li2006}
-Li, L., Walsh, T.~J., and Littman, M.~L. (2006).
-Towards a unified theory of state abstraction for MDPs.
-In \textit{ISAIM}.
-
-\bibitem{Garcia2015}
-Garc{\'\i}a, J. and Fern{\'a}ndez, F. (2015).
-A comprehensive survey on safe reinforcement learning.
-\textit{JMLR}, 16(42):1437--1480.
-
-\bibitem{Zap2019}
-Zap, A., Chaudhuri, S., and Topcu, U. (2019).
-Deep ordinal reinforcement learning.
-In \textit{AAMAS}, pp.~1838--1846.
+\begin{thebibliography}{18}
 
 \bibitem{Bellman1957}
-Bellman, R. (1957).
-\textit{Dynamic Programming}.
-Princeton University Press.
+Bellman, R.: Dynamic Programming. Princeton University Press (1957)
 
-\bibitem{Watkins1992}
-Watkins, C.~J.~C.~H. and Dayan, P. (1992).
-Q-learning.
-\textit{Machine Learning}, 8(3--4):279--292.
+\bibitem{Garcia2015}
+Garc{\'\i}a, J., Fern{\'a}ndez, F.: A comprehensive survey on safe reinforcement learning. J. Mach. Learn. Res. 16(42), 1437--1480 (2015)
+
+\bibitem{Giry1982}
+Giry, M.: A categorical approach to probability theory. In: Categorical Aspects of Topology and Analysis. LNM, vol. 915, pp. 68--85. Springer (1982)
+
+\bibitem{Haarnoja2018}
+Haarnoja, T., Zhou, A., Abbeel, P., Levine, S.: Soft actor-critic: off-policy maximum entropy deep reinforcement learning with a stochastic actor. In: Proc. ICML, pp. 1861--1870 (2018)
+
+\bibitem{Hutter2005}
+Hutter, M.: Universal Artificial Intelligence: Sequential Decisions Based on Algorithmic Probability. Springer (2005)
+
+\bibitem{Li2006}
+Li, L., Walsh, T.J., Littman, M.L.: Towards a unified theory of state abstraction for MDPs. In: Proc. ISAIM (2006)
 
 \bibitem{Mnih2015}
-Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.~A., Veness, J., Bellemare, M.~G., et~al. (2015).
-Human-level control through deep reinforcement learning.
-\textit{Nature}, 518(7540):529--533.
+Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.A., Veness, J., Bellemare, M.G., et~al.: Human-level control through deep reinforcement learning. Nature 518(7540), 529--533 (2015)
+
+\bibitem{Rafailov2023}
+Rafailov, R., Sharma, A., Mitchell, E., Ermon, S., Manning, C.D., Finn, C.: Direct preference optimization: your language model is secretly a reward model. In: Proc. NeurIPS (2023)
+
+\bibitem{Rutten2000}
+Rutten, J.J.M.M.: Universal coalgebra: a theory of systems. Theor. Comput. Sci. 249(1), 3--80 (2000)
+
+\bibitem{Skalse2022}
+Skalse, J., Hammond, L., Griffin, C., Abate, A.: Lexicographic multi-objective reinforcement learning. In: Proc. IJCAI, pp. 3430--3436 (2022)
+
+\bibitem{Sutton2018}
+Sutton, R.S., Barto, A.G.: Reinforcement Learning: An Introduction, 2nd edn. MIT Press (2018)
+
+\bibitem{Tercan2024}
+Tercan, H., Prabhu, S.: Thresholded lexicographic ordered multiobjective reinforcement learning. In: Proc. ECAI (2024)
+
+\bibitem{Vajjha2021}
+Vajjha, K., Shinnar, A., Trager, B., Pestun, V., Fulton, N.: CertRL: formalizing convergence proofs for value and policy iteration in Coq. In: Proc. CPP, pp. 18--31. ACM (2021)
+
+\bibitem{vanderPol2020}
+van der Pol, E., Worrall, D., van Hoof, H., Oliehoek, F., Welling, M.: MDP homomorphic networks: group symmetries in reinforcement learning. In: Proc. NeurIPS (2020)
+
+\bibitem{Watkins1992}
+Watkins, C.J.C.H., Dayan, P.: Q-learning. Mach. Learn. 8(3--4), 279--292 (1992)
+
+\bibitem{Williams1992}
+Williams, R.J.: Simple statistical gradient-following algorithms for connectionist reinforcement learning. Mach. Learn. 8(3--4), 229--256 (1992)
+
+\bibitem{Wirth2017}
+Wirth, C., Akrour, R., Neumann, G., F{\"u}rnkranz, J.: A survey of preference-based reinforcement learning methods. J. Mach. Learn. Res. 18(136), 1--46 (2017)
+
+\bibitem{Zap2019}
+Zap, A., Chaudhuri, S., Topcu, U.: Deep ordinal reinforcement learning. In: Proc. AAMAS, pp. 1838--1846 (2019)
 
 \end{thebibliography}
 
