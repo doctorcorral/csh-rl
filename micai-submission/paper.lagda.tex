@@ -77,9 +77,9 @@
 % Theorem environments (theorem, lemma, corollary, definition, remark)
 % are predefined by the llncs class.
 
-\title{Coinductive Homomorphism Reinforcement Learning:\\
+\title{Coinductive Symmetric Homomorphism Reinforcement Learning:\\
 Optimality as Structure Preservation}
-\titlerunning{Coinductive Homomorphism Reinforcement Learning}
+\titlerunning{Coinductive Symmetric Homomorphism RL}
 
 \author{Anonymous Author(s)}
 \authorrunning{Anonymous Author(s)}
@@ -90,33 +90,15 @@ Optimality as Structure Preservation}
 \maketitle
 
 \begin{abstract}
-Traditional reinforcement learning defines optimality by maximizing a scalar return---a criterion that collapses infinite reward sequences into a single number, discarding their temporal structure.
-We propose a different foundation: an action is optimal when it leads to a state from which the agent's future is best.
+We define a typable optimality criterion based on coinductive preservation of action dominance: an action is better than another if it leads to a strictly better future in the coinductive sense.
+We realize this criterion through homomorphic rankings---permutations of the action set that preserve the coinductive ordering on successor value streams.
 
-What makes one state better than another?
-Acting optimally from it yields higher rewards at every future depth.
-And what makes \emph{those} rewards higher?
-The states reachable from there are themselves better---by the same criterion, unfolding without bound.
-This coinductive structure is the core of our definition: a \textbf{coinductive homomorphism} is an action ranking that preserves the quality ordering on the states actions lead to.
+A natural strengthening additionally requires immediate rewards to respect the ranking.
+These two conditions decompose cleanly; the homomorphism criterion alone is strictly more general and correctly ranks actions in sacrifice patterns where discounted return fails.
+We give a constructive procedure---the Finder together with violation-correction learning---that computes rankings provably satisfying the criterion.
+All results are machine-verified in Agda, including monotonic convergence of learning, instant adaptation, stochastic lifting via the Giry monad, and scalable verification on large combinatorial domains with zero postulates.
 
-The definition is an order homomorphism from action rankings into a coinductively ordered codomain, and it decouples optimality from immediate transition rewards.
-An action that sacrifices immediate reward to reach a superior state is correctly ranked---a pattern that arises naturally in investment, exploration, and preparation.
-
-A natural strengthening additionally requires that immediate transition rewards respect the ranking, bundling two orthogonal conditions into a single requirement on the full action-value stream.
-We prove that the two conditions decompose cleanly, that the coinductive homomorphism alone is strictly more general, and that the top-ranked action maximizes cumulative return from successor states at every finite horizon.
-Three verified environments of increasing structural complexity demonstrate settings where the coinductive homomorphism correctly ranks actions but its action-value strengthening cannot.
-
-We prove seven main results, all machine-verified in Agda:
-\textbf{(1)}~Subsumption: both conditions imply classical argmax optimality for any finite horizon;
-\textbf{(2)}~Monotonic learning: ranking updates via violation-correction converge in at most $|S| \cdot \binom{|A|}{2}$ swaps;
-\textbf{(3)}~Instant adaptation: when actions become unavailable, the next-best action is $O(1)$ lookup;
-\textbf{(4)}~Stochastic extension: the framework lifts to probabilistic environments via the Giry monad, where rankings preserve lexicographic expected stream dominance;
-\textbf{(5)}~Distributional hierarchy: FOSD and the SD$[k]$ chain give parameterized verification strength for broader utility classes;
-\textbf{(6)}~Compositional algebra: verified rankings compose via product, sum, convolution, and scaling;
-\textbf{(7)}~State abstraction: rankings verified on finite abstract systems lift to arbitrary concrete state spaces;
-\textbf{(8)}~Scalable verification: a modular Environment Class architecture provides automatic trace-to-stream bridges, demonstrated with a full coinductive homomorphism for $8$-Queens ($8^8$ search space, zero postulates).
-
-\keywords{Reinforcement learning \and Coinduction \and Formal verification \and Agda \and Optimality \and Stochastic dominance}
+\keywords{Reinforcement learning \and Coinduction \and Symmetric group \and Formal verification \and Agda \and Optimality \and Stochastic dominance}
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -137,7 +119,7 @@ The result is a single scalar.  A policy is optimal when it maximizes this numbe
 
 \subsection{The Problem: Temporal Structure Loss}
 
-The difficulty is that this scalar discards the \emph{temporal structure} of the reward sequence.  Consider two futures:
+Scalar return collapses the temporal structure of reward sequences.  Two futures can have similar discounted sums while being structurally very different:
 
 \begin{center}
 \begin{tabular}{lcc}
@@ -148,20 +130,20 @@ B: ``Struggle then thrive'' & $[0, 5, 0, 0, \ldots]$ & $0 + 4.5 = 4.5$ \\
 \end{tabular}
 \end{center}
 
-A scalar optimizer chooses Future~A.  But \emph{structurally}, Future~B may be preferable---it avoids catastrophic failure and enters a productive state.  The sum erases this distinction.  This is \textbf{value aliasing}: structurally different futures mapping to the same scalar.
+A scalar optimizer prefers A, yet B is structurally superior---it avoids catastrophic failure and reaches a productive state.  This is \textbf{value aliasing}: structurally different futures map to the same scalar.
 
-The problem deepens with several well-known artifacts of scalar aggregation:
+This formulation introduces several artifacts:
 \begin{itemize}
-\item \textbf{The Discount Factor ($\gamma$):} An extrinsic parameter that controls how quickly future rewards are attenuated.  It systematically undervalues delayed payoffs, making the agent short-sighted by design.  No single $\gamma$ is correct for all environments, yet the optimal policy can change discontinuously as $\gamma$ varies.
-\item \textbf{Instability:} Q-learning bootstraps scalar estimates of $J(\pi)$, leading to the deadly triad of function approximation, bootstrapping, and off-policy learning \cite{Sutton2018}.
-\item \textbf{Credit Assignment:} A reward at $t{=}1000$ is discounted by $\gamma^{1000} \approx 0$, making long-horizon learning effectively impossible under standard discounting.
+\item \textbf{Discount factor ($\gamma$):} An extrinsic parameter that undervalues delayed rewards and can make the optimal policy discontinuous in $\gamma$.
+\item \textbf{Instability:} Q-learning's bootstrapping of scalar estimates leads to the deadly triad (function approximation $+$ bootstrapping $+$ off-policy learning) \cite{Sutton2018}.
+\item \textbf{Credit assignment:} Rewards at large $t$ are effectively zero under discounting, crippling long-horizon learning.
 \end{itemize}
 
-\noindent These are not implementation bugs---they are consequences of the scalar return formulation itself.  When the best course of action requires accepting a cost now in exchange for a benefit later, discounting can make the sacrifice appear irrational.
+\noindent These are not bugs---they follow directly from compressing sequences into scalars.  When optimal behavior requires paying a cost now for a benefit later, discounting systematically distorts the decision.
 
 \subsection{Our Approach}
 
-We propose to define optimality via \emph{structure preservation} rather than scalar maximization.  Instead of compressing the reward sequence into a number, we keep it as an infinite stream and define action rankings that preserve the quality ordering of successor states at every depth.  The question is: what structure should be preserved, and how?
+We instead define optimality via \emph{structure preservation}.  We keep reward sequences as infinite streams and rank actions by whether they lead to successor states whose optimal futures dominate others at every depth under a coinductive ordering.  The central question is what structure to preserve and how to do so formally.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART II: THE IDEA
@@ -185,7 +167,7 @@ The ranking tracks which actions lead to \emph{success}---both in the sense of s
 % PART III: FORMAL DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Formal Definition}
+\section{Formal Definition}\label{sec:formal}
 
 \subsection{The Order Homomorphism}
 
@@ -195,6 +177,8 @@ We now make the intuition from Section~\ref{sec:key-idea} precise.  The formaliz
 Let $\mathcal{A}$ be the finite set of actions available to the agent.
 At each state~$s$, the agent maintains a \emph{ranking}---a total preorder $\le_a$ on~$\mathcal{A}$---expressing which actions it considers at least as good as which others.
 If $a \le_a b$, the agent regards~$b$ as at least as good as~$a$ at state~$s$.
+
+The object of interest is the \emph{entire} order on~$\mathcal{A}$, not merely its maximum.  A total preorder commits the agent to comparing \emph{every} pair of actions---including the two \emph{worst} ones---rather than only separating a top choice from the rest.  A strict total ranking is precisely an element of the symmetric group~$S_{|\mathcal{A}|}$ acting on the actions: the agent selects one ordering among all~$|\mathcal{A}|!$ permutations, whereas an argmax commitment leaves that choice almost entirely underdetermined.  This full-ranking stance is foundational---it is the sense in which the homomorphism is \emph{symmetric}: optimality is judged against the whole permutation structure on actions, not a single distinguished action.  An agent that has genuinely understood an environment can say which of even its two worst options is less bad; an argmax-centric agent cannot.  The commitment is not merely conceptual: it is what makes learning correct \emph{every} violated pair, including among the worst (\S\ref{sec:learning}), and what makes adaptation to a lost top action an $O(1)$ lookup of the next-best (\S\ref{sec:adaptation}).
 
 \paragraph{Successor states.}
 When the agent takes action~$a$ at state~$s$, the environment transitions to a new state and emits a reward.
@@ -220,8 +204,8 @@ This is a strong condition: the better stream must be at least as good at every 
 
 With these ingredients in hand, the definition is a single sentence:
 
-\begin{definition}[Coinductive Homomorphism]\label{def:coind-homo}
-The ranking $\le_a$ is a \textbf{coinductive homomorphism} at state~$s$ if:
+\begin{definition}[CoinductiveHomomorphism --- Successor Condition]\label{def:coind-homo}
+The ranking $\le_a$ satisfies the \textbf{CoinductiveHomomorphism} condition at state~$s$ if:
 \[
 a \le_a b \;\;\Longrightarrow\;\; \mathit{value}(\mathit{next}(s,a)) \le_s \mathit{value}(\mathit{next}(s,b))
 \]
@@ -271,7 +255,7 @@ This is a \textbf{strategic} evaluation of actions: it assesses the absolute pot
 
 \subsection{The Action-Value Specialization}
 
-The coinductive homomorphism evaluates successor state quality---the agent's future \emph{after} the transition.  A natural strengthening evaluates the \emph{entire} consequence of an action, including the immediate reward it produces.
+The CoinductiveHomomorphism condition evaluates successor state quality---the agent's future \emph{after} the transition.  A natural strengthening evaluates the \emph{entire} consequence of an action, including the immediate reward it produces.
 
 Given action~$a$ at state~$s$, define the \emph{action-value stream}:
 \[
@@ -279,8 +263,8 @@ Given action~$a$ at state~$s$, define the \emph{action-value stream}:
 \]
 Its head is the immediate transition reward; its tail is the value stream of the successor state.  The action-value stream is a richer object: it records both what the action pays now and what it sets up for the future.
 
-\begin{definition}[Action-Value Coinductive Homomorphism]\label{def:coindhomo}
-The ranking $\le_a$ is an \textbf{action-value coinductive homomorphism} at state~$s$ if:
+\begin{definition}[CoindHomo --- Action-Value Condition]\label{def:coindhomo}
+The ranking $\le_a$ satisfies the \textbf{CoindHomo} (action-value) condition at state~$s$ if:
 \[
 a \le_a b \;\;\Longrightarrow\;\; \mathit{action\text{-}value}(s,a) \le_s \mathit{action\text{-}value}(s,b)
 \]
@@ -303,29 +287,13 @@ The action-value condition decomposes into two independent conditions:
 Either condition can hold independently.  Together, they are equivalent to the action-value condition.
 \end{theorem}
 
-The first condition is the coinductive homomorphism---the strategic evaluation.
+The first condition is CoinductiveHomomorphism---the strategic evaluation.
 The second is a purely local constraint on immediate rewards.
 The action-value condition is their conjunction: it insists on tactical \emph{and} strategic soundness simultaneously.
 
 When immediate rewards are aligned with the ranking---as they are in environments with uniform step costs, shaped rewards, or goal-terminal structure---the second condition holds for free, and the two definitions coincide.  The gap opens only in environments where the optimal action has a worse immediate reward than a suboptimal alternative: the sacrifice pattern.
 
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[
-    set/.style={draw=nord3,rounded corners=8pt,minimum width=6cm,minimum height=2.8cm,fill=nord5!50},
-    label/.style={font=\small\sffamily,color=nord0},
-    example/.style={font=\footnotesize\sffamily,color=nord3}
-]
-\node[set] (outer) {};
-\node[set,minimum width=3.5cm,minimum height=1.6cm,fill=nord9!20,xshift=0.3cm] (inner) {};
-\node[label,anchor=north west] at ([shift={(3pt,-3pt)}]outer.north west) {CoinductiveHomomorphism};
-\node[label,anchor=north west] at ([shift={(3pt,-3pt)}]inner.north west) {CoindHomo};
-\node[example,anchor=south] at ([yshift=4pt]inner.south) {uniform step costs};
-\node[example,anchor=south east] at ([shift={(-5pt,4pt)}]outer.south east) {sacrifice now, gain later};
-\end{tikzpicture}
-\caption{CoindHomo is strictly contained in CoinductiveHomomorphism.  Environments with uniform step costs satisfy both.  Environments requiring immediate reward sacrifice separate them.}
-\label{fig:containment}
-\end{figure}
+As sets of admissible rankings the relationship is a strict containment, $\mathrm{CoindHomo} \subsetneq \mathrm{CoinductiveHomomorphism}$: uniform-step-cost environments lie in the inner set, while sacrifice-now-gain-later environments lie in the gap.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART IV: THE AGDA CORE
@@ -458,7 +426,7 @@ The \texttt{CoinductiveHomomorphism} record is the Agda encoding of Definition~\
                   successor-value s a ≤ₛ successor-value s b
 \end{code}
 
-\noindent CoinductiveHomomorphism requires only that the ranking preserves successor state quality.  The immediate transition reward is decoupled by design.
+\noindent The CoinductiveHomomorphism condition requires only that the ranking preserves successor state quality.  The immediate transition reward is decoupled by design.
 
 \subsection{The Decomposition}
 
@@ -506,35 +474,17 @@ The \texttt{CoinductiveHomomorphism} record is the Agda encoding of Definition~\
 
 The decomposition theorem reveals that CoindHomo and CoinductiveHomomorphism differ by exactly one condition: whether immediate transition rewards respect the ranking.  When does this matter?
 
-\subsection{Aligned Environments: The Common Case}
+\subsection{When the Two Conditions Coincide}
 
-In a large class of environments, the head condition holds trivially---and the two definitions coincide.  This class includes:
+In many standard environments the head condition holds for free, so CoindHomo and CoinductiveHomomorphism coincide.  This includes environments with uniform step costs, shaped rewards that already guide the agent toward optimality, and goal-terminal settings where the only distinction is reaching the goal versus not.  In these cases every CoinductiveHomomorphism is automatically a CoindHomo, and all results proved under CoindHomo apply directly.
 
-\begin{itemize}
-\item \textbf{Uniform step costs.}  If all actions at a given state yield the same immediate reward, the head condition reduces to $r \le_r r$---reflexivity.  Examples: FrozenLake (all non-terminal steps give~$0$), MountainCar (all steps give~$-1$), navigation grids with uniform penalties.
+\subsection{When They Diverge: The Sacrifice Pattern}
 
-\item \textbf{Shaped rewards.}  When reward functions are engineered so that immediate feedback points toward the optimal policy, the head condition is satisfied by construction.  This is common in continuous-control benchmarks (Pendulum, LunarLander) where shaping rewards guide the agent toward desirable configurations.
+The two conditions diverge precisely when the optimal action has a \emph{worse} immediate reward than a suboptimal alternative.  We call this the \textbf{sacrifice pattern}: the agent must accept an immediate cost to reach a superior successor state.
 
-\item \textbf{Goal-terminal environments.}  If the episode ends upon reaching a goal state and all non-terminal transitions have equal cost, the only reward distinction is reaching the goal versus not.  The head condition holds at every non-terminal state.
-\end{itemize}
+This pattern is invisible both to discounted return (which suppresses future payoffs geometrically) and to CoindHomo (which refuses to rank when the head condition fails).  The CoinductiveHomomorphism condition is the first in the framework that fully decouples optimality from immediate reward, judging actions solely by the quality of the states they lead to.
 
-For these environments, every CoinductiveHomomorphism is automatically a CoindHomo, and vice versa.  Results proved under CoindHomo---the Finder algorithm, propagation theorems, environment class constructions, verified instantiations---apply directly and without modification.  The environments are not ``easier'' in any pejorative sense; they are the standard decision problems that the reinforcement learning community has studied for decades, and they are well-served by either condition.
-
-\subsection{The Sacrifice Pattern: An Unexplored Realm}
-
-The gap between the two conditions opens when the optimal action has a \emph{worse} immediate reward than a suboptimal alternative.  We call this the \textbf{sacrifice pattern}: the agent must pay an immediate cost to reach a superior successor state.
-
-This pattern is structurally interesting because it is precisely where discount factors also struggle.  A discount factor~$\gamma < 1$ exponentially suppresses future rewards; a sacrifice whose payoff arrives $k$~steps later is scaled by~$\gamma^k$.  For deep sacrifices---multi-stage investment chains, extended preparation sequences---the discounted return of the sacrificing action can fall below the myopic alternative, even though the undiscounted future is strictly superior at every depth.
-
-CoindHomo and discounted returns thus share a blind spot: both anchor optimality to the present.  Discounting does so by geometric decay; CoindHomo does so via the head condition.  CoinductiveHomomorphism is the first condition in this framework that fully decouples optimality from immediate reward, judging actions solely by the quality of states they lead to.
-
-\subsection{Why the Sacrifice Pattern Is Rare in Benchmarks}
-
-The observation that CoindHomo suffices for virtually every standard environment is not a coincidence.  Reinforcement learning benchmarks have been developed in a culture where discounted scalar return is the optimality criterion.  Reward functions are carefully shaped to \emph{eliminate} the sacrifice pattern---that is literally the purpose of reward shaping.  Environments where immediate rewards actively mislead are regarded as ``hard exploration problems'' and are typically studied as pathological cases rather than representative ones.
-
-The result is a selection bias: the environments that survive into textbooks and standard libraries are precisely those where immediate rewards already point toward optimality.  The sacrifice pattern---where the greedy action is wrong---has been quietly engineered out.
-
-This does not diminish the value of CoindHomo.  It is the right tool for aligned environments, and the vast majority of practical decision problems have this structure.  Both conditions are introduced here as part of a unified framework: CoindHomo handles the common case cleanly, while CoinductiveHomomorphism extends the formal reach to environments where immediate rewards conflict with long-term quality---without losing anything that CoindHomo provides.
+Most standard benchmarks have been shaped so that immediate rewards already align with long-term quality.  Environments where immediate rewards actively mislead are regarded as ``hard exploration problems'' and are typically studied as pathological cases rather than representative ones.  As a result, the sacrifice pattern---where the greedy action is wrong---has been quietly engineered out of the environments the field studies most.  CoindHomo remains the right tool for the common (aligned) case; CoinductiveHomomorphism extends the framework to the complementary regime without losing anything that CoindHomo provides.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART VI: STRICT GENERALITY
@@ -549,19 +499,21 @@ The implication CoindHomo $\Rightarrow$ CoinductiveHomomorphism is strict.  We p
 The minimal separating example has three states and two actions:
 
 \begin{center}
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
+    node distance=3.2cm,
     state/.style={draw=nord3,circle,minimum size=2em,font=\small\sffamily,fill=nord5},
     arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt}
 ]
-\node[state] (S) {Start};
-\node[state,above right=1.5cm and 3cm of S,fill=nord14!30] (P) {Paradise};
-\node[state,below right=1.5cm and 3cm of S,fill=nord11!30] (T) {Trap};
+\node[state,fill=nord11!30] (T) {Trap};
+\node[state,right=of T] (S) {Start};
+\node[state,right=of S,fill=nord14!30] (P) {Paradise};
 
+\draw[arr,nord11] (S) -- node[above,font=\footnotesize,color=nord0] {GoTrap ($r{=}1$)} (T);
 \draw[arr,nord14] (S) -- node[above,font=\footnotesize,color=nord0] {GoParadise ($r{=}0$)} (P);
-\draw[arr,nord11] (S) -- node[below,font=\footnotesize,color=nord0] {GoTrap ($r{=}1$)} (T);
+\draw[arr,nord11] (T) edge[loop left] node[left,font=\footnotesize,color=nord0] {$r{=}0$} (T);
 \draw[arr,nord14] (P) edge[loop right] node[right,font=\footnotesize,color=nord0] {$r{=}1$} (P);
-\draw[arr,nord11] (T) edge[loop right] node[right,font=\footnotesize,color=nord0] {$r{=}0$} (T);
-\end{tikzpicture}
+\end{tikzpicture}}
 \end{center}
 
 GoParadise sacrifices the immediate reward ($0$ vs~$1$) but leads to Paradise (reward~$1$ forever).  GoTrap grabs the immediate reward but leads to Trap (reward~$0$ forever).
@@ -577,6 +529,7 @@ Full proof: \fpath{src/CSHRL/Tasks/Verified/BinarySacrifice.agda}
 A chain of investment decisions where training sacrifices immediate reward to advance:
 
 \begin{center}
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
     state/.style={draw=nord3,rounded corners,minimum size=2em,font=\small\sffamily,fill=nord5,minimum width=4em},
     arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt}
@@ -594,7 +547,7 @@ A chain of investment decisions where training sacrifices immediate reward to ad
 \draw[arr,nord3] (A) edge[loop below] node[below,font=\footnotesize,color=nord3] {Work ($r{=}2$)} (A);
 \draw[arr,nord3] (E) edge[loop below] node[below,font=\footnotesize,color=nord3] {Work ($r{=}3$)} (E);
 \draw[arr,nord14] (M) edge[loop below] node[below,font=\footnotesize,color=nord14] {Work ($r{=}5$)} (M);
-\end{tikzpicture}
+\end{tikzpicture}}
 \end{center}
 
 The capability profiles (value streams) form a clean progression:
@@ -620,21 +573,27 @@ Full proof: \fpath{src/CSHRL/Tasks/Verified/SkillInvestment.agda}
 A structurally different pattern with regression and context-dependent optimal actions:
 
 \begin{center}
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
+    node distance=3cm,
     state/.style={draw=nord3,rounded corners,minimum size=2em,font=\small\sffamily,fill=nord5,minimum width=4em},
     arr/.style={->,thick,>=Stealth,shorten >=3pt,shorten <=3pt}
 ]
 \node[state] (I) {Idle};
-\node[state,right=3cm of I] (R) {Ready};
-\node[state,right=3cm of R,fill=nord14!30] (P) {Producing};
+\node[state,right=of I] (R) {Ready};
+\node[state,right=of R,fill=nord14!30] (P) {Producing};
 
+% forward transitions, labels above
 \draw[arr,nord10] (I) -- node[above,font=\footnotesize,color=nord0] {Prepare ($r{=}0$)} (R);
 \draw[arr,nord14] (R) -- node[above,font=\footnotesize,color=nord0] {Rush ($r{=}3$)} (P);
 
-\draw[arr,nord3] (I) edge[loop above] node[above,font=\footnotesize,color=nord3] {Rush ($r{=}1$)} (I);
-\draw[arr,nord11] (R) edge[bend right=30] node[below,font=\footnotesize,color=nord11] {Prepare ($r{=}0$) \emph{regression}} (I);
+% self loops kept off the centre line: Idle to the left, Producing above
+\draw[arr,nord3] (I) edge[loop left] node[left,font=\footnotesize,color=nord3] {Rush ($r{=}1$)} (I);
 \draw[arr,nord14] (P) edge[loop above] node[above,font=\footnotesize,color=nord14] {$r{=}3$} (P);
-\end{tikzpicture}
+
+% regression curves below, label below
+\draw[arr,nord11] (R) to[bend left=40] node[below,font=\footnotesize,color=nord11] {Prepare ($r{=}0$) \emph{regression}} (I);
+\end{tikzpicture}}
 \end{center}
 
 \noindent At Idle, the optimal action is Prepare (sacrifice now for readiness).  At Ready, the optimal action flips to Rush (capitalize on preparation).  Over-preparing at Ready sends the agent \emph{back} to Idle---a regression penalty.
@@ -655,19 +614,17 @@ Full proof: \fpath{src/CSHRL/Tasks/Verified/PreparationDilemma.agda}
 % PART VII: SUBSUMPTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Subsumption and Classical RL}\label{sec:subsumes}
+\section{Relationship to Classical Reinforcement Learning}\label{sec:subsumes}
 
 The value streams compared by CoinductiveHomomorphism are computed from the actual environment dynamics by the \texttt{solve} function---they are ground truth, not estimates.  If the environment terminates (absorbing states with zero reward), the value streams reflect that.  If the environment is infinite, the streams extend accordingly.  The horizon is not a parameter of the condition; it is encoded in the dynamics.
 
-\subsection{CoindHomo Subsumes Discounted Return}
+\subsection{Relationship to Classical Optimality}
 
-The action-value condition compares the \emph{full} action-value streams, which include the immediate reward as the head element.  Pointwise dominance at every position implies that the cumulative sum---at every finite horizon---is at least as large for the better-ranked action.  Since the discounted return is a weighted sum with positive weights, action-value dominance implies discounted return dominance for every discount factor $\gamma \in [0,1)$.
+Both conditions are sound with respect to classical objectives, and each subsumes a different one.
 
-This is genuine subsumption: any policy optimal under CoindHomo is also optimal under every discounted return criterion.
+\paragraph{CoindHomo subsumes discounted return.}  The action-value condition compares the \emph{full} action-value streams, whose head is the immediate reward.  Pointwise dominance at every position implies that the cumulative sum---at every finite horizon---is at least as large for the better-ranked action.  Since discounted return is a positively weighted sum, action-value dominance implies discounted-return dominance for every $\gamma \in [0,1)$: any policy optimal under CoindHomo is optimal under every discounted-return criterion.
 
-\subsection{CoinductiveHomomorphism Subsumes Successor Return}
-
-The coinductive homomorphism compares successor value streams---the accumulated reward \emph{from the state the action leads to}.  The verified theorem states:
+\paragraph{CoinductiveHomomorphism subsumes successor return.}  The successor condition compares successor value streams---the accumulated reward \emph{from the state the action leads to}.  The verified theorem:
 
 \begin{code}[hide]
   iter-head : ℕ → StreamR → Reward
@@ -724,9 +681,9 @@ module CoreWithArithmetic
 
 \noindent The top-ranked action leads to the state with the highest accumulated reward at every finite horizon.  This is successor return dominance: the better-ranked action places the agent in a strictly better position.
 
-\subsection{Where Discounted Return Fails}
+\subsection{CoinductiveHomomorphism Is Sound Where Classical Methods Can Fail}
 
-To make the contrast with classical RL concrete, we examine Q-learning---the workhorse algorithm of model-free reinforcement learning~\cite{Sutton2018}.  Q-learning maintains a table of \emph{Q-values}, $Q(s, a)$, estimating the expected discounted return of taking action~$a$ in state~$s$ and acting optimally thereafter.  These estimates are updated via the Bellman equation:
+CoindHomo refuses to rank in sacrifice environments, remaining conservative.  By contrast, the CoinductiveHomomorphism condition continues to produce correct rankings, while classical discounted methods can actively select the \emph{wrong} action in exactly these cases.  To make the contrast concrete, we examine Q-learning---the workhorse algorithm of model-free reinforcement learning~\cite{Sutton2018}.  Q-learning maintains a table of \emph{Q-values}, $Q(s, a)$, estimating the expected discounted return of taking action~$a$ in state~$s$ and acting optimally thereafter.  These estimates are updated via the Bellman equation:
 \[
 Q(s, a) \;\leftarrow\; r(s, a) \;+\; \gamma \cdot \max_{a'} Q(s', a')
 \]
@@ -770,21 +727,19 @@ Together: Q-learning with $\gamma < \tfrac{1}{2}$ selects the action with the hi
 \paragraph{Deeper sacrifice chains.}
 The Skill Investment chain sharpens the point.  Q-learning requires $\gamma > (1/5)^{1/3} \approx 0.585$ to identify the optimal training path.  Below this threshold, it converges to the policy of working at Novice forever---earning~$1$ per step while a three-step investment would yield~$5$ per step permanently.  CoinductiveHomomorphism identifies the training path regardless: the successor state quality is strictly better at every depth, and the environment dynamics confirm it.
 
-\subsection{CoindHomo as a Conservative Strengthening}
+\subsection{CoindHomo as the Conservative Special Case}
 
-When the two conditions coincide---in environments where immediate rewards align with the ranking---CoinductiveHomomorphism inherits CoindHomo's full subsumption of classical RL.  This covers the vast majority of standard environments (Section~\ref{sec:landscape}).
+CoindHomo is best understood as a deliberate conservative restriction of the CoinductiveHomomorphism condition.  One might prefer it precisely when its extra demand---that immediate rewards also respect the ranking---is desirable: it bundles tactical and strategic soundness, so its rankings are compatible with existing discounted-return theory and algorithms without further argument.  In aligned environments (Section~\ref{sec:landscape}), where the two conditions coincide, this comes for free, and CoinductiveHomomorphism inherits CoindHomo's full subsumption of classical RL.
 
-In sacrifice environments, CoindHomo cannot rank the actions at all (the action-value streams are pointwise incomparable), while CoinductiveHomomorphism correctly identifies the better successor state.  CoindHomo is the conservative choice: it refuses to rank when the immediate reward conflicts with the future.  CoinductiveHomomorphism resolves the conflict in favor of successor state quality---which the environment dynamics validate.
+The restriction has a cost.  In sacrifice environments CoindHomo cannot rank the actions at all---the action-value streams are pointwise incomparable---whereas CoinductiveHomomorphism still identifies the better successor state, which the environment dynamics validate.  CoindHomo refuses to rank when immediate reward conflicts with the future; CoinductiveHomomorphism resolves the conflict in favor of successor state quality.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART VIII: STREAM ISOMORPHISM
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{The Stream Isomorphism}\label{sec:stream-iso}
+\section{Stream Isomorphism}\label{sec:stream-iso}
 
-We defined stream dominance coinductively: $x \le_s y$ iff heads compare and tails recursively compare.  A natural question is whether this definition captures exactly pointwise dominance at every timestep.  The answer is affirmative: the coinductive definition is \emph{isomorphic} to pointwise dominance.
-
-The forward direction (\texttt{≤ₛ-to-pointwise}) was already given in \S\ref{sec:agda-core}.  The reverse:
+We defined stream dominance coinductively: $x \le_s y$ holds if the heads compare and the tails recursively compare.  This definition is equivalent to pointwise dominance at every timestep.  The forward direction follows by unfolding the definition.  The converse is established by coinduction: if $x_n \le_r y_n$ for every~$n$, then both \texttt{head≤} and \texttt{tail≤} hold, hence $x \le_s y$.
 
 \begin{code}[hide]
 module IsoSketch
@@ -823,16 +778,9 @@ module IsoSketch
   tail≤ (pointwise-to-≤ₛ pw) = pointwise-to-≤ₛ (pointwise-tail pw)
 \end{code}
 
-\noindent Together with \texttt{≤ₛ-to-pointwise}, this yields:
-\[
-x \le_s y \;\Longleftrightarrow\; \forall n.\, x_n \le_r y_n
-\]
+This equivalence has two direct consequences.  First, it confirms that the coinductive formulation precisely captures dominance at every future depth.  Second, it justifies the completeness of the Finder: because the Finder decides rankings via finite trace comparison, and trace dominance at all depths implies coinductive stream dominance, every ranking returned by the Finder satisfies the coinductive condition.
 
-This isomorphism has three consequences.  First, it confirms that the coinductive formulation exactly captures ``dominance at every timestep''---it is a precise characterization, not an approximation.  Second, it establishes Finder completeness: since the Finder compares traces at finite depths, the isomorphism guarantees that trace dominance at all depths implies coinductive stream dominance.  Third, the bidirectional correspondence means that rankings preserving stream order and stream orders inducing rankings are interchangeable views---the ``symmetric'' aspect of the framework.
-
-The isomorphism applies equally to both CoinductiveHomomorphism and CoindHomo: both use $\le_s$ as their codomain ordering, differing only in which streams are compared (successor value streams vs.\ action-value streams).
-
-\noindent The full proof is in \fpath{src/appendix/StreamIsomorphism.agda}.
+The isomorphism holds for both successor-value and action-value streams, and therefore supports both CoinductiveHomomorphism and CoindHomo.  The full proof is in \fpath{src/appendix/StreamIsomorphism.agda}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART VIII: THE ALGORITHM
@@ -1336,6 +1284,8 @@ The Finder computes rankings at a fixed depth. But real learning is \emph{increm
 
 Suppose the current ranking at some state is $[\text{Stay}, \text{Go}]$ (Stay preferred), but the Finder discovers at depth~$k$ that Go's trace dominates Stay's.  This is a \textbf{violation}: the ranking disagrees with the evidence.  The fix is to swap Go ahead of Stay, producing $[\text{Go}, \text{Stay}]$.  Each swap fixes exactly one violated pair without disturbing unrelated pairs.
 
+This is where the section title is literal: a swap of two actions is a \emph{transposition}, and transpositions generate the symmetric group~$S_{|\mathcal{A}|}$ (\S\ref{sec:formal}).  Learning is therefore a walk through~$S_{|\mathcal{A}|}$, applying transpositions until the ranking reaches the permutation that the environment's stream order dictates---restoring the correct symmetric structure one violated pair at a time.
+
 Formally, a violation records which state, which two actions, and at what depth the disagreement was found:
 
 \begin{code}[hide]
@@ -1590,7 +1540,7 @@ It is important to distinguish the \emph{coinductive ideal} from the \emph{algor
 
 The deterministic framework assumes: finite action space, deterministic step function, decidable reward order, and a horizon parameter for Finder approximation.  Section~\ref{sec:stochastic} lifts to stochastic environments; Section~\ref{sec:abstraction} lifts to infinite state spaces.
 
-A natural objection: the coinductive homomorphism is undecidable in general.  We view this as analogous to AIXI \cite{Hutter2005}: an uncomputable ideal that organizes a hierarchy of practical approximations.  Crucially, Level~$\omega$ (the full coinductive homomorphism) \emph{is} achievable for structured domains: the 8-Queens instance attains it by exploiting binary reward structure and finite game depth.
+A natural objection: the CoinductiveHomomorphism condition is undecidable in general.  We view this as analogous to AIXI \cite{Hutter2005}: an uncomputable ideal that organizes a hierarchy of practical approximations.  Crucially, Level~$\omega$ (the full CoinductiveHomomorphism condition) \emph{is} achievable for structured domains: the 8-Queens instance attains it by exploiting binary reward structure and finite game depth.
 
 \section{Verified Instantiations: From Theory to Tasks}
 
@@ -1628,19 +1578,25 @@ module TwoStateExample where
 
 \begin{table}[ht]
 \centering
-\small
-\renewcommand{\arraystretch}{1.2}
-\begin{tabularx}{\textwidth}{|l|l|X|}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{0.27\textwidth}|>{\raggedright\arraybackslash}X|}
 \hline
 \textbf{Task} & \textbf{Environment class} & \textbf{Phenomenon demonstrated} \\
 \hline
-TwoState & FiniteDeterministicMDP & minimal aligned case; postulate-free \\
-Delayed Gratification & FiniteDeterministicMDP & depth-discovery (depth~2 needed) \\
-Trap Sparse & FiniteDeterministicMDP & discrimination at depth~1 \\
-Key-Door-Treasure & FiniteDeterministicMDP & state-dependent ranking flip \\
-8-Queens & CombinatorialPlacementMDP & scalable verification ($8^8$); postulate-free \\
-BinarySacrifice, SkillInvestment, PreparationDilemma & FiniteDeterministicMDP & separate the two conditions (\S\ref{sec:strict-generality}) \\
-CoinFlip, GamblersRuin, RandomWalk, BiasedBandit & StochasticFiniteMDP & lexicographic stochastic verification; postulate-free \\
+TwoState & Finite\-Deterministic\-MDP & minimal aligned case; postulate-free \\
+\hline
+Delayed Gratification & Finite\-Deterministic\-MDP & depth-discovery (depth~2 needed) \\
+\hline
+Trap Sparse & Finite\-Deterministic\-MDP & discrimination at depth~1 \\
+\hline
+Key-Door-Treasure & Finite\-Deterministic\-MDP & state-dependent ranking flip \\
+\hline
+8-Queens & Combinatorial\-Placement\-MDP & scalable verification ($8^8$); postulate-free \\
+\hline
+BinarySacrifice, SkillInvestment, PreparationDilemma & Finite\-Deterministic\-MDP & separate the two conditions (\S\ref{sec:strict-generality}) \\
+\hline
+CoinFlip, GamblersRuin, RandomWalk, BiasedBandit & Stochastic\-Finite\-MDP & lexicographic stochastic verification; postulate-free \\
 \hline
 \end{tabularx}
 \caption{Verified instantiations across the three environment classes.  All are machine-checked; classic tasks use the general FiniteDeterministicMDP, while structurally specialised classes discharge the bridge automatically.}
@@ -1696,7 +1652,7 @@ The three environments from Section~\ref{sec:strict-generality}---BinarySacrific
 
 The framework connects to multiple research traditions but makes a distinct move: replacing scalar aggregation with a coinductive order on infinite futures, and distinguishing strategic evaluation (CoinductiveHomomorphism) from tactical evaluation (CoindHomo).
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \small
 \renewcommand{\arraystretch}{1.2}
@@ -1714,7 +1670,7 @@ The framework connects to multiple research traditions but makes a distinct move
 \hline
 \textbf{Coalgebra} \cite{Rutten2000} & Infinite behaviors via coinductive definitions & Direct inspiration: $\le_s$ is a coinductive relation \\
 \hline
-\textbf{MDP Homomorphisms} \cite{vanderPol2020} & Exploit state/action symmetries for efficiency & Complementary: we use order-preservation, not group automorphisms \\
+\textbf{MDP Homomorphisms} \cite{vanderPol2020} & Exploit state/action symmetries for efficiency & Different symmetry: theirs is state/action \emph{automorphisms} for compression; ours is the symmetric group's full \emph{total order} on actions \\
 \hline
 \textbf{Giry Monad} \cite{Giry1982} & Probability distributions as monad & Direct application: stochastic extension (\S\ref{sec:stochastic}) \\
 \hline
@@ -1762,7 +1718,7 @@ Deep Ordinal Reinforcement Learning \cite{Zap2019} modifies Q-learning for ordin
 
 The coinductive stream order $\le_s$ is a coalgebraic relation in the sense of Rutten \cite{Rutten2000}.  Coalgebra provides the categorical semantics for infinite behaviors, and our formalization directly instantiates these ideas in Agda's guarded coinduction.  The \texttt{coinductive} keyword in the $\le_s$ record is precisely the coalgebraic final coalgebra construction.
 
-MDP homomorphisms \cite{vanderPol2020} exploit state/action symmetries for computational efficiency.  The framework uses a different notion of ``symmetry'': not group-theoretic automorphisms of the state space, but \emph{order-preservation} between rankings and stream dominance.
+MDP homomorphisms \cite{vanderPol2020} exploit state/action symmetries---group-theoretic automorphisms of the state/action space---to collapse equivalent states and reduce computation.  Our use of ``symmetric'' is group-theoretic too, but on a different object: the symmetric group~$S_{|\mathcal{A}|}$ acting on the action set, of which a total ranking is a single element (\S\ref{sec:formal}).  The two notions are independent and could in principle be combined---an automorphism quotient on states with a full action ranking within each class.  (Order-preservation between rankings and stream dominance is the \emph{homomorphism} part of the framework, not the \emph{symmetric} part; the two were previously conflated.)
 
 \subsection{Formal Verification of RL}
 
@@ -1774,6 +1730,7 @@ CertRL \cite{Vajjha2021} is a Coq library that machine-checks convergence proofs
 \item \textbf{Criterion vs.\ algorithm:} Classical RL and policy gradients are \emph{algorithms} to optimize a scalar.  Our framework defines an \emph{optimality criterion}---a structural property that rankings may or may not satisfy.
 \item \textbf{Temporal structure:} The scalar return $\sum \gamma^t r_t$ erases timing; the coinductive order $\le_s$ preserves it completely.
 \item \textbf{Pointwise dominance:} Unlike lexicographic MORL (priority among objectives) or average-reward RL (limit of partial sums), the framework requires dominance at \emph{every} timestep.
+\item \textbf{Full rankings (symmetric):} Optimality is the entire total order on actions---an element of the symmetric group~$S_{|\mathcal{A}|}$---not the argmax.  Ranking even the worst pair is required, which dissolves exploration/exploitation and makes adaptation to a lost top action $O(1)$.
 \item \textbf{Strategic vs.\ tactical:} CoinductiveHomomorphism judges actions solely by successor state quality; CoindHomo additionally demands immediate reward alignment.  No prior work makes this decomposition.
 \item \textbf{Machine verification:} All results are fully implemented in Agda with type-checked proofs.
 \end{itemize}
