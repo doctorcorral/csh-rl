@@ -101,6 +101,11 @@ All results are machine-verified in Agda, including monotonic convergence of lea
 \keywords{Reinforcement learning \and Coinduction \and Symmetric group \and Formal verification \and Agda \and Optimality \and Stochastic dominance}
 \end{abstract}
 
+\noindent\textbf{Code Availability.}
+All definitions, theorems, and algorithms presented in this paper have been formalized and machine-checked in Agda 2.8.0.
+The complete development includes the \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} records, the Finder algorithm, monotonic convergence of learning, instant adaptation, stochastic lifting via the finite distribution monad, the Environment Class infrastructure, compositional algebra, verified state abstraction, and all verified tasks (including \texttt{Queens8}).
+Concrete module paths are referenced throughout the text; the full artifact will be made publicly available upon acceptance.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART I: MOTIVATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1037,188 +1042,36 @@ The \texttt{Queens8} module (\fpath{src/CSHRL/Tasks/Verified/Queens8.agda}) inst
 \label{fig:ec-hierarchy}
 \end{figure}
 
-\section{Stochastic Extension via the Giry Monad}\label{sec:stochastic}
+\section{Stochastic Extension}\label{sec:stochastic}
 
-Everything up to this point assumes deterministic environments: each action from a given state leads to exactly one successor state and one reward.  But many real-world problems are inherently stochastic---a robot's actuators have noise, a card game involves shuffled decks, a medical treatment has variable patient responses.  In such environments, the step function returns not a single outcome but a \emph{probability distribution} over outcomes.
+Everything up to this point assumes deterministic environments. Many real-world problems are inherently stochastic: a robot's actuators have noise, a card game involves shuffled decks, or a medical treatment has variable patient responses. In such environments the step function returns a probability distribution over outcomes rather than a single successor state and reward.
 
-The classical approach to stochastic MDPs uses the \textbf{Giry monad}~\cite{Giry1982}: a categorical construction that equips probability measures with a monadic interface (unit, bind), enabling compositional reasoning about probabilistic programs.  In full generality, the Giry monad operates over measurable spaces and $\sigma$-algebras---far too heavy for constructive, decidable verification in Agda.
-
-Our approach is to use a \textbf{finite distribution monad}: a discrete, constructive approximation of the Giry monad that represents distributions as weighted lists.  This gives us exact arithmetic (no floating-point rounding), decidable equality, and compatibility with Agda's termination checker---while being expressive enough to model any finite-state stochastic MDP.
-
-\begin{code}[hide]
-module StochasticExtension where
-  open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_)
-  open import Data.Nat.Properties using (≤-refl)
-  open import Data.List using (List; []; _∷_; foldr; concatMap; map)
-  open import Data.Product using (_×_; _,_; proj₁; proj₂)
-  open import Codata.Guarded.Stream using (Stream; head; tail)
-  open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-  open import Function using (_∘_; id)
-\end{code}
-
-\subsection{The Distribution Monad}
-
-A distribution over type~$A$ is represented as a list of outcome--weight pairs, where weights are natural numbers encoding unnormalized probability mass.  For example, a fair coin flip producing \texttt{Won} or \texttt{Lost} is \texttt{(Won,\,1)\,∷\,(Lost,\,1)\,∷\,[]}---each outcome has weight~$1$ out of total weight~$2$.  This ``poor man's measure theory'' suffices for finite MDPs and supports exact arithmetic with no rounding.
-
-\begin{code}[hide]
-  Dist : Set → Set
-  Dist A = List (A × ℕ)
-
-  pure : ∀ {A} → A → Dist A
-  pure a = (a , 1) ∷ []
-
-  scale : ∀ {A} → ℕ → Dist A → Dist A
-  scale k = map (λ { (a , w) → a , k * w })
-
-  _>>=_ : ∀ {A B} → Dist A → (A → Dist B) → Dist B
-  d >>= f = concatMap (λ { (a , w) → scale w (f a) }) d
-\end{code}
-
-\noindent The three operations form a monad: \texttt{pure} creates a point mass; \texttt{scale} multiplies all weights (for conditional branching); and \texttt{>>=} implements the law of total probability---each outcome in~\texttt{d} contributes its weight-scaled continuation.  The monad laws are verified in \fpath{src/CSHRL/Probability/Finite.agda}.
-
-\subsection{Stochastic Step Functions}
-
-The key change: the step function returns a distribution over outcomes.
-
-\begin{code}[hide]
-  module StepSignatures (State Action Reward : Set) where
-    DeterministicStep : Set
-    DeterministicStep = State → Action → State × Reward
-
-    StochasticStep : Set
-    StochasticStep = State → Action → Dist (State × Reward)
-\end{code}
-
-\noindent\textbf{Example (CoinFlip):}
-
-\begin{code}[hide]
-  data CoinState : Set where
-    Ready Won Lost : CoinState
-
-  data CoinAction : Set where
-    Flip Stay : CoinAction
-
-  bernoulli : ∀ {A} → A → ℕ → A → ℕ → Dist A
-  bernoulli a₁ w₁ a₂ w₂ = (a₁ , w₁) ∷ (a₂ , w₂) ∷ []
-
-  coin-step : CoinState → CoinAction → Dist (CoinState × ℕ)
-  coin-step Ready Flip = bernoulli (Won , 1) 1 (Lost , 0) 1
-  coin-step Ready Stay = pure (Ready , 0)
-  coin-step Won   _    = pure (Won , 0)
-  coin-step Lost  _    = pure (Lost , 0)
-\end{code}
+The classical approach to stochastic MDPs uses the Giry monad~\cite{Giry1982}, but its full generality (measurable spaces and $\sigma$-algebras) is far too heavy for constructive, decidable verification in Agda. We therefore use a \emph{finite distribution monad}: a discrete, constructive approximation that represents distributions as weighted lists. This gives exact arithmetic, decidable equality, and compatibility with Agda's termination checker while remaining expressive enough for any finite-state stochastic MDP. The monad operations (\texttt{pure}, \texttt{scale}, \texttt{>>=}) and their laws are verified in \fpath{src/CSHRL/Probability/Finite.agda}.
 
 \subsection{Lexicographic Coinductive Comparison}
 
-In stochastic MDPs the ``value'' at each depth is an \emph{expected} reward.  Pointwise comparison $\le_s$ is too strict here: if action~$a$ already wins at depth~$0$, demanding it also win at every later depth rules out valid rankings.  The correct notion is \textbf{lexicographic coinductive comparison} ($\le_{lex}$): compare expected heads, and recurse to tails only when heads are equal.  This remains coinductive but lets earlier rewards break ties:
+In stochastic MDPs the value at each depth is an \emph{expected} reward. The deterministic pointwise order $\leq_s$ is too strict here: if action $a$ already wins at depth 0 in expectation, demanding it also wins at every later depth would rule out many valid rankings. The appropriate notion is \emph{lexicographic coinductive comparison} ($\leq_{lex}$): compare expected heads, and recurse on the tails only when the heads are equal. This remains coinductive but lets earlier rewards break ties.
 
-\begin{code}[hide]
-  record _≤ₛ-lex_ {Reward : Set} (_≤ᵣ_ : Reward → Reward → Set) 
-                  (x y : Stream Reward) : Set where
-    coinductive
-    field
-      head≤ : head x ≤ᵣ head y
-      tail≤ : head x ≡ head y → _≤ₛ-lex_ _≤ᵣ_ (tail x) (tail y)
-\end{code}
+\subsection{Stochastic Coinductive Homomorphism}
 
-\subsection{Verification Pattern}
-
-All four verified stochastic examples (CoinFlip, GamblersRuin, RandomWalk, BiasedBandit) share one pattern: one action dominates in expected immediate reward, so \texttt{head$\le$} follows from the ranking hypothesis, while the tail obligation requires the two expected heads to be \emph{equal}---an absurdity (e.g. $0 \equiv 1$ for CoinFlip) discharged by the empty pattern \texttt{()}.  All four are thus fully verified with no postulates.
-
-\begin{code}[hide]
-  coinflip-tail-example : ∀ {A : Set} → 0 ≡ 1 → A
-  coinflip-tail-example ()
-\end{code}
-
-\subsection{The Stochastic Coinductive Homomorphism}
-
-We can now assemble the stochastic analogue of the deterministic \texttt{CoindHomo} record from \S\ref{sec:agda-core}.  The structure is identical---a ranking paired with a preservation proof---but the codomain changes: instead of comparing deterministic reward streams with pointwise $\le_s$, we compare \emph{expected} reward streams with lexicographic $\le_{lex}$.
-
-\begin{code}[hide]
-  record StochasticCoindHomo 
-    (State Action : Set) (StreamR : Set)
-    (expected-action-value : State → Action → Stream StreamR)
-    (_≤ᵣ_ : StreamR → StreamR → Set) : Set₁ where
-    field
-      _≤ₐ_     : State → Action → Action → Set
-      preserves : ∀ a b s → _≤ₐ_ s a b →
-                  _≤ₛ-lex_ _≤ᵣ_ (expected-action-value s a) (expected-action-value s b)
-\end{code}
-
-\noindent Reading the fields: \texttt{\_$\le$ₐ\_} is the ranking, indexed by state, just as in the deterministic case.  The \texttt{preserves} field says: if the ranking considers~$b$ at least as good as~$a$ at state~$s$, then the expected action-value stream of~$a$ is lexicographically dominated by that of~$b$.  The parameter \texttt{expected-action-value} is computed by the stochastic Environment Class: it marginalizes the \texttt{Dist}-valued step function over all possible successors at each depth, producing an infinite stream of expected rewards.
-
-The full implementation is in \fpath{src/CSHRL/Core/Stochastic.agda}, with the stochastic Environment Class in \fpath{src/CSHRL/EnvironmentClass/StochasticFiniteMDP.agda}.
-
-\subsection{Both Conditions in the Stochastic Setting}
-
-Just as the deterministic framework distinguishes CoinductiveHomomorphism (successor state quality) from CoindHomo (full action-value streams), the stochastic extension admits both:
+We can now lift both conditions from the deterministic setting.
 
 \begin{itemize}
-\item \textbf{StochasticCoindHomo}: preserves expected \emph{action-value} streams lexicographically.  This bundles the immediate expected reward and the expected successor quality.
-\item \textbf{StochasticCoinductiveHomomorphism}: preserves expected \emph{successor-value} streams lexicographically.  This decouples from immediate reward, allowing sacrifice-pattern reasoning in stochastic environments.
+\item \textbf{StochasticCoindHomo} preserves expected action-value streams lexicographically. This bundles the immediate expected reward and the expected successor quality.
+\item \textbf{StochasticCoinductiveHomomorphism} preserves expected successor-value streams lexicographically. This decouples immediate reward, allowing sacrifice-pattern reasoning in stochastic environments.
 \end{itemize}
 
-\noindent The decomposition theorem (Theorem~\ref{thm:decomposition}) lifts directly: the stochastic action-value condition decomposes into expected-immediate-reward compatibility plus stochastic successor quality preservation.
+The decomposition theorem (Theorem~\ref{thm:decomposition}) lifts directly: the stochastic action-value condition decomposes into expected-immediate-reward compatibility plus stochastic successor-quality preservation. The full implementation is in \fpath{src/CSHRL/Core/Stochastic.agda}, with the corresponding Environment Class in \fpath{src/CSHRL/EnvironmentClass/StochasticFiniteMDP.agda}.
 
-\begin{remark}[Distributional Hierarchy and CoinductiveHomomorphism]
-The FOSD and SD$[k]$ extensions (\S\ref{sec:fosd}--\ref{sec:sd-hierarchy}) are \emph{per-timestep} conditions: they require distributional dominance at each individual depth.  This aligns naturally with \texttt{StochasticCoindHomo}, whose action-value stream bundles immediate reward and successor quality at every timestep.
+All four verified stochastic examples (\texttt{CoinFlip}, \texttt{GamblersRuin}, \texttt{RandomWalk}, \texttt{BiasedBandit}) follow the same verification pattern: one action dominates in expected immediate reward (so the head obligation follows from the ranking hypothesis), while the tail obligation requires two expected heads to be equal---an absurdity discharged by the empty pattern. All four are therefore fully verified with zero postulates.
 
-\texttt{StochasticCoinductiveHomomorphism}, by contrast, compares successor-value streams \emph{lexicographically}: dominance is required only at the first depth where expected values differ.  Expected successor values may be equal at all finite depths, with the comparison satisfied vacuously.  This holistic, stream-level guarantee does not decompose into per-timestep distributional claims, placing lexicographic CoinductiveHomomorphism outside the scope of the per-timestep FOSD/SD hierarchy.
+\subsection{Distributional Hierarchy}
 
-In the deterministic case, $\le_s$ is unconditionally pointwise (head~$\le$ AND tail~$\le_s$, no equality guard), so the Stream Isomorphism (\S\ref{sec:stream-iso}) recovers per-depth dominance.  The stochastic split---$\le_{lex}$ guards tail recursion on head equality---is what creates the gap.
-\end{remark}
+The framework so far compares actions by their expected reward streams. Stronger distributional guarantees are available through a hierarchy of stochastic dominance relations. \textbf{First-Order Stochastic Dominance} (FOSD) requires that the cumulative distribution of one action lies everywhere below that of another at every timestep. The \textbf{Stochastic Dominance Hierarchy} generalizes this: $\text{SD}[0] = \text{FOSD}$, $\text{SD}[1] = \text{SOSD}$, $\text{SD}[2] = \text{TOSD}$, etc. Each additional level integrates the CDF and captures a broader class of utility functions while remaining verifiable.
 
-Pointwise dominance implies lexicographic (but not conversely), and the two coincide in the deterministic case.  Lexicographic comparison is the correct stochastic notion: when $\mathbb{E}[\text{head}(a)] < \mathbb{E}[\text{head}(b)]$, action~$b$ is already established as better and further tail proofs add no information.  Classical RL is subsumed by linearity of expectation, $\mathbb{E}[\sum_{t<N} r_t] = \sum_{t<N} \mathbb{E}[r_t]$: comparing partial sums of expected rewards is comparing expected partial sums (proof in \fpath{appendix/StochasticSubsumption.agda}).
+A single FOSD verification automatically yields optimality at all higher SD levels. The complete pipeline (distribution level and stream level) is machine-verified in \fpath{src/CSHRL/Probability/FOSD.agda}, \fpath{src/CSHRL/Core/FOSD.agda}, \fpath{src/CSHRL/Probability/SD.agda}, and \fpath{src/CSHRL/Core/SD.agda}. These stronger distributional conditions align naturally with \texttt{StochasticCoindHomo}; the lexicographic \texttt{StochasticCoinductiveHomomorphism} sits outside the per-timestep hierarchy, as expected.
 
-The stochastic framework so far compares actions by their expected reward streams.  But expected values are themselves a lossy summary---they collapse an entire distribution to a single number.  Can we do better?  The next two sections develop a hierarchy of distributional comparisons, from FOSD (the strongest) through progressively weaker SD$[k]$ orderings, each capturing a broader class of rational agents.
-
-\section{First-Order Stochastic Dominance}\label{sec:fosd}
-
-The expected-value stochastic pipeline (\S\ref{sec:stochastic}) compares actions by $\mathbb{E}[\text{trace}(s, a)] \le \mathbb{E}[\text{trace}(s, b)]$.  This suffices for expected-value maximizers, but collapses the full reward distribution to a single scalar.
-
-A strictly stronger comparison is \textbf{First-Order Stochastic Dominance (FOSD)}: action~$a$ FOSD-dominates~$b$ at state~$s$ iff for all thresholds~$r$ and all timesteps~$n$:
-\[
-P(\text{reward}_n(s,a) \le r) \le P(\text{reward}_n(s,b) \le r)
-\]
-i.e., $a$'s cumulative distribution lies everywhere below~$b$'s.  FOSD implies expected-value dominance ($\mu \ge_\text{FOSD} \nu \Rightarrow \mathbb{E}[\mu] \ge \mathbb{E}[\nu]$) but not conversely.  An action FOSD-dominating another is preferred by \emph{all monotone utility functions}---risk-averse, risk-neutral, and risk-seeking agents agree.
-
-The complete FOSD pipeline is machine-verified across \texttt{Probability.FOSD} (distribution level) and \texttt{Core.FOSD} (stream level).
-
-At the distribution level, \texttt{cdf-weight} computes the CDF of a list-based distribution and the FOSD ordering is pointwise CDF dominance (reflexive, transitive).  The bridge \texttt{fosd→ev} shows FOSD implies expected-value dominance at equal total weight, and a decidable \texttt{fosd?} is proved sound and complete.  At the stream level, \textbf{PointwiseFOSD} requires FOSD dominance at every depth~$n$, and its coinductive reformulation \texttt{StreamFOSD} is proved equivalent by the \textbf{Stochastic Isomorphism}---the distributional analogue of the Stream Isomorphism (\S\ref{sec:stream-iso}).
-
-We then define \texttt{FOSDCoindHomo}: a ranking preserving \texttt{PointwiseFOSD} at every state.  Two machine-verified bridges (\texttt{pointwise-ev}, \texttt{fosd→lex-stream}) establish the key implication \texttt{fosd-homo→ev-lex}: every \texttt{FOSDCoindHomo} is automatically a \texttt{StochasticCoindHomo}, so FOSD verification simultaneously guarantees expected-value optimality \emph{and} dominance for all monotone utilities (full implementation in \fpath{src/CSHRL/Probability/FOSD.agda}, \fpath{src/CSHRL/Core/FOSD.agda}).
-
-\section{The Stochastic Dominance Hierarchy}\label{sec:sd-hierarchy}
-
-FOSD provides the strongest distributional comparison: an action FOSD-dominating another is preferred by \emph{all} monotone utility functions.  But this strength is also a limitation---many distributions that exhibit a clear ``better'' relationship fail the FOSD test because their CDFs cross at some threshold.
-
-The \textbf{Stochastic Dominance Hierarchy} generalizes FOSD to a parameterized family of orderings, each capturing a broader class of utility functions.  The $k$-th order SD condition integrates the CDF $k$ times; each additional integration ``smooths out'' CDF crossings:
-\[
-\text{SD}[0] = \text{FOSD} \;\Rightarrow\; \text{SD}[1] = \text{SOSD} \;\Rightarrow\; \text{SD}[2] = \text{TOSD} \;\Rightarrow\; \cdots
-\]
-
-The hierarchy is built on a single operation: \textbf{prefix sum} (the discrete analogue of integration).  Define \texttt{sd-weight~0} as the CDF (\texttt{cdf-weight}) and \texttt{sd-weight~(suc~k)} as the prefix sum of \texttt{sd-weight~k}; the level-$k$ ordering is $\mu \mathrel{\texttt{SD[}k\texttt{]}\le} \nu \;=\; \forall r.\;\texttt{sd-weight}~k~\nu~r \le \texttt{sd-weight}~k~\mu~r$.  Three facts are machine-verified at the distribution level (\texttt{Probability.SD}):
-
-\begin{itemize}
-\item \textbf{One-line subsumption} (\texttt{SD-subsumes}): $\mu \mathrel{\texttt{SD[}k\texttt{]}\le} \nu \Rightarrow \mu \mathrel{\texttt{SD[}k{+}1\texttt{]}\le} \nu$, a direct application of prefix-sum monotonicity---giving the full chain FOSD $\Rightarrow$ SOSD $\Rightarrow$ TOSD $\Rightarrow \cdots$ in one step.
-\item \textbf{SD-to-EV bridge} (\texttt{sd→ev}): since \texttt{sd-weight~$k$~$d$~0~$\equiv$~cdf-weight~$d$~0}, SD$[k]$ implies expected-value dominance at equal total weight, for every~$k$.
-\item \textbf{Strict separation:} SOSD is strictly weaker than FOSD (e.g. $\mu=\{0{:}2,2{:}1\}$, $\nu=\{1{:}3\}$: FOSD fails at $r{=}1$, but the integrated CDFs are ordered---confirmed by \texttt{refl}).
-\end{itemize}
-
-\noindent At the stream level (\texttt{Core.SD}), \textbf{PointwiseSD~$k$} requires SD$[k]$ dominance at every depth, and \texttt{SDCoindHomo~$k$} is a ranking preserving it.  Then \texttt{SDCoindHomo~0} is \texttt{FOSDCoindHomo}, and \texttt{sd-homo-subsumes} shows a level-$k$ ranking is automatically a level-$(k{+}1)$ ranking---so a single FOSD verification establishes optimality at \emph{all} levels.  The \textbf{SD Isomorphism} (\texttt{sd-isomorphism}) lifts the FOSD coinductive/pointwise equivalence uniformly to every~$k$: the proof never inspects the relation on distributions, so the same head/tail decomposition works at all levels, with the Stochastic Isomorphism of \S\ref{sec:fosd} as the case $k{=}0$.  Finally, the master bridge \texttt{sd-homo→ev-lex} shows any \texttt{SDCoindHomo~$k$} yields lexicographic EV-stream dominance: rankings verified at any SD level yield expected-value optimality, while higher levels relax the requirement for broader utility classes.
-
-\begin{remark}[Utility Function Classes]
-The SD hierarchy parameterizes the tradeoff between verification strength and agent generality:
-\begin{itemize}
-\item \textbf{SD$[0]$ (FOSD):} optimal for all monotone utilities (risk-seeking, neutral, and averse).
-\item \textbf{SD$[1]$ (SOSD):} optimal for all concave monotone utilities (risk-averse agents).
-\item \textbf{SD$[2]$ (TOSD):} optimal for all utilities with non-increasing absolute risk aversion (prudent agents).
-\item \textbf{SD$[k]$:} each level captures a broader class, with weaker verification requirements.
-\end{itemize}
-When FOSD cannot be established between two distributions (CDF crossing), SOSD may still hold---accepting distributions with the same ``integrated tail behavior.''  The hierarchy lets the framework verify the strongest relationship that exists, rather than giving up when FOSD fails.
-\end{remark}
-
-\noindent Full implementation: \fpath{src/CSHRL/Probability/SD.agda} and \fpath{src/CSHRL/Core/SD.agda}.
+Pointwise dominance implies lexicographic dominance (but not conversely), and the two coincide in the deterministic case. Classical RL is subsumed via linearity of expectation.
 
 \section{Compositional Ranking Algebra}\label{sec:compose}
 
@@ -1254,220 +1107,30 @@ Three composition operators extend the framework: \texttt{product-abstraction} (
 
 \section{Learning as Symmetry Restoration}\label{sec:learning}
 
-The Finder computes rankings at a fixed depth. But real learning is \emph{incremental}: we observe samples, detect violations, and restore them.
+The Finder computes rankings at a fixed depth. Real learning, however, is incremental: the agent observes samples, detects violations of the homomorphism condition, and restores them.
 
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[
-    node distance=2cm,
-    box/.style={draw=nord3,rounded corners,minimum height=2.5em,minimum width=6em,align=center,font=\small,fill=nord5},
-    arr/.style={->,thick,>=Stealth,nord3}
-]
-\node[box,fill=nord8!30] (sample) {Sample\\Experience};
-\node[box,fill=nord9!25] (test) at (3.5,0) {Test\\Symmetry};
-\node[box,fill=nord11!25] (update) at (7,0) {Update\\Ranking};
-\node[box,fill=nord14!30] (refine) at (3.5,-1.8) {Increase\\Depth};
+A \emph{violation} occurs when the current ranking at a state disagrees with the ground-truth comparator (instantiated by the Finder at the current depth). The repair is a single transposition: swap the two actions so the better one precedes the worse one. Each swap fixes exactly one violated pair without disturbing unrelated pairs. Because transpositions generate the symmetric group $S_{|\mathcal{A}|}$ (\S\ref{sec:formal}), repeated swapping corresponds to walking through the space of total rankings until the environment's stream order is restored.
 
-\draw[arr] (sample) -- (test);
-\draw[arr] (test) -- node[above,font=\footnotesize,color=nord11] {violation} (update);
-\draw[arr] (update.north) -- ++(0,0.8) -| (sample.north);
-\draw[arr] (test) -- node[right,font=\footnotesize,color=nord14] {ok} (refine);
-\draw[arr] (refine) -| (sample);
-
-\node[below=2.3cm of test,font=\footnotesize,color=nord3] {Loop until convergence};
-\end{tikzpicture}
-\caption{The learning loop: sample, test for violations, update ranking, refine depth.}
-\label{fig:learning-loop}
-\end{figure}
-
-\subsection{Violations and Swaps}
-
-Suppose the current ranking at some state is $[\text{Stay}, \text{Go}]$ (Stay preferred), but the Finder discovers at depth~$k$ that Go's trace dominates Stay's.  This is a \textbf{violation}: the ranking disagrees with the evidence.  The fix is to swap Go ahead of Stay, producing $[\text{Go}, \text{Stay}]$.  Each swap fixes exactly one violated pair without disturbing unrelated pairs.
-
-This is where the section title is literal: a swap of two actions is a \emph{transposition}, and transpositions generate the symmetric group~$S_{|\mathcal{A}|}$ (\S\ref{sec:formal}).  Learning is therefore a walk through~$S_{|\mathcal{A}|}$, applying transpositions until the ranking reaches the permutation that the environment's stream order dictates---restoring the correct symmetric structure one violated pair at a time.
-
-Formally, a violation records which state, which two actions, and at what depth the disagreement was found:
-
-\begin{code}[hide]
-module LearningBase
-  (State Action : Set)
-  (_≟ₐ_ : ∀ (a b : Action) → Dec (a ≡ b))
-  where
-
-  open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
-  open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s)
-  open import Data.Nat.Properties using (≤-refl; +-mono-≤)
-  open import Data.List using (List; []; _∷_; _++_)
-  open import Data.Maybe using (Maybe; just; nothing)
-  open import Data.Product using (_×_; _,_; ∃; ∃-syntax)
-  open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-  open import Data.Empty using (⊥)
-
-  ExplicitRanking : Set
-  ExplicitRanking = State → List Action
-\end{code}
-
-\begin{code}[hide]
-  record Violation : Set where
-    constructor violation
-    field
-      viol-state  : State
-      viol-better : Action
-      viol-worse  : Action
-      viol-depth  : ℕ
-
-  DominanceOracle : Set
-  DominanceOracle = State → Action → Action → Bool
-\end{code}
-
-\noindent The \texttt{DominanceOracle} is the ground-truth pairwise comparator---in practice, instantiated by the Finder's trace comparison at the current depth.  The fix is to \textbf{swap} the violated pair in the ranking:
-
-\begin{code}[hide]
-  is-dominated-by : List Action → Action → Action → Bool
-  is-dominated-by [] _ _ = true
-  is-dominated-by (x ∷ xs) a b with a ≟ₐ x | b ≟ₐ x
-  ... | yes _ | yes _ = true
-  ... | yes _ | no  _ = false
-  ... | no  _ | yes _ = true
-  ... | no  _ | no  _ = is-dominated-by xs a b
-
-  remove-action : Action → List Action → List Action
-  remove-action _ [] = []
-  remove-action a (x ∷ xs) with x ≟ₐ a
-  ... | yes _ = xs
-  ... | no  _ = x ∷ remove-action a xs
-\end{code}
-
-\begin{code}[hide]
-  swap-in-list : Action → Action → List Action → List Action
-  swap-in-list _ _ [] = []
-  swap-in-list better worse (x ∷ xs) with x ≟ₐ worse
-  ... | yes _ = better ∷ worse ∷ remove-action better xs
-  ... | no  _ = x ∷ swap-in-list better worse xs
-
-  global-swap-updater : Violation → ExplicitRanking → ExplicitRanking
-  global-swap-updater v ranking s = 
-    swap-in-list (Violation.viol-better v) (Violation.viol-worse v) (ranking s)
-\end{code}
-
-\subsection{Monotonicity Guarantee}
-
-The critical question is: does repeated swapping converge?  The answer is yes, and we can bound the number of steps.  The argument has three parts:
+Formally, a violation records the state, the pair of actions, and the depth at which the disagreement was found. The fix is to apply the transposition in the ranking.
 
 \begin{theorem}[Swap Monotonicity]
-Let $v$ be a violation with actions $(better, worse)$. After swapping:
-(1)~the violated pair is correctly ordered;
-(2)~unrelated pairs are unchanged;
-(3)~total violations decrease by at least~$1$.
+Let $v$ be a violation with actions $(\textit{better}, \textit{worse})$. After swapping: (1)~the violated pair is correctly ordered; (2)~unrelated pairs are unchanged; (3)~the total number of violations decreases by at least~$1$.
 \end{theorem}
 
-\noindent In Agda, part~(1) is \texttt{SwapFixesPair}: after swapping, the oracle confirms the pair is correctly ordered.  Part~(2) is \texttt{SwapPreservesUnrelated}: for any pair $(a, b)$ where neither $a$ nor $b$ is involved in the swap, their relative order is unchanged.  Together, these guarantee that each swap reduces the violation count by exactly one without introducing new violations.
-
-\begin{code}[hide]
-  SwapFixesPair : Set
-  SwapFixesPair = ∀ (better worse : Action) (xs : List Action) →
-    (better ≡ worse → ⊥) →
-    is-dominated-by (swap-in-list better worse xs) worse better ≡ true
-
-  SwapPreservesUnrelated : Set
-  SwapPreservesUnrelated = ∀ (better worse a b : Action) (xs : List Action) →
-    (a ≡ better → ⊥) → (a ≡ worse → ⊥) →
-    (b ≡ better → ⊥) → (b ≡ worse → ⊥) →
-    is-dominated-by xs a b ≡ is-dominated-by (swap-in-list better worse xs) a b
-\end{code}
-
-\noindent Since each swap strictly decreases the violation count and violations are non-negative, the process terminates.  The worst case is when every pair at every state is initially violated, giving a convergence bound:
+Since each swap strictly decreases the violation count and the count is non-negative, the process terminates. The worst-case bound is
 \[
-\text{max-violations} \leq |S| \times \binom{|A|}{2} = |S| \times \frac{|A|(|A|-1)}{2}
+\text{max-violations} \leq |S| \times \binom{|\mathcal{A}|}{2} = |S| \times \frac{|\mathcal{A}|(|\mathcal{A}|-1)}{2}.
 \]
 
-\begin{code}[hide]
-  count-violations-at : ExplicitRanking → DominanceOracle → State → ℕ
-  count-violations-at ranking oracle s = count-list (ranking s)
-    where
-      count-list : List Action → ℕ
-      count-list [] = 0
-      count-list (_ ∷ []) = 0
-      count-list (a ∷ b ∷ rest) = 
-        let ranking-says = is-dominated-by (ranking s) a b
-            oracle-says  = oracle s a b
-            this-viol    = if ranking-says ∧ not oracle-says then 1 else 0
-        in this-viol + count-list (b ∷ rest)
-
-  count-total-violations : ExplicitRanking → DominanceOracle → List State → ℕ
-  count-total-violations _ _ [] = 0
-  count-total-violations ranking oracle (s ∷ ss) = 
-    count-violations-at ranking oracle s + count-total-violations ranking oracle ss
-
-  open import Data.Maybe using (Maybe; just; nothing)
-  open import Data.Bool using (Bool; true; false)
-
-  iterated-update : (ExplicitRanking → Maybe Violation) → 
-                    ExplicitRanking → ℕ → ExplicitRanking
-  iterated-update _ r zero = r
-  iterated-update find r (suc n) with find r
-  ... | nothing = r
-  ... | just v  = iterated-update find (global-swap-updater v r) n
-
-  FindViolValid : (ExplicitRanking → Maybe Violation) → Set
-  FindViolValid find = ∀ r v → find r ≡ just v → 
-    is-dominated-by (r (Violation.viol-state v)) 
-      (Violation.viol-better v) (Violation.viol-worse v) ≡ true
-
-  StrictDecrease : DominanceOracle → List State → Set
-  StrictDecrease oracle states = ∀ v ranking →
-    oracle (Violation.viol-state v) (Violation.viol-better v) 
-           (Violation.viol-worse v) ≡ true →
-    is-dominated-by (ranking (Violation.viol-state v)) 
-      (Violation.viol-better v) (Violation.viol-worse v) ≡ true →
-    let swapped = global-swap-updater v ranking
-    in suc (count-total-violations swapped oracle states) ≤ 
-       count-total-violations ranking oracle states
-\end{code}
-
-\noindent The \texttt{ConvergenceTheorem} packages the full guarantee: given a valid violation finder and a ground-truth oracle, iterated swapping from any initial ranking reaches zero violations in at most \texttt{max-violations} steps.  Reading the type: the hypotheses require (i)~\texttt{StrictDecrease}---each swap reduces the count; (ii)~\texttt{FindViolValid}---the finder only reports genuine violations; (iii)~oracle soundness---reported better actions truly dominate; and (iv)~completeness---when no violation is found, the count is zero.
-
-\begin{code}[hide]
-  ConvergenceTheorem : DominanceOracle → List State → Set
-  ConvergenceTheorem oracle all-states = 
-    StrictDecrease oracle all-states →
-    ∀ (ranking₀ : ExplicitRanking) 
-      (find-viol : ExplicitRanking → Maybe Violation) →
-    FindViolValid find-viol →
-    (∀ r v → find-viol r ≡ just v → 
-       oracle (Violation.viol-state v) (Violation.viol-better v) 
-              (Violation.viol-worse v) ≡ true) →
-    (∀ r → find-viol r ≡ nothing → 
-       count-total-violations r oracle all-states ≡ 0) →
-    ∃[ n ] (n ≤ count-total-violations ranking₀ oracle all-states × 
-            count-total-violations (iterated-update find-viol ranking₀ n) 
-              oracle all-states ≡ 0)
-\end{code}
-
-\noindent Learning is guaranteed to converge in at most \texttt{max-violations} swaps.  Full proofs are in \fpath{src/CSHRL/Learning/Base.agda}.
+The \texttt{ConvergenceTheorem} packages the full guarantee: given a valid violation finder and a sound ground-truth oracle, iterated swapping from any initial ranking reaches zero violations in at most \texttt{max-violations} steps. All proofs are in \fpath{src/CSHRL/Learning/Base.agda}.
 
 \begin{remark}[Full-ranking learning dissolves the exploration/exploitation trade-off]\label{rem:exploration}
-The convergence bound $|S| \times \binom{|A|}{2}$ counts \emph{all} pairwise violations, including those between the two worst actions.  To reach zero violations the learner must correctly order every pair---not just identify the argmax.  Uniform pairwise sampling suffices for convergence; no separate exploration mechanism ($\epsilon$-greedy, entropy bonus, UCB) is needed.
+The convergence bound counts \emph{all} pairwise violations, including those between the two worst actions. Uniform pairwise sampling therefore suffices for convergence; no separate exploration mechanism is required.
 \end{remark}
 
-\subsection{Practical Learning Interface}
+The same learning loop applies to both CoinductiveHomomorphism and CoindHomo (the only difference is whether the oracle compares successor-value or action-value traces). The output is a total ranking at every state. This totality is what enables the $O(1)$ adaptation described in the next section: when the top-ranked action becomes unavailable, the second-ranked action is already known.
 
-The learning infrastructure provides a stateful interface supporting:
-
-\begin{itemize}
-\item \textbf{Checkpointing:} The \texttt{LearnerState} captures training progress; save to pause, resume by passing to \texttt{train-step}.
-\item \textbf{Incremental learning:} Process samples one at a time or in batches.
-\item \textbf{Active refinement:} The \texttt{ActiveLearner} maintains an explicit ranking updated on violation (swap), rather than re-querying the Finder.
-\item \textbf{Policy materialization:} A \texttt{PolicyTable} is a concrete list of (state, action-ranking) pairs---the verified analogue of trained weights.  At deployment, \texttt{lookup} retrieves the cached ranking in $O(n)$; for states not in the table a fallback to the Finder guarantees no state is ever unhandled.
-\end{itemize}
-
-\noindent The same learning loop applies to both CoinductiveHomomorphism and CoindHomo: the only difference is whether the dominance oracle compares successor-value traces or action-value traces.
-
-The output of this learning process is a \emph{total ranking} at every state: every action has a definite position.  This totality is exactly what enables the $O(1)$ adaptation described next---when an action becomes unavailable, we simply skip it in the ranking and pick the next one, with no recomputation needed.
-
-\subsection{Stochastic and Placement Learning}
-
-The learning infrastructure extends to both stochastic MDPs (comparing expected traces; module in \fpath{src/CSHRL/Learning/StochasticFiniteMDP.agda}) and \texttt{CombinatorialPlacementMDP} (short-circuit traces for absorbing Dead/Solved states; module in \fpath{src/CSHRL/Learning/CombinatorialPlacementMDP.agda}).  All monotonicity guarantees carry over.
+The learning infrastructure extends to stochastic MDPs (comparing expected traces) and to \texttt{CombinatorialPlacementMDP} (short-circuiting traces for absorbing states). All monotonicity guarantees carry over.
 
 \section{Instant Adaptation to Action Unavailability}\label{sec:adaptation}
 
@@ -1480,6 +1143,19 @@ If ranking $R$ satisfies the homomorphism property for actions $\mathcal{A}$, an
 \end{theorem}
 
 \noindent The preservation property is pairwise: the fact that $a \le_a b$ implies stream dominance does not depend on which other actions exist.  Removing unavailable actions leaves the relative order of remaining actions unchanged.
+
+\begin{code}[hide]
+module LearningBase
+  (State Action : Set)
+  (_≟ₐ_ : ∀ (a b : Action) → Dec (a ≡ b))
+  where
+
+  open import Data.Bool using (Bool; true; false; if_then_else_; not)
+  open import Data.List using (List; []; _∷_; _++_)
+
+  ExplicitRanking : Set
+  ExplicitRanking = State → List Action
+\end{code}
 
 \begin{code}[hide]
   Available : Set
@@ -1763,7 +1439,7 @@ The framework is supported by machine-verified results in Agda:
 \item \textbf{Monotonic learning:} Violation-correction converges in at most $|S| \times \binom{|A|}{2}$ swaps.
 \item \textbf{Instant adaptation:} Action unavailability requires $O(1)$ lookup, not full recomputation.
 \item \textbf{Stochastic extension:} The framework lifts to probabilistic environments via the Giry monad, with lexicographic coinductive comparison.
-\item \textbf{Distributional hierarchy:} FOSD and the SD$[k]$ chain (\S\ref{sec:fosd}--\ref{sec:sd-hierarchy}) give parameterized verification strength for progressively broader utility function classes.
+\item \textbf{Distributional hierarchy:} FOSD and the SD$[k]$ chain (\S\ref{sec:stochastic}) give parameterized verification strength for progressively broader utility function classes.
 \item \textbf{Compositional algebra:} Verified rankings compose via product, sum, convolution, and scaling.
 \item \textbf{State abstraction:} Rankings verified on finite abstract systems lift to arbitrary concrete spaces.
 \item \textbf{Scalable verification:} The Environment Class architecture provides automatic trace-to-stream bridges; 8-Queens achieves a full CoindHomo for $8^8$ candidate placements with zero postulates.
