@@ -185,7 +185,9 @@ Let $\mathcal{A}$ be the finite set of actions available to the agent.
 At each state~$s$, the agent maintains a \emph{ranking}---a total preorder $\le_a$ on~$\mathcal{A}$---expressing which actions it considers at least as good as which others.
 If $a \le_a b$, the agent regards~$b$ as at least as good as~$a$ at state~$s$.
 
-The object of interest is the \emph{entire} order on~$\mathcal{A}$, not merely its maximum: a strict total ranking is precisely an element of the symmetric group~$S_{|\mathcal{A}|}$ acting on the actions---one ordering among all~$|\mathcal{A}|!$ permutations, whereas an argmax commitment leaves that choice almost entirely underdetermined.  This full-ranking stance is foundational: it is the sense in which the homomorphism is \emph{symmetric}.  Optimality is judged against the whole permutation structure on actions, not a single distinguished action.  An agent that has genuinely understood an environment can say which of even its two worst options is less bad; an argmax-centric agent cannot.  The commitment is not merely conceptual: it is what makes learning correct every violated pair, including among the worst (\S\ref{sec:learning}), and what makes adaptation to a lost top action an $O(1)$ lookup of the next-best (\S\ref{sec:adaptation}).
+The object of interest is the \emph{entire} order on~$\mathcal{A}$, not merely its maximum: a strict total ranking is precisely an element of the symmetric group~$S_{|\mathcal{A}|}$ acting on the actions---one ordering among all~$|\mathcal{A}|!$ permutations, whereas an argmax commitment leaves that choice almost entirely underdetermined.  This full-ranking stance is foundational: it is the sense in which the homomorphism is \emph{symmetric}.  Optimality is judged against the whole permutation structure on actions, not a single distinguished action.  An agent that has genuinely understood an environment can say which of even its two worst options is less bad; an argmax-centric agent cannot.  The commitment is not merely conceptual: it is what makes learning correct every violated pair, including among the worst (\S\ref{sec:learning}), and what makes adaptation to a lost top action an $O(1)$ lookup of the next-best (Remark~\ref{rem:adaptation}).
+
+This full-ranking requirement is not merely a matter of having more information. It reflects a stronger epistemic stance: an agent that only identifies its single best action has not necessarily understood the environment. Such an agent can maintain the appearance of competence for as long as its preferred action remains available; the limitations of its model only become visible when that action is lost. Worse, by never being forced to maintain coherent preferences among suboptimal actions, a top-action-only learner can enter undetected bias spirals in which its internal model of the environment is structurally faulty. Requiring every pair to respect the homomorphism forces the ranking to reflect genuine understanding rather than local preference for a single distinguished choice.
 
 \paragraph{Successor states.}
 When the agent takes action~$a$ at state~$s$, the environment transitions to a new state and emits a reward.
@@ -837,7 +839,7 @@ Given the comparator, we need the traces themselves.  For a deterministic MDP, t
 
 \subsection{The Ranking Finder}
 
-With traces and a comparator in hand, producing a ranking is straightforward: compute each action's trace at the desired depth, then sort by lexicographic dominance.  The head of the sorted list is the optimal action; the full list is the total ranking used by the adaptation layer (\S\ref{sec:adaptation}).
+With traces and a comparator in hand, producing a ranking is straightforward: compute each action's trace at the desired depth, then sort by lexicographic dominance.  The head of the sorted list is the optimal action; the full list is the total ranking used by the adaptation layer (Remark~\ref{rem:adaptation}).
 
 \begin{code}[hide]
   insert : (Action × Trace) → List (Action × Trace) → List (Action × Trace)
@@ -1116,23 +1118,13 @@ The \texttt{ConvergenceTheorem} packages the full guarantee: given a valid viola
 The convergence bound counts \emph{all} pairwise violations, including those between the two worst actions. Uniform pairwise sampling therefore suffices for convergence; no separate exploration mechanism is required.
 \end{remark}
 
-The same learning loop applies to both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} (the only difference is whether the oracle compares successor-value or action-value traces). The output is a total ranking at every state. This totality is what enables the $O(1)$ adaptation described in the next section: when the top-ranked action becomes unavailable, the second-ranked action is already known.
+The same learning loop applies to both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} (the only difference is whether the oracle compares successor-value or action-value traces). The output is a total ranking at every state.
 
 The learning infrastructure extends to stochastic MDPs (comparing expected traces) and to \texttt{CombinatorialPlacementMDP} (short-circuiting traces for absorbing states). All monotonicity guarantees carry over.
 
-\section{Instant Adaptation to Action Unavailability}\label{sec:adaptation}
-
-In many practical settings---robotics, network routing, game playing---actions can become unavailable at runtime (e.g., a joint fails, a resource is exhausted, or an opponent blocks a move).  Classical RL typically stores only the argmax action.  When that action becomes unavailable, the policy must be recomputed, usually at cost~$O(|S| \cdot |A|)$ or worse.
-
-Modern neural networks can produce multiple ranked actions quickly (e.g., via top-$k$ logits).  However, while the top action is usually reliable, the relative ordering among the remaining actions is typically not trustworthy: the network was trained to identify the single best action, not to produce a well-calibrated total ranking.  Secondary and tertiary preferences are often poorly justified.
-
-Our framework maintains a \emph{total ranking} over all actions at every state, together with a machine-checked proof that the ranking satisfies the homomorphism property.  Because preservation is a pairwise property, the relative order between any two actions remains valid even after some actions are removed.  Consequently, when the top-ranked action becomes unavailable, the second-ranked action is already known to be the best among the remaining ones---an $O(1)$ lookup with a formal guarantee.
-
-\begin{theorem}[Restricted Preservation]
-If a ranking $R$ satisfies the homomorphism property for action set $\mathcal{A}$, and $\mathcal{A}' \subseteq \mathcal{A}$ is the set of currently available actions, then the restriction $R|_{\mathcal{A}'}$ satisfies the same property for $\mathcal{A}'$.
-\end{theorem}
-
-\noindent The core step---demoting an unavailable action leaves the relative order of every remaining pair unchanged---is machine-checked in \fpath{src/CSHRL/Learning/Base.agda} (\texttt{demote-preserves-dominance}), and applies to both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} without retraining or runtime re-verification.
+\begin{remark}[Reliable adaptation under action unavailability]\label{rem:adaptation}
+Because the learned ranking is a total preorder that satisfies the homomorphism property at every state, the relative order among any pair of actions remains valid even after some actions are removed.  Consequently, when the top-ranked action becomes unavailable, the second-ranked action is already known to be the best among those that remain---an $O(1)$ lookup.  The core preservation step under demotion is machine-checked (\texttt{demote-preserves-dominance} in \fpath{src/CSHRL/Learning/Base.agda}).  This holds for both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} without retraining or re-verification.
+\end{remark}
 
 \section{Scope, Assumptions, and Limits}
 
@@ -1259,7 +1251,6 @@ The framework is supported by machine-verified results in Agda:
 \begin{enumerate}
 \item \textbf{Subsumption:} Both conditions imply classical argmax optimality for any finite horizon.
 \item \textbf{Monotonic learning:} Violation-correction converges in at most $|S| \times \binom{|A|}{2}$ swaps.
-\item \textbf{Instant adaptation:} Action unavailability requires $O(1)$ lookup, not full recomputation.
 \item \textbf{Stochastic extension:} The framework lifts to probabilistic environments via the Giry monad, with lexicographic coinductive comparison.
 \item \textbf{Distributional hierarchy:} FOSD and the SD$[k]$ chain (\S\ref{sec:stochastic}) give parameterized verification strength for progressively broader utility function classes.
 \item \textbf{Compositional algebra:} Verified rankings compose via product, sum, convolution, and scaling.
