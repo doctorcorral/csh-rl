@@ -777,6 +777,89 @@
       make-actions-unavailable as (make-action-unavailable a ranking)
 
     ------------------------------------------------------------------------
+    -- Demotion Preserves the Homomorphism Property
+    --
+    -- Demoting one action to the end of a ranking list only moves that
+    -- action; it never reorders any other pair.  Hence the dominance
+    -- relation between any two actions OTHER than the demoted one is left
+    -- unchanged.  This is the machine-checked justification for the
+    -- "instant adaptation" claim: when an action becomes unavailable, the
+    -- relative order of the remaining actions still satisfies whatever
+    -- homomorphism property the ranking satisfied before.
+    ------------------------------------------------------------------------
+
+    module DemotePreservation where
+
+      open import Data.List using (_++_)
+      open import Data.Empty using (⊥; ⊥-elim)
+      open import Relation.Binary.PropositionalEquality using (sym; trans)
+
+      -- Skipping a head that is neither a nor b leaves dominance unchanged.
+      dom-skip : ∀ (x a b : Action) (xs : List Action) →
+        (a ≡ x → ⊥) → (b ≡ x → ⊥) →
+        is-dominated-by (x ∷ xs) a b ≡ is-dominated-by xs a b
+      dom-skip x a b xs ¬ax ¬bx with a ≟ₐ x | b ≟ₐ x
+      ... | yes ax | _      = ⊥-elim (¬ax ax)
+      ... | no  _  | yes bx = ⊥-elim (¬bx bx)
+      ... | no  _  | no  _  = refl
+
+      -- Appending one action c at the end never changes the dominance of a
+      -- pair (a , b) whenever neither a nor b equals c.
+      dominated-snoc-irrelevant : ∀ (c a b : Action) (xs : List Action) →
+        (a ≡ c → ⊥) → (b ≡ c → ⊥) →
+        is-dominated-by (xs ++ c ∷ []) a b ≡ is-dominated-by xs a b
+      dominated-snoc-irrelevant c a b [] ¬ac ¬bc with a ≟ₐ c | b ≟ₐ c
+      ... | yes ac | _      = ⊥-elim (¬ac ac)
+      ... | no  _  | yes bc = ⊥-elim (¬bc bc)
+      ... | no  _  | no  _  = refl
+      dominated-snoc-irrelevant c a b (x ∷ xs) ¬ac ¬bc with a ≟ₐ x | b ≟ₐ x
+      ... | yes _ | yes _ = refl
+      ... | yes _ | no  _ = refl
+      ... | no  _ | yes _ = refl
+      ... | no  _ | no  _ = dominated-snoc-irrelevant c a b xs ¬ac ¬bc
+
+      -- MAIN LEMMA: demoting `target` to the end preserves the dominance
+      -- relation between any two actions other than `target`.
+      demote-preserves-dominance : ∀ (target a b : Action) (xs : List Action) →
+        (a ≡ target → ⊥) → (b ≡ target → ⊥) →
+        is-dominated-by (demote-to-end target xs) a b ≡ is-dominated-by xs a b
+      demote-preserves-dominance target a b [] ¬at ¬bt = refl
+      demote-preserves-dominance target a b (x ∷ xs) ¬at ¬bt with x ≟ₐ target
+      ... | yes x≡t =
+        trans (dominated-snoc-irrelevant target a b xs ¬at ¬bt)
+              (sym (dom-skip x a b xs
+                      (λ a≡x → ¬at (trans a≡x x≡t))
+                      (λ b≡x → ¬bt (trans b≡x x≡t))))
+      ... | no  _ with a ≟ₐ x | b ≟ₐ x
+      ...   | yes _ | yes _ = refl
+      ...   | yes _ | no  _ = refl
+      ...   | no  _ | yes _ = refl
+      ...   | no  _ | no  _ = demote-preserves-dominance target a b xs ¬at ¬bt
+
+      -- COROLLARY (homomorphism preservation): if the ranking realizes some
+      -- target relation R on a pair of non-demoted actions, the demoted
+      -- ranking realizes the same relation on that pair.  Taking R to be the
+      -- oracle's optimal order, this is exactly preservation of the
+      -- homomorphism property under demotion.
+      demote-preserves-homomorphism :
+        ∀ (target a b : Action) (xs : List Action) (R : Action → Action → Bool) →
+        (a ≡ target → ⊥) → (b ≡ target → ⊥) →
+        is-dominated-by xs a b ≡ R a b →
+        is-dominated-by (demote-to-end target xs) a b ≡ R a b
+      demote-preserves-homomorphism target a b xs R ¬at ¬bt eq =
+        trans (demote-preserves-dominance target a b xs ¬at ¬bt) eq
+
+      -- The public runtime API (make-action-unavailable) inherits the result
+      -- pointwise at every state.
+      make-action-unavailable-preserves-dominance :
+        ∀ (forbidden a b : Action) (ranking : ExplicitRanking) (s : State) →
+        (a ≡ forbidden → ⊥) → (b ≡ forbidden → ⊥) →
+        is-dominated-by (make-action-unavailable forbidden ranking s) a b
+          ≡ is-dominated-by (ranking s) a b
+      make-action-unavailable-preserves-dominance forbidden a b ranking s ¬af ¬bf =
+        demote-preserves-dominance forbidden a b (ranking s) ¬af ¬bf
+
+    ------------------------------------------------------------------------
     -- Updater Properties
     ------------------------------------------------------------------------
 
