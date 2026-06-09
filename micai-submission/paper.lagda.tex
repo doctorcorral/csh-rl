@@ -1050,11 +1050,22 @@ A single FOSD verification automatically yields optimality at all higher SD leve
 
 Pointwise dominance implies lexicographic dominance (but not conversely), and the two coincide in the deterministic case. Classical RL is subsumed via linearity of expectation.
 
-\section{Compositional Ranking Algebra}\label{sec:compose}
+\section{Composition for Independent Subsystems}\label{sec:compose}
 
-As environments grow in complexity, monolithic verification becomes impractical.  Consider a warehouse robot that must navigate (an MDP with 20~states) \emph{and} pick items (an MDP with 50~configurations).  Verifying the product MDP ($20 \times 50 = 1000$ states, $O(|A|^2)$ pairs per state) is far more expensive than verifying each component independently.  The Compositional Ranking Algebra proves that verified rankings \emph{compose}---enabling a ``divide and conquer'' strategy: verify navigation and picking separately, then combine.
+When an environment consists of multiple truly independent components (no shared state and no interaction between their transitions), verified rankings on each component can be combined without additional proof effort.  This is useful in settings where a system is naturally modular, such as separate control loops or disjoint subsystems.
 
-The foundation is that \texttt{prefix-sum} is a \emph{linear operator}, so the SD$[k]$ ordering (built from iterated prefix sums) is closed under distribution concatenation (\texttt{SD-++}) and non-negative scaling (\texttt{SD-scale})---both one-line proofs by monotonicity.  A \texttt{VerifiedRanking} bundles a ranking with a machine-checked proof that it preserves SD$[k]$ at every state and timestep, and the algebra provides five verified operations that combine \texttt{VerifiedRanking}s with \emph{zero} additional proof burden: hierarchy subsumption ($k \to k{+}1$), product composition (\texttt{++-product}), convolution product (\texttt{conv-product}, for additive-reward products, via discrete Abel summation), sum composition (disjoint environments), and scaling.  They compose freely---e.g. \texttt{scaled-product~c~vr₁~vr₂}---enabling divide-and-conquer verification of multi-component MDPs (full implementation in \fpath{src/CSHRL/Probability/Compose.agda}, \fpath{src/CSHRL/Core/Compose.agda}).
+The foundation is that the SD$[k]$ ordering is closed under distribution concatenation (\texttt{SD-++}) and non-negative scaling (\texttt{SD-scale}).  Both closures are one-line consequences of monotonicity.  A \texttt{VerifiedRanking} packages a ranking together with a machine-checked proof that it preserves SD$[k]$ at every state and timestep.  The algebra then provides four verified operations that combine such rankings with zero extra proof burden:
+
+\begin{itemize}
+\item \textbf{Product} (\texttt{++-product}): combine rankings over the product of two independent MDPs.
+\item \textbf{Convolution} (\texttt{conv-product}): combine rankings over additive-reward products via discrete Abel summation.
+\item \textbf{Sum}: combine rankings over disjoint environments.
+\item \textbf{Scaling}: scale a verified ranking by a non-negative factor.
+\end{itemize}
+
+These operations are implemented and verified in \fpath{src/CSHRL/Probability/Compose.agda} and \fpath{src/CSHRL/Core/Compose.agda}.  They allow modular verification when the environment genuinely factors into independent parts.  They do not apply to tasks whose components interact, nor do they provide a general decomposition technique for monolithic MDPs.
+
+The same compositional infrastructure lifts to the stochastic setting and is used by the verified stochastic tasks.
 
 \section{Verified State Abstraction}\label{sec:abstraction}
 
@@ -1111,76 +1122,17 @@ The learning infrastructure extends to stochastic MDPs (comparing expected trace
 
 \section{Instant Adaptation to Action Unavailability}\label{sec:adaptation}
 
-In many practical settings---robotics, network routing, game playing---actions become unavailable at runtime.  Classical RL stores only the argmax action and must recompute the policy at cost~$O(|S| \cdot |A|)$ or worse.
+In many practical settings---robotics, network routing, game playing---actions can become unavailable at runtime (e.g., a joint fails, a resource is exhausted, or an opponent blocks a move).  Classical RL typically stores only the argmax action.  When that action becomes unavailable, the policy must be recomputed, usually at cost~$O(|S| \cdot |A|)$ or worse.
 
-Because the framework maintains a \emph{total ranking} over all actions, adaptation is $O(1)$: when the top-ranked action becomes unavailable, the second-ranked action is already known.
+Modern neural networks can produce multiple ranked actions quickly (e.g., via top-$k$ logits).  However, while the top action is usually reliable, the relative ordering among the remaining actions is typically not trustworthy: the network was trained to identify the single best action, not to produce a well-calibrated total ranking.  Secondary and tertiary preferences are often poorly justified.
+
+Our framework maintains a \emph{total ranking} over all actions at every state, together with a machine-checked proof that the ranking satisfies the homomorphism property.  Because preservation is a pairwise property, the relative order between any two actions remains valid even after some actions are removed.  Consequently, when the top-ranked action becomes unavailable, the second-ranked action is already known to be the best among the remaining ones---an $O(1)$ lookup with a formal guarantee.
 
 \begin{theorem}[Restricted Preservation]
-If ranking $R$ satisfies the homomorphism property for actions $\mathcal{A}$, and $\mathcal{A}' \subseteq \mathcal{A}$ is the set of available actions, then the restriction $R|_{\mathcal{A}'}$ satisfies the same property for $\mathcal{A}'$.
+If a ranking $R$ satisfies the homomorphism property for action set $\mathcal{A}$, and $\mathcal{A}' \subseteq \mathcal{A}$ is the set of currently available actions, then the restriction $R|_{\mathcal{A}'}$ satisfies the same property for $\mathcal{A}'$.
 \end{theorem}
 
-\noindent The preservation property is pairwise: the fact that $a \le_a b$ implies stream dominance does not depend on which other actions exist.  Removing unavailable actions leaves the relative order of remaining actions unchanged.
-
-\begin{code}[hide]
-module LearningBase
-  (State Action : Set)
-  (_≟ₐ_ : ∀ (a b : Action) → Dec (a ≡ b))
-  where
-
-  open import Data.Bool using (Bool; true; false; if_then_else_; not)
-  open import Data.List using (List; []; _∷_; _++_)
-
-  ExplicitRanking : Set
-  ExplicitRanking = State → List Action
-\end{code}
-
-\begin{code}[hide]
-  Available : Set
-  Available = Action → Bool
-
-  filter-available : Available → List Action → List Action
-  filter-available _ []       = []
-  filter-available p (x ∷ xs) = 
-    if p x then x ∷ filter-available p xs else filter-available p xs
-
-  restricted-explicit-ranking : Available → ExplicitRanking → ExplicitRanking
-  restricted-explicit-ranking avail ranking s = filter-available avail (ranking s)
-\end{code}
-
-\noindent Beyond filtering, actions can be \textbf{demoted} rather than removed---pushed to the end of the ranking so they are used only as a last resort:
-
-\begin{code}[hide]
-  filter-bool : (Action → Bool) → List Action → List Action
-  filter-bool _ [] = []
-  filter-bool p (x ∷ xs) =
-    if p x then x ∷ filter-bool p xs else filter-bool p xs
-
-  demote-unavailable : Available → List Action → List Action
-  demote-unavailable avail xs = available ++ unavailable
-    where
-      available   = filter-bool avail xs
-      unavailable = filter-bool (λ a → not (avail a)) xs
-\end{code}
-
-\begin{code}[hide]
-  demote-to-end : Action → List Action → List Action
-  demote-to-end a xs = filter-bool (λ x → not (is-eq x)) xs ++ kept
-    where
-      is-eq : Action → Bool
-      is-eq x with x ≟ₐ a
-      ... | yes _ = true
-      ... | no  _ = false
-      kept = filter-bool is-eq xs
-\end{code}
-
-\begin{code}[hide]
-  make-action-unavailable : Action → ExplicitRanking → ExplicitRanking
-  make-action-unavailable forbidden ranking s = demote-to-end forbidden (ranking s)
-\end{code}
-
-\noindent Classical RL stores only the argmax; when that action fails, the policy must be recomputed at cost~$O(|S| \cdot |A|)$.  The framework stores a total ranking, so when the top action fails the second-best is already available---$O(1)$ lookup.
-
-This applies to both conditions: \texttt{CoinductiveHomomorphism}'s successor-value preservation and \texttt{CoindHomo}'s action-value preservation are both pairwise properties that restrict without loss.
+\noindent The core step---demoting an unavailable action leaves the relative order of every remaining pair unchanged---is machine-checked in \fpath{src/CSHRL/Learning/Base.agda} (\texttt{demote-preserves-dominance}), and applies to both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} without retraining or runtime re-verification.
 
 \section{Scope, Assumptions, and Limits}
 
@@ -1197,7 +1149,7 @@ A natural objection: the \texttt{CoinductiveHomomorphism} condition is undecidab
 
 \section{Verified Instantiations: From Theory to Tasks}
 
-The examples in this section validate that the formal machinery instantiates correctly.  Each machine-checked development is a proof that the framework applies to that task class.
+The examples in this section validate that the formal machinery instantiates correctly.  Each machine-checked development is a proof that the framework applies to that task class; Table~\ref{tab:tasks} summarizes the verified instantiations across the three environment classes.
 
 \begin{table}[t]
 \centering
