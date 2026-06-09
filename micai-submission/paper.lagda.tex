@@ -98,14 +98,14 @@ We realize this criterion through homomorphic rankings---permutations of the act
 A natural strengthening additionally requires immediate rewards to respect the ranking.
 These two conditions decompose cleanly; the homomorphism criterion alone is strictly more general and correctly ranks actions in sacrifice patterns where discounted return fails.
 We give a constructive procedure---the Finder together with violation-correction learning---that computes rankings provably satisfying the criterion.
-All results are machine-verified in Agda, including monotonic convergence of learning, instant adaptation, stochastic lifting via the Giry monad, and scalable verification on large combinatorial domains with zero postulates.
+All results are machine-verified in Agda, including monotonic convergence of learning, stochastic lifting via the Giry monad, and scalable verification on large combinatorial domains with zero postulates.
 
 \keywords{Reinforcement learning \and Coinduction \and Symmetric group \and Formal verification \and Agda \and Optimality \and Stochastic dominance}
 \end{abstract}
 
 \noindent\textbf{Code Availability.}
 All definitions, theorems, and algorithms presented in this paper have been formalized and machine-checked in Agda 2.8.0.
-The complete development includes the \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} records, the Finder algorithm, monotonic convergence of learning, instant adaptation, stochastic lifting via the finite distribution monad, the Environment Class infrastructure, compositional algebra, verified state abstraction, and all verified tasks (including \texttt{Queens8}).
+The complete development includes the \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} records, the Finder algorithm, monotonic convergence of learning, stochastic lifting via the finite distribution monad, the Environment Class infrastructure, compositional algebra, verified state abstraction, and all verified tasks (including \texttt{Queens8}).
 Concrete module paths are referenced throughout the text; the full artifact will be made publicly available upon acceptance.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -968,6 +968,7 @@ The \texttt{Queens8} module (\fpath{src/CSHRL/Tasks/Verified/Queens8.agda}) inst
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
     node distance=0.8cm and 1.0cm,
     box/.style={draw,rounded corners,minimum height=2.0em,minimum width=5em,align=center,font=\footnotesize},
@@ -1016,7 +1017,8 @@ The \texttt{Queens8} module (\fpath{src/CSHRL/Tasks/Verified/Queens8.agda}) inst
 \draw[arr] (fdmdp) -- (fdtasks);
 \draw[arr] (cpmdp) -- (cptasks);
 \draw[arr] (smdp) -- (stasks);
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{Environment class hierarchy.  Core provides theory; ECs provide reusable verification infrastructure; task groups contain domain-specific instantiations.}
 \label{fig:ec-hierarchy}
 \end{figure}
