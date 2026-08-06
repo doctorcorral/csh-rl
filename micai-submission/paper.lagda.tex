@@ -220,15 +220,14 @@ a \le_a b \;\;\Longrightarrow\;\; \mathit{value}(\mathit{next}(s,a)) \le_s \math
 \]
 \end{definition}
 
-\noindent In words: if the ranking says~$b$ is at least as good as~$a$, then the state reached by~$b$ must have a value stream that dominates the value stream of the state reached by~$a$---at every future depth, without exception.
+\noindent In words: if the ranking says~$b$ is at least as good as~$a$, then the state reached by~$b$ must have a value stream that dominates the value stream of the state reached by~$a$.
 
 The definition says nothing about the immediate rewards $r(s,a)$ and $r(s,b)$.
 It judges actions entirely by \emph{where they lead}.
 An action that pays a cost now but reaches a superior state is correctly ranked, because the successor state's value stream---reflecting the entire optimal future from that point onward---is what matters.
 
 \paragraph{Why ``homomorphism''?}
-The map $a \mapsto \mathit{value}(\mathit{next}(s,a))$ sends each action to a stream.
-The definition requires this map to be \emph{order-preserving}: if $a \le_a b$ in the action ranking, then $\mathit{value}(\mathit{next}(s,a)) \le_s \mathit{value}(\mathit{next}(s,b))$ in the stream ordering.
+The map $a \mapsto \mathit{value}(\mathit{next}(s,a))$ sends each action to a stream, and the definition requires this map to be \emph{order-preserving} from the action ranking into the stream ordering.
 An order-preserving map between ordered sets is called a \emph{homomorphism}---it preserves the structure.
 The qualifier ``coinductive'' refers to the target: the stream ordering $\le_s$ unfolds to arbitrary depth, verified one position at a time, without bound---an infinite tower of commuting diagrams:
 
@@ -311,6 +310,8 @@ As sets of admissible rankings the relationship is a strict containment, $\mathr
 \section{The Agda Core}\label{sec:agda-core}
 
 We now present the verified implementation.  Every code listing shown below is type-checked by Agda; the snippets are rendered directly from the checked source.
+
+We chose Agda over other proof assistants (Coq, Isabelle, Lean) because the development is coinduction-heavy: Agda's copatterns and \texttt{--guardedness} discipline let stream definitions and bisimulation proofs be written in direct style, without the coinduction encodings these systems typically require.  The entire development compiles under \texttt{--safe} (no postulates, no escape hatches), and literate Agda lets this paper itself be the checked artifact.  Nothing in the theory is Agda-specific; ports to other assistants are possible.
 
 \begin{code}[hide]
 {-# OPTIONS --safe --guardedness #-}
@@ -1128,18 +1129,16 @@ The learning infrastructure extends to stochastic MDPs (comparing expected trace
 Because the learned ranking is a total preorder that satisfies the homomorphism property at every state, the relative order among any pair of actions remains valid even after some actions are removed.  Consequently, when the top-ranked action becomes unavailable, the second-ranked action is already known to be the best among those that remain---an $O(1)$ lookup.  The core preservation step under demotion is machine-checked (\texttt{demote-preserves-dominance} in \fpath{src/CSHRL/Learning/Base.agda}).  This holds for both \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} without retraining or re-verification.
 \end{remark}
 
-\section{Scope, Assumptions, and Limits}
+\section{Discussion: Strengths and Limitations}\label{sec:discussion}
 
-It is important to distinguish the \emph{coinductive ideal} from the \emph{algorithmic machinery}:
-\begin{itemize}
-\item \textbf{Coinductive optimality (ideal):} The definitions in \S\ref{sec:agda-core} are about infinite streams and pointwise dominance at every time step.
-\item \textbf{Finder (approximation):} The Finder (\S\ref{sec:finder}) compares \emph{finite} traces lexicographically at a fixed depth.  It becomes exact under conditions verified by the Environment Class infrastructure (e.g., horizon sufficiency for placement problems).
-\item \textbf{Learner (policy discovery):} The Learner (\S\ref{sec:learning}) wraps Finder-style comparisons into a stateful learning loop.
-\end{itemize}
+\paragraph{Strengths.}
+The framework eliminates the discount factor as an optimality requirement, replacing it with pointwise stream dominance, and it correctly ranks sacrifice patterns where discounted return provably fails (\S\ref{sec:subsumes}).  Every result is machine-checked in Agda under \texttt{--safe} with zero postulates, so there are no unstated assumptions.  The full-ranking stance yields concrete operational benefits: convergent learning without a separate exploration mechanism (Remark~\ref{rem:exploration}) and $O(1)$ adaptation to action unavailability (Remark~\ref{rem:adaptation}).
 
-The deterministic framework assumes: finite action space, deterministic step function, decidable reward order, and a horizon parameter for Finder approximation.  Section~\ref{sec:stochastic} lifts to stochastic environments; Section~\ref{sec:abstraction} lifts to infinite state spaces.
+\paragraph{The ideal versus the machinery.}
+It is important to distinguish the \emph{coinductive ideal} from the \emph{algorithmic machinery}.  The definitions in \S\ref{sec:agda-core} are about infinite streams and pointwise dominance at every time step; the \texttt{CoinductiveHomomorphism} condition is undecidable in general.  We view this as analogous to AIXI \cite{Hutter2005}: an uncomputable ideal that organizes a hierarchy of practical approximations.  The Finder (\S\ref{sec:finder}) compares \emph{finite} traces at a fixed depth and becomes exact under conditions verified by the Environment Class infrastructure (e.g., horizon sufficiency); the Learner (\S\ref{sec:learning}) wraps Finder-style comparisons into a learning loop.  Crucially, the full condition \emph{is} achievable for structured domains: the 8-Queens instance attains it by exploiting binary reward structure and finite game depth.
 
-A natural objection: the \texttt{CoinductiveHomomorphism} condition is undecidable in general.  We view this as analogous to AIXI \cite{Hutter2005}: an uncomputable ideal that organizes a hierarchy of practical approximations.  Crucially, Level~$\omega$ (the full \texttt{CoinductiveHomomorphism} condition) \emph{is} achievable for structured domains: the 8-Queens instance attains it by exploiting binary reward structure and finite game depth.
+\paragraph{Limitations.}
+The deterministic framework assumes a finite action space, a deterministic step function, decidable reward order, and a horizon parameter for the Finder approximation (Section~\ref{sec:stochastic} lifts to stochastic environments; Section~\ref{sec:abstraction} to infinite state spaces).  Scaling to \emph{continuous} action spaces remains open (\S\ref{sec:future}).  Because computing exact traces requires access to the step function, the current concrete instantiations sit closer to model-based RL and formal planning than to pure model-free RL; the learning loop itself, however, only consumes pairwise comparisons and is agnostic to how the oracle obtains them.  Finally, this paper's contribution is foundational and its validation is by machine-checked instantiation rather than empirical benchmark; an empirical evaluation of the heuristic, full-ranking synthesis this theory licenses---in robotics and safety-critical control, where verified fallback rankings under actuator failure are directly valuable---is ongoing work beyond the scope of this paper.
 
 \section{Verified Instantiations: From Theory to Tasks}
 
@@ -1227,7 +1226,7 @@ MDP homomorphisms have also been explored to exploit state/action symmetries for
 
 CertRL \cite{Vajjha2021} provides machine-checked convergence proofs for classical value and policy iteration using the Giry monad.  Our work is complementary: we verify a different foundation (coinductive structure preservation rather than scalar convergence) and target a broader class of phenomena, including sacrifice patterns and stochastic dominance hierarchies.  Both lines of work demonstrate that rigorous, machine-checked RL theory is feasible; they address different parts of the verification stack.
 
-\section{Future Work}
+\section{Future Work}\label{sec:future}
 
 \begin{itemize}
 \item \textbf{Continuous distributions:} The stochastic framework (\S\ref{sec:stochastic}) represents distributions as \texttt{List (A $\times$ $\mathbb{N}$)}.  Extending to measure-theoretic distributions would broaden applicability to continuous-outcome environments.
