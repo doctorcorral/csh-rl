@@ -104,7 +104,7 @@ All results are machine-verified in Agda, including monotonic convergence of lea
 \end{abstract}
 
 \noindent\textbf{Code Availability.}
-All definitions, theorems, and algorithms presented in this paper have been formalized and machine-checked in Agda 2.8.0.
+All definitions, theorems, and algorithms presented in this paper have been formalized and machine-checked in Agda 2.8.0 (Standard Library 2.0).
 The complete development includes the \texttt{CoinductiveHomomorphism} and \texttt{CoindHomo} records, the Finder algorithm, monotonic convergence of learning, stochastic lifting via the finite distribution monad, the Environment Class infrastructure, compositional algebra, verified state abstraction, and all verified tasks (including \texttt{Queens8}).
 Concrete module paths are referenced throughout the text; the full artifact is publicly available at \url{https://github.com/doctorcorral/csh-rl}.
 
@@ -1260,16 +1260,6 @@ The framework is supported by machine-verified results in Agda:
 \end{enumerate}
 
 \noindent All Agda code shown in this paper is machine-checked: the literate source type-checks under Agda while producing this document.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Reproducibility and Build}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{itemize}
-\item \textbf{Tested toolchain:} Agda 2.8.0, Agda Standard Library 2.0, Lua\LaTeX.
-\item \textbf{Build:} Compiling the literate source with \texttt{agda --latex} type-checks every embedded definition and emits the \LaTeX{} rendered here; \texttt{lualatex} then produces the PDF. The full verified development is available at \url{https://github.com/doctorcorral/csh-rl}.
-\item \textbf{Fonts:} The document uses \texttt{fontspec} and Unicode math fonts (DejaVu, STIX Two Math).
-\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{thebibliography}{20}
