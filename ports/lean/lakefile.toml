@@ -1,0 +1,5 @@
+name = "cshrl"
+defaultTargets = ["CSHRL"]
+
+[[lean_lib]]
+name = "CSHRL"

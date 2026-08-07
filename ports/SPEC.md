@@ -49,10 +49,19 @@ and demotion lemmas.
 | System | Directory | Style | Status |
 |--------|-----------|-------|--------|
 | Agda 2.8.0 | `src/CSHRL/` | coinductive records + copatterns, `--safe --guardedness` | reference (complete, beyond kernel) |
-| Rocq | `ports/rocq/` | negative coinductives (primitive projections), `cofix` | kernel |
-| Lean 4 | `ports/lean/` | functional streams (`ℕ → R`), pointwise-first | planned |
+| Rocq 9.2 | `ports/rocq/` | negative coinductives (primitive projections), `cofix` | kernel (T1–T6) |
+| Lean 4.32 | `ports/lean/` | functional streams (`Nat → R`), pointwise-first | kernel (T1–T6) |
+
+In the Lean port, T1 takes the form of two facts that together carry the
+coinductive content: `dominance_unfold` (pointwise dominance unfolds one step
+exactly like the coinductive record) and `dominance_coind` (pointwise
+dominance is the greatest relation closed under that unfolding, i.e. the
+coinduction principle).
 
 ## Conformance
 
 A port conforms to the kernel when it defines D1–D11 and proves T1–T6 without
 axioms beyond the system's base theory (no `admit`/`sorry`/`postulate`).
+Verified: Rocq via `Print Assumptions` (all theorems closed under the global
+context); Lean via `#print axioms` (only the base-theory axioms `propext` and
+`Quot.sound` appear; no `Classical.choice`, no `sorryAx`).
