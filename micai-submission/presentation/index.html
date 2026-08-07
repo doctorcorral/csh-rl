@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSHRL — Optimality as Structure Preservation · MICAI 2026</title>
+<style>
+  /* ---------- Nord palette (matches the paper's TikZ figures) ---------- */
+  :root {
+    --nord0: #2e3440; --nord1: #3b4252; --nord2: #434c5e; --nord3: #4c566a;
+    --nord4: #d8dee9; --nord5: #e5e9f0; --nord6: #eceff4;
+    --nord7: #8fbcbb; --nord8: #88c0d0; --nord9: #81a1c1; --nord10: #5e81ac;
+    --nord11: #bf616a; --nord12: #d08770; --nord13: #ebcb8b;
+    --nord14: #a3be8c; --nord15: #b48ead;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--nord0); overflow: hidden;
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+
+  .slide {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; justify-content: center;
+    padding: 5vh 8vw; color: var(--nord6); background: var(--nord0);
+  }
+  .slide.active { display: flex; }
+  .slide.light { background: var(--nord6); color: var(--nord0); }
+
+  h1 { font-size: 3.2vw; line-height: 1.25; color: var(--nord8); margin-bottom: 2vh; }
+  .light h1 { color: var(--nord10); }
+  h2 { font-size: 2.6vw; color: var(--nord8); margin-bottom: 3vh; }
+  .light h2 { color: var(--nord10); }
+  p, li { font-size: 1.7vw; line-height: 1.55; margin-bottom: 1.2vh; }
+  ul { margin-left: 2.2vw; margin-bottom: 1.5vh; }
+  li { margin-bottom: 1.4vh; }
+  strong { color: var(--nord13); }
+  .light strong { color: var(--nord11); }
+  em { color: var(--nord7); font-style: italic; }
+  .light em { color: var(--nord10); }
+
+  .muted { color: var(--nord4); opacity: .75; font-size: 1.4vw; }
+  .light .muted { color: var(--nord3); }
+
+  code, .mono { font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace; }
+  code { background: var(--nord1); color: var(--nord8); padding: .1em .35em;
+         border-radius: .25em; font-size: .92em; }
+  .light code { background: var(--nord4); color: var(--nord10); }
+
+  pre { background: var(--nord1); border-left: .35vw solid var(--nord10);
+        padding: 2vh 2vw; border-radius: .5vw; font-size: 1.45vw; line-height: 1.5;
+        color: var(--nord6); overflow-x: auto; margin: 1.5vh 0; }
+  pre .kw { color: var(--nord9); font-weight: 600; }
+  pre .ty { color: var(--nord7); }
+  pre .fn { color: var(--nord8); }
+  pre .cm { color: var(--nord3); font-style: italic; }
+  pre .op { color: var(--nord13); }
+
+  .cols { display: flex; gap: 4vw; align-items: flex-start; }
+  .col { flex: 1; }
+
+  .box { border: .18vw solid var(--nord3); border-radius: .6vw; padding: 2vh 1.8vw; margin: 1vh 0; }
+  .box.hl { border-color: var(--nord13); background: rgba(235,203,139,.07); }
+  .box.good { border-color: var(--nord14); background: rgba(163,190,140,.08); }
+  .box.bad { border-color: var(--nord11); background: rgba(191,97,106,.08); }
+  .box h3 { font-size: 1.7vw; margin-bottom: 1vh; color: var(--nord8); }
+
+  .formula { font-family: "STIX Two Math", "Cambria Math", Georgia, serif;
+    font-size: 2.1vw; text-align: center; padding: 2.2vh 0; color: var(--nord6); }
+  .light .formula { color: var(--nord0); }
+  .formula .accent { color: var(--nord13); }
+  .light .formula .accent { color: var(--nord11); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 1.45vw; margin: 1.5vh 0; }
+  th, td { border: 1px solid var(--nord3); padding: 1vh 1vw; text-align: left; }
+  th { background: var(--nord1); color: var(--nord8); }
+  .light th { background: var(--nord4); color: var(--nord10); }
+
+  .footer { position: absolute; bottom: 2vh; left: 8vw; right: 8vw;
+    display: flex; justify-content: space-between; font-size: 1.05vw;
+    color: var(--nord3); }
+  .slide.active .footer { color: var(--nord3); }
+
+  .pageno { position: absolute; bottom: 2vh; right: 3vw; font-size: 1.2vw; color: var(--nord3); }
+
+  .title-slide { text-align: center; align-items: center; }
+  .title-slide h1 { font-size: 3.6vw; color: var(--nord8); }
+  .title-slide .subtitle { font-size: 2vw; color: var(--nord7); margin-bottom: 4vh; }
+  .title-slide .author { font-size: 1.9vw; color: var(--nord6); margin-bottom: .8vh; }
+
+  .badge { display: inline-block; background: var(--nord10); color: var(--nord6);
+    border-radius: 2em; padding: .35em 1.1em; font-size: 1.3vw; margin: .3em .3em; }
+  .badge.warn { background: var(--nord12); }
+  .badge.ok { background: var(--nord14); color: var(--nord0); }
+
+  .center { text-align: center; }
+  .big { font-size: 2.4vw; }
+
+  .progress { position: fixed; top: 0; left: 0; height: .5vh;
+    background: var(--nord8); transition: width .25s ease; z-index: 10; }
+
+  @media print {
+    html, body { overflow: visible; background: white; }
+    .slide { display: flex !important; position: relative; page-break-after: always;
+             height: 100vh; }
+    .progress, .pageno { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- ============ SLIDE 1 — Title (REPLACE with MICAI first-slide template) ============ -->
+<section class="slide title-slide active">
+  <p class="badge warn">First slide must use the official MICAI 2026 template — replace before the talk</p>
+  <h1>Coinductive Symmetric Homomorphism<br>Reinforcement Learning</h1>
+  <p class="subtitle">Optimality as Structure Preservation</p>
+  <p class="author">Ricardo Corral-Corral</p>
+  <p class="muted">ricardo@gyx.ai</p>
+  <p class="muted" style="margin-top:3vh">MICAI 2026 · Chihuahua, México · November 2–6</p>
+</section>
+
+<!-- ============ SLIDE 2 — The problem ============ -->
+<section class="slide">
+  <h2>The problem with scalar returns</h2>
+  <div class="formula">G<sub>t</sub> = r<sub>t</sub> + γ·r<sub>t+1</sub> + γ²·r<sub>t+2</sub> + ⋯ &nbsp;&nbsp; γ ∈ [0,1)</div>
+  <ul>
+    <li>The infinite future is <strong>collapsed into one number</strong> — all temporal structure is discarded.</li>
+    <li>The discount factor γ is <strong>arbitrary</strong>: it exists to make the sum converge, not because the task demands it.</li>
+    <li>A reward 10 steps ahead counts for γ<sup>10</sup> of its face value — <em>the math shapes the objective, instead of the objective shaping the math</em>.</li>
+  </ul>
+  <div class="box bad">
+    <p>Consequence: in <strong>sacrifice patterns</strong> — pay now, gain forever — scalar methods can <em>provably</em> pick the wrong action.</p>
+  </div>
+  <div class="pageno">2</div>
+</section>
+
+<!-- ============ SLIDE 3 — Key idea ============ -->
+<section class="slide">
+  <h2>Key idea: keep the stream</h2>
+  <p>From any state, record the <strong>best achievable reward at every future depth</strong> — and never collapse it:</p>
+  <div class="formula">value(s′) = [ v₀, v₁, v₂, … ] &nbsp;&nbsp;<span class="accent">an infinite stream, not a number</span></div>
+  <p>Compare states by <strong>pointwise stream dominance</strong>:</p>
+  <div class="formula">x ≤<sub>s</sub> y &nbsp;⟺&nbsp; x<sub>t</sub> ≤ y<sub>t</sub> &nbsp;for every&nbsp; t = 0, 1, 2, …</div>
+  <ul>
+    <li>No discount factor. No averaging. No horizon cutoff.</li>
+    <li>The better state must be at least as good at <em>every single future depth</em>.</li>
+  </ul>
+  <div class="pageno">3</div>
+</section>
+
+<!-- ============ SLIDE 4 — The two conditions ============ -->
+<section class="slide">
+  <h2>Two coinductive optimality conditions</h2>
+  <div class="cols">
+    <div class="col box good">
+      <h3><code>CoinductiveHomomorphism</code> — strategic</h3>
+      <div class="formula" style="font-size:1.6vw">a ≤<sub>a</sub> b ⟹ value(next(s,a)) ≤<sub>s</sub> value(next(s,b))</div>
+      <p>Judge actions by <strong>where they lead</strong>. Immediate reward is invisible; successor quality is everything.</p>
+    </div>
+    <div class="col box">
+      <h3><code>CoindHomo</code> — tactical</h3>
+      <div class="formula" style="font-size:1.6vw">a ≤<sub>a</sub> b ⟹ action-value(s,a) ≤<sub>s</sub> action-value(s,b)</div>
+      <p>The better action must win the <strong>immediate payoff and the long-term future</strong> — head and tail of the stream.</p>
+    </div>
+  </div>
+  <div class="box hl">
+    <p><strong>Decomposition theorem:</strong> <code>CoindHomo</code> = <code>CoinductiveHomomorphism</code> + immediate-reward compatibility. Machine-checked.</p>
+  </div>
+  <div class="pageno">4</div>
+</section>
+
+<!-- ============ SLIDE 5 — Why "Symmetric" ============ -->
+<section class="slide">
+  <h2>Why “Symmetric”: the full ranking</h2>
+  <ul>
+    <li>The object of interest is the <strong>entire order</strong> on the action set — an element of the symmetric group <strong>S<sub>|𝒜|</sub></strong> — not just the argmax.</li>
+    <li>An agent that has understood its environment can say <em>which of its two worst options is less bad</em>. An argmax agent cannot.</li>
+    <li>A top-action-only learner can look competent while its internal model is <strong>structurally faulty</strong> — until its preferred action disappears.</li>
+  </ul>
+  <div class="box good">
+    <p>The full-ranking stance pays operationally:</p>
+    <p>• learning converges by fixing <em>every</em> violated pair — no exploration mechanism needed</p>
+    <p>• when the top action becomes unavailable: <strong>O(1)</strong> fallback, with a verified guarantee</p>
+  </div>
+  <div class="pageno">5</div>
+</section>
+
+<!-- ============ SLIDE 6 — Sacrifice counterexamples ============ -->
+<section class="slide">
+  <h2>Verified counterexamples: the strict gap</h2>
+  <p>Three environments, all machine-checked, separate the two conditions:</p>
+  <table>
+    <tr><th>Task</th><th>Pattern</th><th>Verified fact</th></tr>
+    <tr><td><code>BinarySacrifice</code></td><td>trap pays 1 now, paradise pays forever</td><td rowspan="3"><code>CoinductiveHomomorphism</code> ranks correctly;<br>no <code>CoindHomo</code> can rank the sacrificing actions</td></tr>
+    <tr><td><code>SkillInvestment</code></td><td>train (0 now) vs. work (2 now)</td></tr>
+    <tr><td><code>PreparationDilemma</code></td><td>prepare vs. act immediately</td></tr>
+  </table>
+  <div class="box bad">
+    <p><strong>Q-learning fails here, provably:</strong> for γ &lt; ½ it selects the action with higher immediate reward and the <em>strictly inferior</em> successor — the discount geometrically suppresses the evidence. (<code>QLearningFailure.agda</code>)</p>
+  </div>
+  <div class="pageno">6</div>
+</section>
+
+<!-- ============ SLIDE 7 — The Agda core ============ -->
+<section class="slide">
+  <h2>The Agda core</h2>
+  <pre><span class="cm">-- Stream dominance: an infinite witness, one field per depth</span>
+<span class="kw">record</span> <span class="ty">_≤ₛ_</span> (x y : <span class="ty">Stream</span> R) : <span class="ty">Set</span> <span class="kw">where</span>
+  <span class="kw">coinductive</span>
+  <span class="kw">field</span>
+    head≤ : head x ≤ᵣ head y
+    tail≤ : tail x ≤ₛ tail y</pre>
+  <ul>
+    <li>Entire development compiles under <code>--safe --guardedness</code>: <strong>zero postulates</strong>, no escape hatches.</li>
+    <li>Copatterns make coinductive proofs <em>direct-style</em> — the reason we chose Agda over Coq/Isabelle/Lean.</li>
+    <li>The paper itself is literate Agda: <strong>building the PDF type-checks every definition shown</strong>.</li>
+  </ul>
+  <div class="pageno">7</div>
+</section>
+
+<!-- ============ SLIDE 8 — Finder ============ -->
+<section class="slide">
+  <h2>Computing rankings: the Finder</h2>
+  <ul>
+    <li>The full coinductive condition is <strong>undecidable in general</strong> — like AIXI, an ideal that organizes practical approximations.</li>
+    <li>The Finder compares <strong>finite traces lexicographically</strong> at depth <em>n</em>: earlier depths dominate, ties recurse deeper.</li>
+    <li><strong>No discount factor required</strong> — the lexicographic order is well-defined at any depth.</li>
+  </ul>
+  <div class="box hl">
+    <p><strong>Exactness is not assumed — it is verified.</strong> Environment Classes prove conditions (e.g. horizon sufficiency) under which finite traces decide the infinite condition.</p>
+  </div>
+  <div class="pageno">8</div>
+</section>
+
+<!-- ============ SLIDE 9 — Learning ============ -->
+<section class="slide">
+  <h2>Learning as symmetry restoration</h2>
+  <ul>
+    <li>A <strong>violation</strong>: the current ranking disagrees with the ground-truth comparator on one pair, at one state.</li>
+    <li>The repair is a <strong>transposition</strong> — swap the two actions. Transpositions generate S<sub>|𝒜|</sub>: learning literally walks the symmetric group.</li>
+  </ul>
+  <div class="formula">max-violations ≤ |S| × <span class="accent">( |𝒜| choose 2 )</span></div>
+  <div class="box good">
+    <p><strong>Swap Monotonicity (verified):</strong> each swap fixes its pair, leaves unrelated pairs unchanged, and strictly decreases total violations ⟹ <strong>convergence in bounded steps</strong>.</p>
+  </div>
+  <p class="muted">Corollary: uniform pairwise sampling suffices — the exploration/exploitation trade-off dissolves. Adaptation to action unavailability: O(1), backed by <code>demote-preserves-dominance</code>.</p>
+  <div class="pageno">9</div>
+</section>
+
+<!-- ============ SLIDE 10 — Stochastic ============ -->
+<section class="slide">
+  <h2>Stochastic extension</h2>
+  <ul>
+    <li>Environments lift through the <strong>finite distribution monad</strong>; values become expected-reward streams.</li>
+    <li>Pointwise order is too strict under expectation ⟹ <strong>lexicographic coinductive comparison</strong>: compare heads, recurse on ties.</li>
+    <li>Beyond expectation: a hierarchy of <strong>stochastic dominance</strong> relations, all verifiable —</li>
+  </ul>
+  <div class="formula">SD[0] = FOSD ⊂ SD[1] = SOSD ⊂ SD[2] = TOSD ⊂ ⋯</div>
+  <p>Each level captures a broader class of utility functions. Verified rankings <strong>compose</strong>: product, convolution, sum, scaling — zero extra proof burden for independent subsystems.</p>
+  <div class="pageno">10</div>
+</section>
+
+<!-- ============ SLIDE 11 — Environment classes / scale ============ -->
+<section class="slide">
+  <h2>Scaling verification: Environment Classes</h2>
+  <p>Reusable verification infrastructure between core theory and tasks:</p>
+  <table>
+    <tr><th>Environment Class</th><th>Verified tasks</th></tr>
+    <tr><td><code>FiniteDeterministicMDP</code></td><td>TwoState, GridWorld, KeyTreasure, sacrifice tasks…</td></tr>
+    <tr><td><code>CombinatorialPlacementMDP</code></td><td>Queens1, <strong>Queens8</strong></td></tr>
+    <tr><td><code>StochasticFiniteMDP</code></td><td>CoinFlip, GamblersRuin, RandomWalk, BiasedBandit</td></tr>
+  </table>
+  <div class="box good">
+    <p><strong>8-Queens:</strong> full <code>CoindHomo</code> over <strong>8⁸ ≈ 16.7 million</strong> candidate placements — zero postulates. The EC supplies the finite-trace-to-infinite-stream bridge; the task author supplies four simple ingredients.</p>
+  </div>
+  <div class="pageno">11</div>
+</section>
+
+<!-- ============ SLIDE 12 — Honest limits ============ -->
+<section class="slide">
+  <h2>Strengths and limits — honestly</h2>
+  <div class="cols">
+    <div class="col box good">
+      <h3>Strengths</h3>
+      <ul style="margin-left:1.2vw">
+        <li>Discount-free optimality criterion</li>
+        <li>Correct in sacrifice patterns where discounting provably fails</li>
+        <li>Everything machine-checked, zero postulates</li>
+        <li>Exploration-free convergent learning; O(1) adaptation</li>
+      </ul>
+    </div>
+    <div class="col box bad">
+      <h3>Limits</h3>
+      <ul style="margin-left:1.2vw">
+        <li>Finite action spaces (continuous: open)</li>
+        <li>Exact traces need the step function — closer to model-based RL / formal planning</li>
+        <li>Validation is by verified instantiation, not benchmark — empirical evaluation is ongoing work</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pageno">12</div>
+</section>
+
+<!-- ============ SLIDE 13 — Takeaways ============ -->
+<section class="slide">
+  <h2>Takeaways</h2>
+  <ul>
+    <li class="big"><strong>Optimality = structure preservation</strong>, not scalar maximization.</li>
+    <li class="big">The full ranking — an element of S<sub>|𝒜|</sub> — is the object of knowledge, and it pays: provable convergence, instant adaptation.</li>
+    <li class="big">Verified ≠ small: environment classes carry the proofs to 16.7M-configuration domains.</li>
+  </ul>
+  <div class="box hl center" style="margin-top:3vh">
+    <p class="mono" style="font-size:1.8vw">github.com/doctorcorral/csh-rl</p>
+    <p class="muted">complete Agda artifact · the paper type-checks itself</p>
+  </div>
+  <div class="pageno">13</div>
+</section>
+
+<!-- ============ SLIDE 14 — Thanks ============ -->
+<section class="slide title-slide">
+  <h1>Thank you</h1>
+  <p class="subtitle">Questions?</p>
+  <p class="author">Ricardo Corral-Corral · ricardo@gyx.ai</p>
+  <p class="mono muted" style="margin-top:2vh">github.com/doctorcorral/csh-rl</p>
+  <div class="pageno">14</div>
+</section>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.getElementById('progress');
+  let i = 0;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+    location.hash = i + 1;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { show(i + 1); e.preventDefault(); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { show(i - 1); e.preventDefault(); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+
+  // touch navigation
+  let x0 = null;
+  document.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; });
+  document.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (dx < -40) show(i + 1);
+    if (dx > 40) show(i - 1);
+    x0 = null;
+  });
+
+  // click right/left halves
+  document.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    show(e.clientX > window.innerWidth / 2 ? i + 1 : i - 1);
+  });
+
+  const fromHash = parseInt(location.hash.slice(1), 10);
+  show(isNaN(fromHash) ? 0 : fromHash - 1);
+})();
+</script>
+
+</body>
+</html>
