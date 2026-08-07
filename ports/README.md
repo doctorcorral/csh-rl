@@ -21,5 +21,6 @@ implementation and goes far beyond the kernel.
 | D5–D11 MDP interface and the two conditions | done | done | — |
 | T2 decomposition theorem | done | done | — |
 | T3 BinarySacrifice separation | done | done | — |
-| Finite-horizon subsumption (milestone 2) | done | — | — |
-| Swap monotonicity / convergence (milestone 2) | done | — | — |
+| T4 finite-horizon subsumption | done | done | — |
+| T5 learning kernel (swap, locality, demotion) | done | done | — |
+| T6 Q-learning failure analysis | done | done | — |

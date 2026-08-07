@@ -3,3 +3,6 @@
 theories/Streams.v
 theories/Core.v
 theories/BinarySacrifice.v
+theories/Subsumption.v
+theories/Learning.v
+theories/QLearningFailure.v

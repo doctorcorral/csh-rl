@@ -34,10 +34,15 @@ definition, at no loss of mathematical content.
 | T1 | Stream isomorphism | `x ⊑ y ↔ ∀ n, x(n) ≤ᵣ y(n)` | §8, `src/appendix/StreamIsomorphism.agda` |
 | T2 | Decomposition | `CoindHomo s ↔ CoinductiveHomomorphism s ∧ RewardCompatible s` | Theorem 2 (§5) |
 | T3 | Strict generality | In `BinarySacrifice`, the ranking `GoTrap ≼ GoParadise` satisfies CoinductiveHomomorphism at `Start`, and *no* ranking relating the two actions (in either direction) satisfies CoindHomo at `Start` | §6, `CSHRL.Tasks.Verified.BinarySacrifice` |
+| T4 | Subsumption | Given `add`/`zero` with `add` monotone: a CoindHomo ranking dominates every partial sum of the action-value stream at every finite horizon (successor form for CoinductiveHomomorphism) | §7, `src/appendix/Arithmetic.agda` (`partial-sum-mono`, `subsumes-partial-sum`) |
+| T5 | Learning kernel | For explicit list rankings: (a) `swap_fixes_pair` — the transposition repair makes the ranking agree with the oracle on the violated pair; (b) `state_updater_locality` — the state-specific updater touches only the violated state; (c) `demote_preserves_dominance` and `make_action_unavailable_preserves_dominance` — demotion preserves dominance among all other pairs (Remark 2, O(1) adaptation). Plus reflexivity and totality of the induced order | §14, `src/CSHRL/Learning/Base.agda` |
+| T6 | Q-learning failure | In `BinarySacrifice`: GoTrap wins the immediate-reward comparison while GoParadise's successor dominates at every horizon (sums are exactly `N` versus `0`); hence Q-learning with γ < ½ selects the action with the strictly inferior successor | §7.2, `src/CSHRL/Analysis/QLearningFailure.agda` |
 
-Second milestone (not yet in the kernel): finite-horizon argmax subsumption
-(§7), the Q-learning failure analysis (§7.2), Swap Monotonicity and the
-convergence bound (§14), demotion preservation (Remark 2).
+Note on T5: as in the Agda reference, the *global* violation-decrease
+statement (`ViolationMonotonicityTheorem`) is an assumption record in
+`Learning/Base.agda`, not a closed proof; it is therefore not part of the
+kernel in any system. The kernel contains exactly the machine-checked swap
+and demotion lemmas.
 
 ## Ports
 
@@ -49,5 +54,5 @@ convergence bound (§14), demotion preservation (Remark 2).
 
 ## Conformance
 
-A port conforms to the kernel when it defines D1–D11 and proves T1–T3 without
+A port conforms to the kernel when it defines D1–D11 and proves T1–T6 without
 axioms beyond the system's base theory (no `admit`/`sorry`/`postulate`).
