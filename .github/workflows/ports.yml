@@ -1,0 +1,42 @@
+name: Ports
+
+on:
+  push:
+    branches: [ "main" ]
+    paths: [ "ports/**", ".github/workflows/ports.yml" ]
+  pull_request:
+    branches: [ "main" ]
+    paths: [ "ports/**", ".github/workflows/ports.yml" ]
+  workflow_dispatch:
+
+jobs:
+  rocq:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: coq-community/docker-coq-action@v1
+      with:
+        custom_image: 'rocq/rocq-prover:9.2'
+        custom_script: |
+          startGroup "Fix permissions"
+            sudo chown -R $(whoami) ports/rocq
+          endGroup
+          startGroup "Ensure stdlib"
+            opam list -i rocq-stdlib 2>/dev/null | grep -q rocq-stdlib || opam install -y rocq-stdlib
+          endGroup
+          startGroup "Build"
+            cd ports/rocq
+            make
+          endGroup
+
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install elan
+      run: |
+        curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+        echo "$HOME/.elan/bin" >> $GITHUB_PATH
+    - name: Build
+      working-directory: ports/lean
+      run: lake build
