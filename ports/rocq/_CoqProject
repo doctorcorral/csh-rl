@@ -1,0 +1,5 @@
+-R theories CSHRL
+
+theories/Streams.v
+theories/Core.v
+theories/BinarySacrifice.v
