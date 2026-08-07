@@ -1,8 +1,19 @@
 -R theories CSHRL
 
+theories/NatFacts.v
 theories/Streams.v
 theories/Core.v
 theories/BinarySacrifice.v
+theories/SkillInvestment.v
+theories/PreparationDilemma.v
 theories/Subsumption.v
 theories/Learning.v
+theories/Convergence.v
 theories/QLearningFailure.v
+theories/Dist.v
+theories/Lex.v
+theories/SDHierarchy.v
+theories/Convolution.v
+theories/Ranking.v
+theories/Abstraction.v
+theories/AxiomCheck.v
