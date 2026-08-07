@@ -15,33 +15,7 @@
    - Fact 3: hence for gamma < 1/2, Q-learning selects the action with the
      higher immediate reward and the strictly inferior successor state. *)
 
-From CSHRL Require Import Streams Core Subsumption BinarySacrifice.
-
-(* Self-contained nat facts, keeping the kernel free of library
-   dependencies (only Init is used). *)
-
-Lemma nat_le_trans : forall n m p : nat, n <= m -> m <= p -> n <= p.
-Proof.
-  intros n m p H1 H2; induction H2; [exact H1 | apply le_S; exact IHle].
-Qed.
-
-Lemma nat_add_le_mono_l : forall p n m : nat, n <= m -> p + n <= p + m.
-Proof.
-  induction p; simpl; intros; [assumption | apply le_n_S; apply IHp; assumption].
-Qed.
-
-Lemma nat_add_le_mono_r : forall n m p : nat, n <= m -> n + p <= m + p.
-Proof.
-  intros n m p H; induction H; simpl; [apply le_n | apply le_S; exact IHle].
-Qed.
-
-Lemma nat_add_le_mono :
-  forall a b c d : nat, a <= b -> c <= d -> a + c <= b + d.
-Proof.
-  intros a b c d Hab Hcd.
-  apply nat_le_trans with (m := a + d);
-    [apply nat_add_le_mono_l; exact Hcd | apply nat_add_le_mono_r; exact Hab].
-Qed.
+From CSHRL Require Import Streams Core Subsumption BinarySacrifice NatFacts.
 
 (* Fact 1: GoTrap has the higher immediate reward. *)
 
