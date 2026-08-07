@@ -12,6 +12,20 @@ import CSHRL.Finder
 import CSHRL.Probability.Finite
 import CSHRL.Core.Stochastic
 
+-- Successor condition (CoinductiveHomomorphism) and analysis
+import CSHRL.Core.CoinductiveHomomorphism
+import CSHRL.Analysis.QLearningFailure
+
+-- Stochastic dominance hierarchy and compositional algebra
+import CSHRL.Probability.FOSD
+import CSHRL.Probability.SD
+import CSHRL.Probability.Convolution
+import CSHRL.Probability.Compose
+import CSHRL.Core.FOSD
+import CSHRL.Core.SD
+import CSHRL.Core.Compose
+import CSHRL.Core.Abstraction
+
 -- Appendix (pedagogical and classical RL connection)
 import appendix.PreservationEquivalence
 import appendix.Arithmetic
@@ -39,6 +53,9 @@ import CSHRL.Tasks.Classic.Trap
 -- Verified Task Implementations
 import CSHRL.Tasks.Verified.TwoState
 import CSHRL.Tasks.Verified.TwoStateLearning
+import CSHRL.Tasks.Verified.BinarySacrifice
+import CSHRL.Tasks.Verified.SkillInvestment
+import CSHRL.Tasks.Verified.PreparationDilemma
 import CSHRL.Tasks.Verified.OnePlacement
 import CSHRL.Tasks.Verified.Queens1
 -- Queens8 and Queens8Learning omitted: full game-tree search (~4 min each).
