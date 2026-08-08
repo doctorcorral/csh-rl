@@ -42,24 +42,25 @@ definition, at no loss of mathematical content.
 | T4 | Subsumption | Given `add`/`zero` with `add` monotone: a CoindHomo ranking dominates every partial sum of the action-value stream at every finite horizon (successor form for CoinductiveHomomorphism) | §7, `src/appendix/Arithmetic.agda` (`partial-sum-mono`, `subsumes-partial-sum`) |
 | T5 | Learning kernel | For explicit list rankings: (a) `swap_fixes_pair` — the transposition repair makes the ranking agree with the oracle on the violated pair; (b) `state_updater_locality` — the state-specific updater touches only the violated state; (c) `demote_preserves_dominance` and `make_action_unavailable_preserves_dominance` — demotion preserves dominance among all other pairs (Remark 2, O(1) adaptation). Plus reflexivity and totality of the induced order | §14, `src/CSHRL/Learning/Base.agda` |
 | T6 | Q-learning failure | In `BinarySacrifice`: GoTrap wins the immediate-reward comparison while GoParadise's successor dominates at every horizon (sums are exactly `N` versus `0`); hence Q-learning with γ < ½ selects the action with the strictly inferior successor | §7.2, `src/CSHRL/Analysis/QLearningFailure.agda` |
-| T7 | Convergence of swap learning (**closed**) | For an explicit list ranking and a total, transitive boolean oracle: (a) `swap_adjacent_decreases` — repairing a violated *adjacent* pair (a transposition, generator of S_n) decreases the violation count by exactly 1; (b) `fix_first_progress` — the first-violation repair either certifies zero violations or strictly decreases them; (c) `swap_convergence_bound` — iterating the repair reaches zero violations within `C(n,2)` steps; (d) `violations_zero_iff` — zero violations means the ranking realizes the oracle on *every* ordered pair (the homomorphism property). This CLOSES the statement that is an assumption record (`ViolationMonotonicityTheorem`) in the Agda reference | §14 (bound `\|S\|·C(\|A\|,2)` per state); Rocq/Lean `Convergence` |
+| T7 | Convergence of swap learning (**closed**) | For an explicit list ranking and a total, transitive boolean oracle: (a) `swap_adjacent_decreases` — repairing a violated *adjacent* pair (a transposition, generator of S_n) decreases the violation count by exactly 1; (b) `fix_first_progress` — the first-violation repair either certifies zero violations or strictly decreases them; (c) `swap_convergence_bound` — iterating the repair reaches zero violations within `C(n,2)` steps; (d) `violations_zero_iff` — zero violations means the ranking realizes the oracle on *every* ordered pair (the homomorphism property) | §14 (bound `\|S\|·C(\|A\|,2)` per state); `CSHRL.Learning.Convergence` |
 | T8 | Pointwise ⇒ lexicographic | `x ⊑ y → x ≤lex y`: every deterministic verification transfers to the stochastic order for free; a ranking preserving pointwise dominance of expected streams is a `StochasticCoindHomo` | `CSHRL.Core.Stochastic` (`pointwise→lex`) |
 | T9 | SD hierarchy + closure | (a) `SD_subsumes`: `SD[k] ⇒ SD[k+1]` (prefix sums preserve dominance); (b) `sd_weight` is linear (distributes over `++` and `scale`), hence FOSD and every `SD[k]` are closed under mixture and reward scaling | `CSHRL.Probability.SD`, `CSHRL.Probability.Compose` |
 | T10 | Convolution closure | If `μ₁ FOSD≤ ν₁` (equal total weights) and `μ₂ FOSD≤ ν₂` then `conv μ₁ μ₂ FOSD≤ conv ν₁ ν₂`, and the closure lifts to every `SD[k]`. Proof by discrete Abel summation: the CDF of a convolution is a generalized weighted sum of shifted CDFs; monotone direction pointwise, base direction by induction on the support bound | `CSHRL.Probability.Convolution` (`FOSD-conv`, `FOSD→SD-conv`) |
 | T11 | Ranking algebra | VerifiedRankings compose: hierarchy subsumption (k → k+1), product composition for any SD[k]-preserving operation (mixture `++`, convolution, scaling as instances), and sum composition for disjoint environments | `CSHRL.Core.Compose` |
 | T12 | Abstraction lifting | Under marginal-invariance (same abstract class ⇒ same marginals), `abstract_lift` transfers a VerifiedRanking from the abstract to the concrete system; abstractions compose (identity, product, vertical), and combine with the convolution product (`abstract_conv_product`) | `CSHRL.Core.Abstraction` |
 
-Note on T7: the Rocq and Lean ports prove the convergence theorem in
-*closed* form for the adjacent-transposition repair; in the Agda reference
-the corresponding global statement is still an assumption record
-(`ViolationMonotonicityTheorem` in `Learning/Base.agda`). T7 is therefore
-the one place where the ports are ahead of the reference.
+Note on T7: the convergence theorem was first closed in the Rocq and Lean
+ports and then back-ported to the Agda reference
+(`CSHRL.Learning.Convergence`), so all three systems now carry it in
+closed form for the adjacent-transposition repair. The
+`ViolationMonotonicityTheorem` record in `Learning/Base.agda` remains
+only for EC-specific instantiations using the global (non-adjacent) swap.
 
 ## Ports
 
 | System | Directory | Style | Status |
 |--------|-----------|-------|--------|
-| Agda 2.8.0 | `src/CSHRL/` | coinductive records + copatterns, `--safe --guardedness` | reference (complete, except T7 which is an assumption record) |
+| Agda 2.8.0 | `src/CSHRL/` | coinductive records + copatterns, `--safe --guardedness` | reference (complete) |
 | Rocq 9.2 | `ports/rocq/` | negative coinductives (primitive projections), `cofix`; T1–T6 use only Init, milestone-3 files (D12–D16, T7–T12) use the axiom-free Stdlib + `lia` | kernel (T1–T12) |
 | Lean 4.32 | `ports/lean/` | functional streams (`Nat → R`), pointwise-first; core library only | kernel (T1–T12) |
 

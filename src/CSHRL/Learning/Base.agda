@@ -552,18 +552,24 @@
       where 
         open import Data.Nat.Properties using (n≤1+n)
 
-    ------------------------------------------------------------------------
-    -- Key Theorem: Violation Monotonicity
-    --
-    -- The main theorem states that the swap-based updater decreases
-    -- violations. The proof requires showing:
-    --   1. Swap fixes the violated pair
-    --   2. Swap doesn't create new violations (requires oracle transitivity)
-    --
-    -- We state this as a theorem type with explicit assumptions.
-    ------------------------------------------------------------------------
+  ------------------------------------------------------------------------
+  -- Key Theorem: Violation Monotonicity
+  --
+  -- The main theorem states that the swap-based updater decreases
+  -- violations. The proof requires showing:
+  --   1. Swap fixes the violated pair
+  --   2. Swap doesn't create new violations (requires oracle transitivity)
+  --
+  -- We state this as a theorem type with explicit assumptions.
+  --
+  -- NOTE: for the ADJACENT-transposition repair this statement is now a
+  -- CLOSED theorem: see CSHRL.Learning.Convergence
+  -- (swap-adjacent-decreases, fix-first-progress, swap-convergence-bound,
+  -- learn-realizes-oracle).  The record below remains for EC-specific
+  -- instantiations that use the global (non-adjacent) swap updater.
+  ------------------------------------------------------------------------
 
-    -- The main monotonicity theorem (stated as a record for assumptions)
+  -- The main monotonicity theorem (stated as a record for assumptions)
     record ViolationMonotonicityTheorem : Set₁ where
       field
         -- The underlying oracle must be a preorder (transitive, reflexive)

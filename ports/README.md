@@ -3,9 +3,7 @@
 Ports of the CSHRL portability kernel to proof assistants other than Agda.
 The kernel — what every port must define and prove — is specified in
 [`SPEC.md`](SPEC.md). The Agda development in `src/CSHRL/` is the reference
-implementation and goes beyond the kernel (with one exception: T7, the
-closed convergence theorem, which the ports prove and the Agda reference
-still states as an assumption record).
+implementation and goes beyond the kernel.
 
 ## Layout
 
@@ -34,7 +32,7 @@ build.
 | T4 finite-horizon subsumption | done | done | done |
 | T5 learning kernel (swap, locality, demotion) | done | done | done |
 | T6 Q-learning failure analysis | done | done | done |
-| T7 closed convergence of swap learning (violation decrease, C(n,2) bound) | assumption record | **done (closed)** | **done (closed)** |
+| T7 closed convergence of swap learning (violation decrease, C(n,2) bound) | done (closed, back-ported from the ports) | done (closed) | done (closed) |
 | D12 finite distribution monad | done | done | done |
 | D13/T8 lexicographic dominance, pointwise ⇒ lex | done | done | done |
 | D14/T9 FOSD + SD[k] hierarchy and closure (++, scale) | done | done | done |

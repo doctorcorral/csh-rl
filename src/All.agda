@@ -38,6 +38,7 @@ import CSHRL.EnvironmentClass.StochasticFiniteMDP
 
 -- Learning Infrastructure
 import CSHRL.Learning.Base
+import CSHRL.Learning.Convergence
 import CSHRL.Learning.FiniteDeterministicMDP
 import CSHRL.Learning.StochasticFiniteMDP
 import CSHRL.Learning.CombinatorialPlacementMDP
