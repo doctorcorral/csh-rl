@@ -59,6 +59,7 @@ import CSHRL.Tasks.Verified.SkillInvestment
 import CSHRL.Tasks.Verified.PreparationDilemma
 import CSHRL.Tasks.Verified.OnePlacement
 import CSHRL.Tasks.Verified.Queens1
+import CSHRL.Tasks.Verified.Sudoku4
 -- Queens8 and Queens8Learning omitted: full game-tree search (~4 min each).
 -- Verified in a separate parallel CI job; run locally with:
 --   agda src/CSHRL/Tasks/Verified/Queens8.agda

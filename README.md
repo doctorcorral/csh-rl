@@ -89,6 +89,7 @@ src/
 │       │   ├── OnePlacement.agda          # Single-slot placement
 │       │   ├── Queens1.agda               # 1-queen (trivial case)
 │       │   ├── Queens8.agda               # Full 8-Queens CoindHomo (--safe)
+│       │   ├── Sudoku4.agda               # 4x4 Sudoku puzzle solving (--safe)
 │       │   ├── GridWorld5x5.agda          # 25-state navigation
 │       │   │
 │       │   │   # Learning Demos
