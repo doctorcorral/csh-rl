@@ -142,12 +142,13 @@ The framework introduces thirteen components, all machine-verified in Agda:
 
 We demonstrate the full pipeline end-to-end on three Environment Classes and three continuous-control benchmarks:
 a Finite Deterministic MDP (1D Maze) where CEGIS synthesizes ranking predicates that yield a verified \texttt{CoindHomo} and optimal policy;
-a Combinatorial Placement MDP ($N$-Queens) where synthesized predicates \emph{define} the environment's step function, enabling \texttt{find-policy} to solve 4-Queens instantly and 8-Queens;
+a Combinatorial Placement MDP ($N$-Queens, Sudoku) where synthesized predicates \emph{define} the environment's step function---\texttt{find-policy} solves 4-Queens, 8-Queens, and 4$\times$4 Sudoku through the synthesized dynamics, certifying solvability and doom via the capability profile, and the same class scales to full 9$\times$9 Sudoku with a machine-checked CoindHomo over a $9^{43}$-leaf game tree;
 a Stochastic Finite MDP where synthesis operates on expected traces;
 and autonomous controllers for CartPole (500/500), MountainCar (1000/1000), and Acrobot (500/500, avg.\ 88 steps)---the last using a \texttt{DirectRewardMDP} EC whose reward is derived from the total energy of the Euler-integrated next state, computed from the Lagrangian ODE of the double pendulum entirely within Agda.
 
 This document is itself the proof: compiling it with \texttt{agda --latex} type-checks all embedded code while producing this PDF.
 The synthesis framework builds on the CSHRL foundation~\cite{CSHRLSuccessor} without modifying it---all results are additive.  The core FOSD, SD hierarchy, and state abstraction theories are developed in~\cite{CSHRLSuccessor}; this paper focuses on the synthesis pipeline and its applications.
+The combinatorial placement environment class and its trace-bridge theorem have additionally been ported to Rocq and Lean~4, where the Sudoku instances are re-verified end to end---including the full 43-step 9$\times$9 policy rollout by compiled evaluation---so the synthesis substrate is certified by three independent proof-assistant kernels.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1520,6 +1521,8 @@ The crown jewel of integration is \textbf{bridge sufficiency}: if the learning l
 \noindent This theorem is the formal bridge between \emph{learning convergence} and \emph{synthesis correctness}: the learner drives observation collection, and the synthesizer guarantees that survivors are globally correct.
 The proof reduces to \texttt{sufficient-cegis} via \texttt{bridge-is-cegis}---the bridge adds no overhead.
 
+The learning-side half of this composition is now itself a closed proof: the convergence of swap-based violation repair, previously an assumption record (\texttt{ViolationMonotonicityTheorem}) in the reference implementation, is proved in \fpath{src/CSHRL/Learning/Convergence.agda} (each adjacent-transposition repair strictly decreases the violation count, giving convergence to an oracle-realizing ranking within $\binom{n}{2}$ repairs per state).  The composed pipeline---learning convergence through \textsc{Bridge-Sufficient} to synthesis correctness---is therefore assumption-free end to end.
+
 The bridge also inherits commutativity and replay redundancy:
 
 \begin{spec}
@@ -1812,6 +1815,7 @@ module FDMDPSynthesis (State Action : Set)
 \end{spec}
 
 \subsection{Combinatorial Placement MDP Synthesis}
+\label{sec:cpmdp-synthesis}
 
 For CPMDPs, the synthesis target is different: instead of rankings, we synthesize the \emph{environment predicates} \texttt{is-dead} and \texttt{is-solved} that determine the step function.
 
@@ -1836,6 +1840,8 @@ module PlacementSynthesis (Config : Set) (Action : Set) ... where
 \end{spec}
 
 \noindent This is the ``synthesis on the critical path'' pattern: without CEGIS producing \texttt{is-dead-prog} and \texttt{is-solved-prog}, there is no step function, and \texttt{find-policy} cannot operate.  The synthesized \texttt{PredProg} terms \emph{are} the environment dynamics.
+
+The CPMDP class itself scales well beyond $N$-Queens: Section~\ref{sec:e2e-sudoku} instantiates it at full 9$\times$9 Sudoku (horizon 43), where the trace-bridge CoindHomo is obtained symbolically for every state of a $9^{43}$-leaf game, and the class has been ported to Rocq and Lean~4 (kernel item T13) with the Sudoku instances re-verified in both systems.
 
 \subsection{Stochastic Finite MDP Synthesis}
 \label{sec:stochastic-synthesis}
@@ -2007,6 +2013,52 @@ refine-same : refine (initial-vs 0) (board₁ , true)
             ≡ refine (initial-vs 0) (board₂ , true)
 refine-same = refine-equiv (initial-vs 0) board₁ board₂ true (λ { ... → refl })
 \end{spec}
+
+\subsection{Demo 16: Sudoku (CPMDP)}
+\label{sec:e2e-sudoku}
+
+Sudoku exercises the CPMDP pattern twice: the full synthesis pipeline at 4$\times$4 (\fpath{src/CSHRL/Tasks/Synthesized/SudokuE2E.agda}), and the placement theory at full 9$\times$9 scale (38 givens, horizon 43, a $9^{43}$-leaf raw game tree) via direct instantiation in the reference implementation and the cross-system ports.
+
+\paragraph{Synthesized predicates (4$\times$4).}  Exactly as in the Queens demo, the environment dynamics \emph{are} PredProg terms.  The feature vocabulary is the 56 pairwise \texttt{conflict} features over the \texttt{sees} relation (row, column, box) plus a \texttt{filled-is} counter:
+\begin{spec}
+sees p q = (div4 p ≡ᵇ div4 q) ∨ (mod4 p ≡ᵇ mod4 q)
+  ∨ ((div2 (div4 p) ≡ᵇ div2 (div4 q)) ∧ (div2 (mod4 p) ≡ᵇ div2 (mod4 q)))
+
+is-dead-prog   : PredProg = any-feat conflict-feats     -- 56 features
+is-solved-prog : PredProg = feat (filled-is num-empty)
+
+open CombinatorialPlacementMDP Config Action
+  (eval is-dead-prog) (eval is-solved-prog)
+  place solved-reward all-actions D1 num-empty
+\end{spec}
+The Finder then completes the puzzle through the synthesized dynamics, verified end to end by \texttt{refl}:
+\begin{spec}
+test-solution : run-policy (Ongoing []) 8 8
+  ≡ D2 ∷ D3 ∷ D3 ∷ D2 ∷ D1 ∷ D4 ∷ D4 ∷ D1 ∷ []
+\end{spec}
+CEGIS pins the conflict predicate from two board observations (one dead, one alive), and propagation transfers observations between boards with the same conflict pattern---the Queens demo's structure, unchanged.
+
+\paragraph{Solvability and doom are knowable.}  The EC's capability profile \texttt{solve} certifies both directions computationally.  From the empty board the full reward is reachable (the puzzle \emph{is} solvable); a wrong digit leads to a successor whose profile is identically zero (the branch is \emph{doomed}):
+\begin{spec}
+test-solvable : solve (Ongoing []) num-empty ≡ solved-reward   = refl
+test-doomed   : solve (proj₁ (step (Ongoing []) D3)) num-empty ≡ 0 = refl
+\end{spec}
+The subtler phenomenon---a state that is \emph{not yet dead} but already unwinnable---is certified in the Queens demo: board $[0]$ has no attack, yet no 4-Queens solution starts in column 0, and \texttt{solve (Ongoing (0 ∷ [])) N ≡ 0} holds by \texttt{refl}.  Horizon sufficiency (\S\ref{sec:cpmdp-synthesis}) upgrades this finite-depth zero to \emph{all} depths: doom detected at the horizon is doom forever.
+
+\paragraph{Full 9$\times$9 scale.}  The 9$\times$9 instances (\fpath{src/CSHRL/Tasks/Verified/Sudoku9.agda} and the ports) instantiate the same EC with hand-written predicates of the same shape (a disjunction of \texttt{sees}-conflicts) rather than the CEGIS pipeline---the point at this scale is the placement theory itself.  The trace bridge (\texttt{WithTraceBridge}) yields the CoindHomo for the Finder's trace ranking at \emph{every} state of the 9$\times$9 MDP.  Crucially, this proof is symbolic: its cost is independent of the $9^{43}$-leaf game tree, because the bridge argues through the binary structure and monotonicity of \texttt{solve} rather than by enumeration.
+
+Policy extraction by normalization is where scale bites: certifying a rollout by \texttt{refl} means the type checker itself executes the depth-43 lookahead search.  The 9$\times$9 \emph{instance} is therefore designed so that every empty cell, in row-major fill order, is directly conflict-forced---all eight wrong digits immediately collide with an already-filled peer---making the search tree the normalizer must walk linear ($\sim$400 nodes).  This is a property of the chosen puzzle, not of the solver: the Finder's definition and its CoindHomo cover the general MDP with all nine actions at every node.  Two \texttt{refl} certificates pin the rollout:
+\begin{spec}
+-- every cell is conflict-forced to the unique solution digit
+test-forced : map surviving (upTo num-empty) ≡ map (λ d → d ∷ []) solution
+
+-- the Finder's policy fills the final cells (shallow lookahead)
+test-tail-rollout :
+  run-policy (Ongoing (take' 40 solution)) 3 3 ≡ A5 ∷ A6 ∷ A8 ∷ []
+\end{spec}
+Dead actions produce all-zero traces while the surviving action's trace carries the solved reward within lookahead, so forcedness plus the trace bridge determine the full rollout mathematically.
+
+\paragraph{Cross-system verification.}  The placement class, its binary-solve theory, and the trace bridge are ported to Rocq and Lean~4 as kernel item T13 (\fpath{ports/rocq/theories/Placement.v}, \fpath{ports/lean/CSHRL/Placement.lean}), with one improvement over the Agda reference: horizon sufficiency is discharged \emph{generically} for sized games (each placement increases a size measure by one; solving means reaching the horizon), so the Sudoku instances carry no proof obligations beyond their static description.  Each system then plays to its evaluator's strengths: Rocq verifies the \emph{full 43-step 9$\times$9 rollout} by \texttt{vm\_compute} (call-by-value with perfect sharing); Lean verifies the 4$\times$4 rollout by kernel reduction and the 9$\times$9 forcedness certificate by kernel \texttt{decide}; Agda verifies forcedness and the tail rollout by \texttt{refl}.  The Lean axiom check confirms T13 and both Sudoku CoindHomos depend only on \texttt{propext} and \texttt{Quot.sound}; the Rocq development is closed under the global context (\texttt{Print Assumptions}).
 
 \subsection{Demo 4: Biased Bandit (SFMDP)}
 \label{sec:e2e-bandit}
@@ -3277,6 +3329,7 @@ The paper is a literate Agda document.  Building the PDF type-checks all embedde
     \item \textbf{Theory Bridges:} \fpath{src/CSHRL/Synthesis/PairwiseRanking.agda} (unavailability), \fpath{CoindHomoBridge.agda} (oracle substitution)
     \item \textbf{Python Extractions:} \fpath{scripts/record\_cartpole\_gridless.py}, \fpath{scripts/record\_pong\_gridless.py}
   \end{itemize}
+\item \textbf{Cross-system ports:} The portability kernel (streams, dominance, the two optimality conditions, decomposition, learning convergence, the stochastic/FOSD layer, and the placement environment class with its trace bridge, T13) is maintained in Rocq (\fpath{ports/rocq/}, Stdlib only) and Lean~4 (\fpath{ports/lean/}, core only, no Mathlib).  Both ports re-verify the Sudoku instances---Rocq including the full 43-step 9$\times$9 rollout by \texttt{vm\_compute}---and both carry axiom-hygiene checks (\texttt{Print Assumptions} / \texttt{\#print axioms}) certifying no admitted or sorried proofs.
 \end{itemize}
 
 \appendix

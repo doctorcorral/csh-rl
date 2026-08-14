@@ -271,6 +271,28 @@ test-final-state :
 test-final-state = refl
 
 ------------------------------------------------------------------------
+-- DOOM DETECTION: alive but unwinnable states are recognized
+--
+-- Board [0] has no attack yet (it is NOT dead), but no 4-Queens
+-- solution places the first queen in column 0.  The EC's capability
+-- profile certifies this: solve = 0 at full depth means no sequence
+-- of placements from [0] ever reaches Solved.  Contrast with the
+-- empty board, whose capability profile is the full reward.
+------------------------------------------------------------------------
+
+-- [0] is not (yet) dead ...
+test-c0-alive : synth-is-dead (0 ∷ []) ≡ false
+test-c0-alive = refl
+
+-- ... but it is doomed: nothing is reachable from it
+test-c0-doomed : solve (Ongoing (0 ∷ [])) N ≡ 0
+test-c0-doomed = refl
+
+-- The empty board, by contrast, is certified solvable
+test-solvable : solve (Ongoing []) N ≡ solved-reward
+test-solvable = refl
+
+------------------------------------------------------------------------
 -- ═══════════════════════════════════════════════════════════════════
 -- STEP 5: CEGIS DEMO — Synthesize a predicate from observations
 -- ═══════════════════════════════════════════════════════════════════
