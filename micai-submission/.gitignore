@@ -2,3 +2,8 @@ latex/
 _build/
 *.agdai
 _agda_build.log
+16.pdf
+16.zip
+16/
+Copyright-*.pdf
+.DS_Store
