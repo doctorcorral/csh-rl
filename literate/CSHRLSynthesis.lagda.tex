@@ -142,7 +142,7 @@ The framework introduces thirteen components, all machine-verified in Agda:
 
 We demonstrate the full pipeline end-to-end on three Environment Classes and three continuous-control benchmarks:
 a Finite Deterministic MDP (1D Maze) where CEGIS synthesizes ranking predicates that yield a verified \texttt{CoindHomo} and optimal policy;
-a Combinatorial Placement MDP ($N$-Queens, Sudoku) where synthesized predicates \emph{define} the environment's step function---\texttt{find-policy} solves 4-Queens, 8-Queens, and 4$\times$4 Sudoku through the synthesized dynamics, certifying solvability and doom via the capability profile, and the same class scales to full 9$\times$9 Sudoku with a machine-checked CoindHomo over a $9^{43}$-leaf game tree;
+a Combinatorial Placement MDP ($N$-Queens, Sudoku) where synthesized predicates \emph{define} the environment's step function---\texttt{find-policy} solves 4-Queens, 8-Queens, and 4$\times$4 Sudoku through the synthesized dynamics, certifying solvability and doom via the capability profile; for Sudoku the dynamics are additionally \emph{learned from scratch} by an online CEGIS loop (24 counterexample observations, CEGAR-verified convergence, policy extracted from the learned model), and the same class scales to full 9$\times$9 Sudoku with a machine-checked CoindHomo over a $9^{43}$-leaf game tree;
 a Stochastic Finite MDP where synthesis operates on expected traces;
 and autonomous controllers for CartPole (500/500), MountainCar (1000/1000), and Acrobot (500/500, avg.\ 88 steps)---the last using a \texttt{DirectRewardMDP} EC whose reward is derived from the total energy of the Euler-integrated next state, computed from the Lagrangian ODE of the double pendulum entirely within Agda.
 
@@ -2017,7 +2017,7 @@ refine-same = refine-equiv (initial-vs 0) board₁ board₂ true (λ { ... → r
 \subsection{Demo 16: Sudoku (CPMDP)}
 \label{sec:e2e-sudoku}
 
-Sudoku exercises the CPMDP pattern twice: the full synthesis pipeline at 4$\times$4 (\fpath{src/CSHRL/Tasks/Synthesized/SudokuE2E.agda}), and the placement theory at full 9$\times$9 scale (38 givens, horizon 43, a $9^{43}$-leaf raw game tree) via direct instantiation in the reference implementation and the cross-system ports.
+Sudoku exercises the CPMDP pattern three times: the full synthesis pipeline at 4$\times$4 with hand-constructed predicates (\fpath{src/CSHRL/Tasks/Synthesized/SudokuE2E.agda}), the same instance with the dynamics \emph{learned automatically} from environment interaction (\fpath{src/CSHRL/Tasks/Synthesized/SudokuSynth.agda}), and the placement theory at full 9$\times$9 scale (38 givens, horizon 43, a $9^{43}$-leaf raw game tree) via direct instantiation in the reference implementation and the cross-system ports.
 
 \paragraph{Synthesized predicates (4$\times$4).}  Exactly as in the Queens demo, the environment dynamics \emph{are} PredProg terms.  The feature vocabulary is the 56 pairwise \texttt{conflict} features over the \texttt{sees} relation (row, column, box) plus a \texttt{filled-is} counter:
 \begin{spec}
@@ -2037,6 +2037,31 @@ test-solution : run-policy (Ongoing []) 8 8
   ≡ D2 ∷ D3 ∷ D3 ∷ D2 ∷ D1 ∷ D4 ∷ D4 ∷ D1 ∷ []
 \end{spec}
 CEGIS pins the conflict predicate from two board observations (one dead, one alive), and propagation transfers observations between boards with the same conflict pattern---the Queens demo's structure, unchanged.
+
+\paragraph{Arriving at the dynamics automatically.}  The demo above still \emph{writes down} \texttt{is-dead-prog} and then verifies it.  The companion module \fpath{src/CSHRL/Tasks/Synthesized/SudokuSynth.agda} removes the hand: the learner starts with the \emph{empty} feature set (candidate \texttt{is-dead} $=$ \texttt{falsep}, ``nothing ever dies''---and indeed \texttt{cand-is-dead [] (1 ∷ []) ≡ false} while the environment observably kills that board) and discovers the dynamics by online CEGIS against the environment as a black box.  At each reachable board the learner probes every action and compares its candidate's prediction with the observed outcome; every disagreement is a counterexample observation whose witness board's firing features are absorbed into the compact version space:
+\begin{spec}
+probe c (vs , n) a = let b = place c a in
+  if env-is-dead b ∧ not (cand-is-dead vs b)
+    then (vs ++ new-firing b vs , suc n)  else (vs , n)
+
+learned      = walk [] ([] , 0) num-empty
+synthesized  = proj₁ learned
+\end{spec}
+Because every vocabulary feature semantically under-approximates death (a firing \texttt{conflict} \emph{is} a rule violation), absorption is sound, and the candidate can only disagree in one direction (predicting alive on a dead board)---so counterexamples monotonically grow the version space and the loop terminates.  Three \texttt{refl} certificates quantify the run, and a CEGAR-style verification sweep re-walks the environment to certify convergence:
+\begin{spec}
+test-obs-count  : proj₂ learned ≡ 24            -- counterexamples absorbed
+test-feat-count : length synthesized ≡ 44       -- of the 56-feature vocabulary
+test-no-counterexample : verify synthesized [] num-empty ≡ true
+\end{spec}
+The observation count exhibits the dissolution effect at the level of \emph{dynamics} synthesis: 24 disagreements suffice where the raw board space has $4^8 = 65{,}536$ elements, because only disagreements are informative.  The 12 unlearned features never fire on any reachable counterexample; they are behaviourally irrelevant and the version space correctly never resolves them.  Finally the EC is instantiated with the \emph{learned} PredProg and the Finder plans inside the learned model:
+\begin{spec}
+synth-is-dead = eval (any-feat synthesized)     -- discovered, not written
+
+test-solution : run-policy (Ongoing []) 8 8
+  ≡ D2 ∷ D3 ∷ D3 ∷ D2 ∷ D1 ∷ D4 ∷ D4 ∷ D1 ∷ []   -- the unique solution
+test-valid    : ok-board (board-of solution) ≡ true   -- valid in the REAL env
+\end{spec}
+Nothing about \texttt{is-dead} was written by hand; the agent arrived at an environment model from interaction, a CEGAR sweep certified it against the environment, and the policy extracted from the learned model solves the real puzzle.  All of it is \texttt{--safe} Agda checked by \texttt{refl}.
 
 \paragraph{Solvability and doom are knowable.}  The EC's capability profile \texttt{solve} certifies both directions computationally.  From the empty board the full reward is reachable (the puzzle \emph{is} solvable); a wrong digit leads to a successor whose profile is identically zero (the branch is \emph{doomed}):
 \begin{spec}
