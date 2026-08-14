@@ -39,3 +39,5 @@ build.
 | T10 convolution closure (Abel summation) | done | done | done |
 | D15/T11 compositional ranking algebra | done | done | done |
 | D16/T12 verified state abstraction | done | done | done |
+| D17/T13 placement class + trace bridge (generic sized-game CoindHomo) | done | done | done |
+| Sudoku instances (4×4 + full 9×9) | done (forcedness + tail rollout by `refl`) | done (full 9×9 rollout by `vm_compute`) | done (4×4 rollout + 9×9 forcedness by kernel) |

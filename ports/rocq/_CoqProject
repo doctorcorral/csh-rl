@@ -16,4 +16,6 @@ theories/SDHierarchy.v
 theories/Convolution.v
 theories/Ranking.v
 theories/Abstraction.v
+theories/Placement.v
+theories/Sudoku.v
 theories/AxiomCheck.v

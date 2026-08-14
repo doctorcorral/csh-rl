@@ -20,6 +20,8 @@ import CSHRL.SDHierarchy
 import CSHRL.Convolution
 import CSHRL.Ranking
 import CSHRL.Abstraction
+import CSHRL.Placement
+import CSHRL.Sudoku
 
 namespace CSHRL
 
@@ -71,5 +73,11 @@ namespace CSHRL
 -- T12
 #print axioms abstractLift
 #print axioms abstractConvProduct
+-- T13
+#print axioms Placement.bestTrace_is_solve
+#print axioms Placement.placement_coindhomo
+#print axioms Placement.sized_coindhomo
+#print axioms Sudoku.S4.sudoku4_coindhomo
+#print axioms Sudoku.S9.sudoku9_coindhomo
 
 end CSHRL

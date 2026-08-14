@@ -58,3 +58,6 @@ jobs:
     - name: Compile Queens8 (full game-tree verification)
       run: agda src/CSHRL/Tasks/Verified/Queens8.agda
 
+    - name: Compile Sudoku9 (full 9x9 verification)
+      run: agda src/CSHRL/Tasks/Verified/Sudoku9.agda
+

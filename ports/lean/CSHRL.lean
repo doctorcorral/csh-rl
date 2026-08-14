@@ -14,5 +14,7 @@ import CSHRL.SDHierarchy
 import CSHRL.Convolution
 import CSHRL.Ranking
 import CSHRL.Abstraction
+import CSHRL.Placement
+import CSHRL.Sudoku
 import CSHRL.AxiomCheck
 import CSHRL.QLearningFailure

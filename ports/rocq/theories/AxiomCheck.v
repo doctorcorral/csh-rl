@@ -8,7 +8,8 @@
 From CSHRL Require Import
   Streams Core BinarySacrifice SkillInvestment PreparationDilemma
   Subsumption Learning Convergence QLearningFailure
-  Dist Lex SDHierarchy Convolution Ranking Abstraction.
+  Dist Lex SDHierarchy Convolution Ranking Abstraction
+  Placement Sudoku.
 
 (* T1 *)
 Print Assumptions stream_le_iff_pointwise.
@@ -56,3 +57,9 @@ Print Assumptions sum_ranking.
 (* T12 *)
 Print Assumptions abstract_lift.
 Print Assumptions abstract_conv_product.
+(* T13 *)
+Print Assumptions best_trace_is_solve.
+Print Assumptions placement_coindhomo.
+Print Assumptions sized_coindhomo.
+Print Assumptions Sudoku4.sudoku4_coindhomo.
+Print Assumptions Sudoku9.sudoku9_coindhomo.

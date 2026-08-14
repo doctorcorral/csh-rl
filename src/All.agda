@@ -60,10 +60,11 @@ import CSHRL.Tasks.Verified.PreparationDilemma
 import CSHRL.Tasks.Verified.OnePlacement
 import CSHRL.Tasks.Verified.Queens1
 import CSHRL.Tasks.Verified.Sudoku4
--- Queens8 and Queens8Learning omitted: full game-tree search (~4 min each).
--- Verified in a separate parallel CI job; run locally with:
+-- Queens8, Queens8Learning, and Sudoku9 omitted: heavy normalization
+-- (~2-4 min each).  Verified in a separate parallel CI job; run locally:
 --   agda src/CSHRL/Tasks/Verified/Queens8.agda
 --   agda src/CSHRL/Tasks/Verified/Queens8Learning.agda
+--   agda src/CSHRL/Tasks/Verified/Sudoku9.agda
 
 -- Stochastic Task Implementations
 import CSHRL.Tasks.Stochastic.CoinFlip

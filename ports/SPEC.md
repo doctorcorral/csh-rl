@@ -31,6 +31,7 @@ definition, at no loss of mathematical content.
 | D14 | FOSD and the SD[k] hierarchy | `μ FOSD≤ ν ⟺ ∀ r, cdf ν r ≤ cdf μ r`; `sd_weight k` = k-fold prefix sum of the CDF; `μ SD[k]≤ ν ⟺ ∀ r, sd_weight k ν r ≤ sd_weight k μ r`. SD[0] = FOSD, SD[1] = SOSD, SD[2] = TOSD | `CSHRL.Probability.FOSD`, `CSHRL.Probability.SD` |
 | D15 | VerifiedRanking | An action ordering per state plus a proof that it preserves `SD[k]` on a marginal-reward function `State → Action → ℕ → Dist ℕ` at every timestep | `CSHRL.Core.Compose` |
 | D16 | StateAbstraction | `project : Concrete → Abstract`, `embed : Abstract → Concrete`, with the section law `project ∘ embed = id` | `CSHRL.Core.Abstraction` |
+| D17 | CombinatorialPlacementMDP | A placement game: states `Ongoing c \| Dead \| Solved c`, a `step` driven by `is_dead`/`is_solved`/`place`, reward `R > 0` on solving and `0` otherwise, capability profile `solve` = best achievable reward at each depth, and the Finder's lexicographic trace ranking. A *sized* game additionally has `size` with `place` increasing it by one and `solved ↔ size = horizon` | `CSHRL.EnvironmentClass.CombinatorialPlacementMDP` |
 
 ## Theorems
 
@@ -48,6 +49,7 @@ definition, at no loss of mathematical content.
 | T10 | Convolution closure | If `μ₁ FOSD≤ ν₁` (equal total weights) and `μ₂ FOSD≤ ν₂` then `conv μ₁ μ₂ FOSD≤ conv ν₁ ν₂`, and the closure lifts to every `SD[k]`. Proof by discrete Abel summation: the CDF of a convolution is a generalized weighted sum of shifted CDFs; monotone direction pointwise, base direction by induction on the support bound | `CSHRL.Probability.Convolution` (`FOSD-conv`, `FOSD→SD-conv`) |
 | T11 | Ranking algebra | VerifiedRankings compose: hierarchy subsumption (k → k+1), product composition for any SD[k]-preserving operation (mixture `++`, convolution, scaling as instances), and sum composition for disjoint environments | `CSHRL.Core.Compose` |
 | T12 | Abstraction lifting | Under marginal-invariance (same abstract class ⇒ same marginals), `abstract_lift` transfers a VerifiedRanking from the abstract to the concrete system; abstractions compose (identity, product, vertical), and combine with the convolution product (`abstract_conv_product`) | `CSHRL.Core.Abstraction` |
+| T13 | Placement trace bridge | (a) `best_trace_is_solve` — the Finder's finite lexicographic max-trace computes `solve` pointwise (via binary values and monotonicity of the placement game); (b) `placement_coindhomo` — given horizon sufficiency (`solve c horizon = 0 → ∀ n, solve c n = 0`), the Finder's trace ranking is a CoindHomo at *every* state; (c) `sized_coindhomo` — for sized games, horizon sufficiency is discharged generically, so any instance obtains its CoindHomo from the static description alone | `CSHRL.EnvironmentClass.CombinatorialPlacementMDP.WithTraceBridge` |
 
 Note on T7: the convergence theorem was first closed in the Rocq and Lean
 ports and then back-ported to the Agda reference
@@ -61,8 +63,17 @@ only for EC-specific instantiations using the global (non-adjacent) swap.
 | System | Directory | Style | Status |
 |--------|-----------|-------|--------|
 | Agda 2.8.0 | `src/CSHRL/` | coinductive records + copatterns, `--safe --guardedness` | reference (complete) |
-| Rocq 9.2 | `ports/rocq/` | negative coinductives (primitive projections), `cofix`; T1–T6 use only Init, milestone-3 files (D12–D16, T7–T12) use the axiom-free Stdlib + `lia` | kernel (T1–T12) |
-| Lean 4.32 | `ports/lean/` | functional streams (`Nat → R`), pointwise-first; core library only | kernel (T1–T12) |
+| Rocq 9.2 | `ports/rocq/` | negative coinductives (primitive projections), `cofix`; T1–T6 use only Init, milestone-3 files (D12–D17, T7–T13) use the axiom-free Stdlib + `lia` | kernel (T1–T13) |
+| Lean 4.32 | `ports/lean/` | functional streams (`Nat → R`), pointwise-first; core library only | kernel (T1–T13) |
+
+The placement class (D17/T13) is instantiated in all three systems with 4×4
+and full 9×9 Sudoku (`theories/Sudoku.v`, `CSHRL/Sudoku.lean`,
+`src/CSHRL/Tasks/Verified/Sudoku{4,9}.agda`). The executable certificates
+play to each evaluator's strengths: Rocq checks the full 43-step 9×9 policy
+rollout by `vm_compute`; Lean checks the 4×4 rollout by kernel reduction and
+the 9×9 conflict-forcedness certificate by `decide +kernel`; Agda checks the
+4×4 rollout, the 9×9 forcedness certificate, and a 9×9 tail rollout by
+`refl`.
 
 In the Lean port, T1 takes the form of two facts that together carry the
 coinductive content: `dominance_unfold` (pointwise dominance unfolds one step
@@ -72,7 +83,7 @@ coinduction principle).
 
 ## Conformance
 
-A port conforms to the kernel when it defines D1–D16 and proves T1–T12 without
+A port conforms to the kernel when it defines D1–D17 and proves T1–T13 without
 axioms beyond the system's base theory (no `admit`/`sorry`/`postulate`).
 Verified continuously by `theories/AxiomCheck.v` and `CSHRL/AxiomCheck.lean`:
 Rocq via `Print Assumptions` (all 34 checked theorems closed under the global
