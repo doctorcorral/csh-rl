@@ -142,7 +142,7 @@ The framework introduces thirteen components, all machine-verified in Agda:
 
 We demonstrate the full pipeline end-to-end on three Environment Classes and three continuous-control benchmarks:
 a Finite Deterministic MDP (1D Maze) where CEGIS synthesizes ranking predicates that yield a verified \texttt{CoindHomo} and optimal policy;
-a Combinatorial Placement MDP ($N$-Queens, Sudoku) where synthesized predicates \emph{define} the environment's step function---\texttt{find-policy} solves 4-Queens, 8-Queens, and 4$\times$4 Sudoku through the synthesized dynamics, certifying solvability and doom via the capability profile; for Sudoku the dynamics are additionally \emph{learned from scratch} by an online CEGIS loop (24 counterexample observations, CEGAR-verified convergence, policy extracted from the learned model), and the same class scales to full 9$\times$9 Sudoku with a machine-checked CoindHomo over a $9^{43}$-leaf game tree;
+a Combinatorial Placement MDP ($N$-Queens, Sudoku) where synthesized predicates \emph{define} the environment's step function---\texttt{find-policy} solves 4-Queens, 8-Queens, and 4$\times$4 Sudoku through the synthesized dynamics, certifying solvability and doom via the capability profile; for Sudoku the dynamics are additionally \emph{learned from scratch} by an online CEGIS loop---at 4$\times$4 (24 counterexample observations) and at full 9$\times$9, where $387$ environment probes and $344$ counterexamples suffice to synthesize the dynamics of an $\approx\!10^{41}$-leaf game and solve it, linear in horizon rather than brute force---and the same class scales to full 9$\times$9 Sudoku with a machine-checked CoindHomo over a $9^{43}$-leaf game tree;
 a Stochastic Finite MDP where synthesis operates on expected traces;
 and autonomous controllers for CartPole (500/500), MountainCar (1000/1000), and Acrobot (500/500, avg.\ 88 steps)---the last using a \texttt{DirectRewardMDP} EC whose reward is derived from the total energy of the Euler-integrated next state, computed from the Lagrangian ODE of the double pendulum entirely within Agda.
 
@@ -2017,7 +2017,7 @@ refine-same = refine-equiv (initial-vs 0) board₁ board₂ true (λ { ... → r
 \subsection{Demo 16: Sudoku (CPMDP)}
 \label{sec:e2e-sudoku}
 
-Sudoku exercises the CPMDP pattern three times: the full synthesis pipeline at 4$\times$4 with hand-constructed predicates (\fpath{src/CSHRL/Tasks/Synthesized/SudokuE2E.agda}), the same instance with the dynamics \emph{learned automatically} from environment interaction (\fpath{src/CSHRL/Tasks/Synthesized/SudokuSynth.agda}), and the placement theory at full 9$\times$9 scale (38 givens, horizon 43, a $9^{43}$-leaf raw game tree) via direct instantiation in the reference implementation and the cross-system ports.
+Sudoku exercises the CPMDP pattern at two scales and two levels of automation: the full pipeline at 4$\times$4 both with hand-constructed predicates (\fpath{src/CSHRL/Tasks/Synthesized/SudokuE2E.agda}) and with the dynamics \emph{learned automatically} from environment interaction (\fpath{src/CSHRL/Tasks/Synthesized/SudokuSynth.agda}); the same automatic synthesis loop at full 9$\times$9 scale (\fpath{src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda}, 38 givens, horizon 43, a $9^{43}$-leaf raw game tree); and the placement \emph{theory} at 9$\times$9 via direct instantiation in the reference implementation and the cross-system ports.
 
 \paragraph{Synthesized predicates (4$\times$4).}  Exactly as in the Queens demo, the environment dynamics \emph{are} PredProg terms.  The feature vocabulary is the 56 pairwise \texttt{conflict} features over the \texttt{sees} relation (row, column, box) plus a \texttt{filled-is} counter:
 \begin{spec}
@@ -2063,6 +2063,34 @@ test-valid    : ok-board (board-of solution) ≡ true   -- valid in the REAL env
 \end{spec}
 Nothing about \texttt{is-dead} was written by hand; the agent arrived at an environment model from interaction, a CEGAR sweep certified it against the environment, and the policy extracted from the learned model solves the real puzzle.  All of it is \texttt{--safe} Agda checked by \texttt{refl}.
 
+\paragraph{Automatic synthesis at full 9$\times$9 scale.}  The same loop runs unchanged on the full 9$\times$9 puzzle (\fpath{src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda}, 38 givens, horizon 43, vocabulary of the 810 pairwise \texttt{sees}-conflict features), and it directly answers whether learning the dynamics is brute force: it is not.  The learner makes $43 \times 9 = 387$ environment probes---linear in horizon $\times$ actions---against a raw board space of $9^{43} \approx 10^{41}$:
+\begin{spec}
+test-run : (proj₂ learned , length synthesized , verify synthesized [] num-empty)
+         ≡ (344 , 637 , true)
+\end{spec}
+That is, 344 counterexample observations (the $43 \times 8$ dead probes) are absorbed, forcing 637 of the 810 features into the candidate, and the CEGAR sweep certifies no counterexample remains.  The other 173 features never fire on a reachable counterexample and are correctly never resolved.  Two facts about a forced-path walk, both borne out by the certificates, keep each refinement cheap: only the just-placed cell can introduce a new conflict (so it suffices to scan the $\sim$80 features touching that cell, not all 810), and each feature fires at exactly one counterexample (so the accumulated candidate is duplicate-free with no membership test).  The cost of \emph{arriving at} the dynamics is thus a linear sweep, not enumeration---the dissolution effect operating on the environment model itself.
+
+Solving through the learned 9$\times$9 model then meets the same normalization wall as the hand-written 9$\times$9 instance (a depth-43 \texttt{refl} rollout is out of reach for Agda's call-by-name normalizer over unary naturals; see \S\ref{sec:e2e-sudoku}), so it is certified the same way---forcedness under the \emph{learned} dynamics plus a shallow Finder rollout:
+\begin{spec}
+-- every cell conflict-forced to the solution digit, via the LEARNED is-dead
+test-forced : map surviving (upTo num-empty) ≡ map (λ d → d ∷ []) solution
+-- the EC's Finder, planning in the learned model, fills the last cells
+test-tail-rollout : run-policy (Ongoing (take' 41 solution)) 2 2 ≡ A6 ∷ A8 ∷ []
+test-valid  : ok-board (board-of solution) ≡ true   -- valid in the real env
+\end{spec}
+Because the verification sweep certifies that the learned \texttt{is-dead} agrees with the environment on every reachable board, forcedness under the learned model coincides with forcedness under the true puzzle, and (via the trace bridge of \S\ref{sec:cpmdp-synthesis}) pins the full rollout.  The module is heavy ($\sim$25 min of normalization) and runs in a dedicated CI lane.
+
+\paragraph{The same loop scales to full 9$\times$9 --- and is not brute force.}  \fpath{src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda} runs the identical blind-start CEGIS loop on the full 9$\times$9 puzzle (38 givens, 43 holes, an $\approx\!10^{41}$-leaf raw game tree), and the machine-checked numbers show the cost of \emph{arriving at} the dynamics is linear in horizon $\times$ actions rather than in the state space:
+\begin{spec}
+test-run : (proj₂ learned , length synthesized) ≡ (344 , 637)
+\end{spec}
+The learner makes $43 \times 9 = 387$ environment probes and absorbs $344$ counterexample observations (the $43$ cells each rejecting their $8$ non-solution digits), forcing $637$ of the $810$ vocabulary features into the candidate; the other $173$ never fire on a reachable counterexample.  Against a raw board space of $9^{43}\!\approx\!10^{41}$, this is the dissolution effect at full scale: only disagreements are informative, so the loop pays for $344$ of them, not $10^{41}$ boards.  Convergence and solution are then one certificate each---the environment and the \emph{learned} model are both conflict-forced to the same unique completion:
+\begin{spec}
+test-env-forced     : map (surviving-by env-is-dead)   (upTo 43) ≡ map [_] solution
+test-learned-forced : map (surviving-by synth-is-dead) (upTo 43) ≡ map [_] solution
+\end{spec}
+Their agreement \emph{is} the CEGAR fixpoint---the synthesized candidate classifies every reachable probe exactly as the environment does, with no counterexample left---and, because the unique survivor at each of the $43$ cells is the solution digit, the learned model also solves the puzzle; a shallow-lookahead run of the EC's \texttt{find-policy} over the learned \texttt{is-dead} fills the final cells with the solution.  Two forced-path optimizations keep the whole run inside the type checker (it lands in the heavy-verification CI lane, alongside 8-Queens): the refine step scans only the features touching the just-placed cell (identical firing set on a forced prefix, since a single placement can only create conflicts at its own cell), and, because each feature then fires at exactly one counterexample, the accumulated candidate is duplicate-free with no membership test.  Both facts are themselves discharged by the \texttt{refl} counts above.
+
 \paragraph{Solvability and doom are knowable.}  The EC's capability profile \texttt{solve} certifies both directions computationally.  From the empty board the full reward is reachable (the puzzle \emph{is} solvable); a wrong digit leads to a successor whose profile is identically zero (the branch is \emph{doomed}):
 \begin{spec}
 test-solvable : solve (Ongoing []) num-empty ≡ solved-reward   = refl
@@ -2070,7 +2098,7 @@ test-doomed   : solve (proj₁ (step (Ongoing []) D3)) num-empty ≡ 0 = refl
 \end{spec}
 The subtler phenomenon---a state that is \emph{not yet dead} but already unwinnable---is certified in the Queens demo: board $[0]$ has no attack, yet no 4-Queens solution starts in column 0, and \texttt{solve (Ongoing (0 ∷ [])) N ≡ 0} holds by \texttt{refl}.  Horizon sufficiency (\S\ref{sec:cpmdp-synthesis}) upgrades this finite-depth zero to \emph{all} depths: doom detected at the horizon is doom forever.
 
-\paragraph{Full 9$\times$9 scale.}  The 9$\times$9 instances (\fpath{src/CSHRL/Tasks/Verified/Sudoku9.agda} and the ports) instantiate the same EC with hand-written predicates of the same shape (a disjunction of \texttt{sees}-conflicts) rather than the CEGIS pipeline---the point at this scale is the placement theory itself.  The trace bridge (\texttt{WithTraceBridge}) yields the CoindHomo for the Finder's trace ranking at \emph{every} state of the 9$\times$9 MDP.  Crucially, this proof is symbolic: its cost is independent of the $9^{43}$-leaf game tree, because the bridge argues through the binary structure and monotonicity of \texttt{solve} rather than by enumeration.
+\paragraph{Full 9$\times$9 scale.}  The 9$\times$9 instances (\fpath{src/CSHRL/Tasks/Verified/Sudoku9.agda} and the ports) instantiate the same EC with predicates of the same shape (a disjunction of \texttt{sees}-conflicts)---here hand-written, since the point at this scale is the placement theory itself (the CEGIS pipeline that \emph{synthesizes} those same predicates at 9$\times$9 is the preceding paragraph's \fpath{Sudoku9Synth.agda}).  The trace bridge (\texttt{WithTraceBridge}) yields the CoindHomo for the Finder's trace ranking at \emph{every} state of the 9$\times$9 MDP.  Crucially, this proof is symbolic: its cost is independent of the $9^{43}$-leaf game tree, because the bridge argues through the binary structure and monotonicity of \texttt{solve} rather than by enumeration.
 
 Policy extraction by normalization is where scale bites: certifying a rollout by \texttt{refl} means the type checker itself executes the depth-43 lookahead search.  The 9$\times$9 \emph{instance} is therefore designed so that every empty cell, in row-major fill order, is directly conflict-forced---all eight wrong digits immediately collide with an already-filled peer---making the search tree the normalizer must walk linear ($\sim$400 nodes).  This is a property of the chosen puzzle, not of the solver: the Finder's definition and its CoindHomo cover the general MDP with all nine actions at every node.  Two \texttt{refl} certificates pin the rollout:
 \begin{spec}
