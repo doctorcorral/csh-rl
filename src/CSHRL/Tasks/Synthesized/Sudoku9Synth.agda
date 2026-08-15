@@ -17,15 +17,16 @@
 --   REFINE  – each disagreement is a counterexample; the vocabulary
 --             features firing on the witness are absorbed into the
 --             compact disjunctive candidate.
---   VERIFY  – the learned model is shown conflict-forced to exactly the
---             same solution as the environment: the candidate agrees
---             with the environment on every reachable probe (the CEGAR
---             fixpoint, no counterexample left).
---   SOLVE   – that same forcedness means every empty cell has a unique
---             surviving digit under the LEARNED dynamics, and the Finder
---             fills the final cells with the solution.
+--   VERIFY  – a CEGAR sweep re-walks the environment and certifies the
+--             learned candidate agrees with the true environment on every
+--             reachable probe (no solution used; no counterexample left).
+--   SOLVE   – a forward survival solver driven by the LEARNED is-dead is
+--             run from the EMPTY board and produces the puzzle's unique
+--             solution.  It receives no part of the answer.
 --
--- Verified results (all refl):
+-- Verified results (all refl, one combined boolean certificate
+-- `test-outcome` so the 43-step walk is evaluated exactly once — see
+-- the note above `outcome-ok`):
 --   * the blind candidate mispredicts (motivates the loop),
 --   * 344 counterexample observations are absorbed — 43 fill steps x 8
 --     dead digits — versus a raw board space of 9^43 ~ 10^41.  The loop
@@ -33,25 +34,25 @@
 --     actions, the dissolution effect at full scale,
 --   * 637 of the 810 vocabulary features are learned (the other 173
 --     never fire on a reachable counterexample),
---   * the learned model is conflict-forced to the same solution as the
---     environment (candidate == environment on every reachable probe:
---     the CEGAR fixpoint, no remaining counterexample), and a
---     shallow-lookahead Finder rollout fills the last cells with the
---     solution.
+--   * the CEGAR sweep is clean (learned == environment everywhere
+--     reachable), and
+--   * the survival solver, run from the empty board through the learned
+--     model, reproduces the unique solution.
 --
--- WHY forcedness + a tail rollout, rather than a full 43-step
--- find-policy rollout: certifying a rollout by refl makes the type
--- checker execute a depth-43 lookahead search.  Agda's conversion
--- checker reduces call-by-name with no sharing of repeated subterms and
--- uses unary naturals, so the branching-9, depth-43 search re-expands
--- exponentially.  Forcedness is a flat 43x9 scan with no nested
--- lookahead; together with the placement trace bridge (see
--- CSHRL.Tasks.Verified.Sudoku9 and ports/*/Placement) it pins the full
--- policy mathematically.  (The Rocq port executes the full 43-step
--- rollout by vm_compute, which is call-by-value with sharing.)
+-- SCOPE, HONESTLY.  The solve is genuine and from scratch, but it is a
+-- one-step-survival policy, not the EC's depth-lookahead optimal Finder.
+-- Survival suffices here *because this instance is conflict-forced*
+-- (exactly one digit survives per cell).  A non-forced instance needs
+-- the Finder's search; that Finder solves 4x4 from the empty board by
+-- refl in SudokuSynth (run-policy (Ongoing []) 8 8 ≡ solution), but a
+-- depth-43 rollout is beyond Agda's call-by-name normalizer (no sharing
+-- of repeated subterms; unary naturals), so it cannot be normalized at
+-- 9x9.  (The Rocq port runs the full 43-step optimal rollout of the
+-- hand-written 9x9 instance by vm_compute, which is call-by-value with
+-- sharing; here the point is that the *learned* model solves it.)
 --
--- All --safe, no postulates.  Heavy normalization: run in the slow CI
--- lane, not the main All.agda build.
+-- All --safe, no postulates.  With the single-boolean certificate the
+-- whole module — learn, verify, solve — checks in ~40 seconds.
 ------------------------------------------------------------------------
 
 module CSHRL.Tasks.Synthesized.Sudoku9Synth where
@@ -368,34 +369,6 @@ test-env-dies = refl
 test-blind-wrong : cand-is-dead [] (3 ∷ []) ≡ false
 test-blind-wrong = refl
 
-------------------------------------------------------------------------
--- What the run discovered (all by refl):
---
---   * 344 counterexample observations — 43 fill steps x 8 dead digits,
---     each observed dead once.  Compare the raw board space 9^43 ~ 10^41:
---     only disagreements are informative.
---   * 637 of the 810 vocabulary features forced into the candidate; the
---     other 173 never fire on a reachable counterexample and need never
---     be resolved.
---
--- (One tuple so the 43-step walk is normalized once for both numbers.)
-------------------------------------------------------------------------
-
-run-summary : ℕ × ℕ
-run-summary = proj₂ learned , length synthesized
-
-test-run : run-summary ≡ (344 , 637)
-test-run = refl
-
-------------------------------------------------------------------------
--- SOLVE through the LEARNED dynamics
---
--- The learned classifier IS the environment model the agent discovered.
-------------------------------------------------------------------------
-
-synth-is-dead : Config → Bool
-synth-is-dead = cand-is-dead synthesized
-
 synth-is-solved : Config → Bool
 synth-is-solved = eval (feat (filled-is num-empty))
 
@@ -407,94 +380,113 @@ solution =
   9 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 8 ∷ []
 
 ------------------------------------------------------------------------
--- CEGAR fixpoint + SOLVE, via forcedness
+-- CEGAR verification sweep: no counterexample remains
 --
--- `surviving-by p k` = the digits at cell k of the solution prefix that
--- predicate p classifies as alive.  Two certificates:
+-- Re-walk the environment along its own survival path and require the
+-- learned candidate to agree with the observed outcome on every probe of
+-- every reachable board.  This uses NO knowledge of the solution — it
+-- walks by environment survival and compares the two classifiers.  A
+-- clean sweep is the CEGAR fixpoint: the learned model has no remaining
+-- counterexample against the true environment.
 --
---   test-env-forced    – the ENVIRONMENT is conflict-forced: at every
---                        cell exactly the solution digit survives the
---                        true oracle (cheap: uses ok-board, not the
---                        637-feature candidate).
---   test-learned-forced – the LEARNED model is conflict-forced to the
---                        SAME solution.
---
--- Their agreement IS the CEGAR fixpoint: the synthesized candidate
--- classifies every reachable probe (43 cells x 9 digits) exactly as the
--- environment does, with no remaining counterexample — and, because the
--- unique survivor at each cell is the solution digit, the learned model
--- also *solves* the puzzle.  Dead actions give all-zero traces while the
--- survivor carries the solved reward within lookahead, so this pins the
--- full Finder rollout.
+-- NOTE ON SHARING: the learned feature list is threaded as an explicit
+-- PARAMETER (vs) through the sweep and the solver, and applied to the
+-- walk's output exactly once, in `outcome-ok` below.  Referring to the
+-- top-level `synthesized` inside these loops instead would re-unfold the
+-- definition — and re-run the entire 43-step walk — at every one of the
+-- ~800 calls, because Agda does not share top-level definition
+-- unfoldings across occurrences.  An argument is a single shared thunk;
+-- a definition occurrence is not.
 ------------------------------------------------------------------------
 
-take' : ℕ → List ℕ → List ℕ
-take' zero    _        = []
-take' (suc n) []       = []
-take' (suc n) (x ∷ xs) = x ∷ take' n xs
+eq-bool : Bool → Bool → Bool
+eq-bool true  true  = true
+eq-bool false false = true
+eq-bool _     _     = false
 
-upTo : ℕ → List ℕ
-upTo n = go n 0
+agree-all : List SFeature → Config → Bool
+agree-all vs c = go all-actions
   where
-  go : ℕ → ℕ → List ℕ
-  go zero    _ = []
-  go (suc n) k = k ∷ go n (suc k)
+  go : List Action → Bool
+  go [] = true
+  go (a ∷ as) =
+    eq-bool (env-is-dead (place c a)) (cand-is-dead vs (place c a)) ∧ go as
 
-filterℕ : (ℕ → Bool) → List ℕ → List ℕ
-filterℕ f [] = []
-filterℕ f (x ∷ xs) =
-  if f x then x ∷ filterℕ f xs else filterℕ f xs
-
-digits1-9 : List ℕ
-digits1-9 = 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 7 ∷ 8 ∷ 9 ∷ []
-
-surviving-by : (Config → Bool) → ℕ → List ℕ
-surviving-by p k =
-  filterℕ (λ d → not (p (take' k solution ++ (d ∷ [])))) digits1-9
-
--- The environment is conflict-forced to the solution (ground truth).
-test-env-forced :
-  map (surviving-by env-is-dead) (upTo num-empty)
-  ≡ map (λ d → d ∷ []) solution
-test-env-forced = refl
-
--- The LEARNED model is conflict-forced to the SAME solution: the CEGAR
--- fixpoint (candidate agrees with the environment on every reachable
--- probe) and the solution of the puzzle, in one certificate.
-test-learned-forced :
-  map (surviving-by synth-is-dead) (upTo num-empty)
-  ≡ map (λ d → d ∷ []) solution
-test-learned-forced = refl
+verify : List SFeature → Config → ℕ → Bool
+verify _  _ zero = true
+verify vs c (suc n) = agree-all vs c ∧ verify vs (advance c) n
 
 ------------------------------------------------------------------------
--- Finder rollout (shallow lookahead) under the learned dynamics
+-- SOLVE FROM SCRATCH through the LEARNED model
+--
+-- The solver is a forward one-step-survival policy driven by the LEARNED
+-- is-dead: at each cell it takes the first action the *learned* model
+-- does not classify as dead.  It receives NO part of the solution — it
+-- produces all 43 digits from the empty board, and we then check the
+-- result equals the puzzle's unique solution.
+--
+-- Honest scope: one-step survival suffices here *because this instance
+-- is conflict-forced* (exactly one digit survives at each cell, so no
+-- search or backtracking is needed).  A non-forced instance would need
+-- the EC's depth-lookahead Finder; that Finder solves 4x4 from the empty
+-- board by refl in SudokuSynth, but a depth-43 rollout is beyond Agda's
+-- call-by-name normalizer, which is why 9x9 uses the survival solver.
 ------------------------------------------------------------------------
 
-open import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
+-- First action the LEARNED model deems alive (survival, no lookahead).
+learned-alive : List SFeature → Config → Action
+learned-alive vs c = go all-actions
+  where
+  go : List Action → Action
+  go [] = A1
+  go (a ∷ as) = if cand-is-dead vs (place c a) then go as else a
 
-open CombinatorialPlacementMDP
-  Config Action
-  synth-is-dead synth-is-solved
-  place solved-reward
-  all-actions A1 num-empty
-
-run-policy : State → ℕ → ℕ → List Action
-run-policy _ _ zero = []
-run-policy s depth (suc n) =
-  let a = find-policy s depth
-  in a ∷ run-policy (proj₁ (step s a)) depth n
-
--- The Finder, planning in the learned model, fills the last two cells
--- with the solution digits (6 then 8).  Kept shallow: each find-policy
--- node evaluates the 637-feature learned is-dead, so a deep lookahead is
--- expensive — forcedness above already pins the whole rollout, this just
--- exercises the EC's actual Finder on the learned model.
-test-tail-rollout :
-  run-policy (Ongoing (take' 41 solution)) 2 2 ≡ A6 ∷ A8 ∷ []
-test-tail-rollout = refl
+run-solver : List SFeature → Config → ℕ → Config
+run-solver _  c zero    = c
+run-solver vs c (suc n) = run-solver vs (place c (learned-alive vs c)) n
 
 ------------------------------------------------------------------------
--- VERIFY: the completed board is valid in the REAL environment
+-- THE COMBINED CERTIFICATE
+--
+-- Everything the run establishes, in one refl:
+--
+--   * 344 counterexample observations — 43 fill steps x 8 dead digits,
+--     each observed dead once.  Compare the raw board space 9^43 ~ 10^41:
+--     only disagreements are informative.
+--   * 637 of the 810 vocabulary features forced into the candidate; the
+--     other 173 never fire on a reachable counterexample and need never
+--     be resolved.
+--   * the CEGAR sweep over every reachable probe is clean, and
+--   * the survival solver, from the EMPTY board, through the LEARNED
+--     model only, produces the puzzle's unique solution.
+--
+-- The certificate is a SINGLE BOOLEAN (boolean reflection, as a
+-- vm_compute proof in Rocq): the whole computation happens in one
+-- evaluator run, inside which the learned list is one shared thunk, so
+-- the walk is evaluated exactly once.  Returning a tuple of large
+-- structures instead would let the conversion checker decompose the
+-- comparison component-wise and reify unevaluated closures back into
+-- syntax, duplicating — and re-running — the walk inside every
+-- component (measured: the walk alone checks in seconds; the tuple
+-- version of this certificate did not finish in hours).
+------------------------------------------------------------------------
+
+eq-config : Config → Config → Bool
+eq-config []       []       = true
+eq-config (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ eq-config xs ys
+eq-config _        _        = false
+
+outcome-ok : LearnerState → Bool
+outcome-ok (vs , n) =
+  (n ≡ᵇ 344) ∧ (length vs ≡ᵇ 637)
+  ∧ verify vs [] num-empty
+  ∧ eq-config (run-solver vs [] num-empty) solution
+
+test-outcome : outcome-ok learned ≡ true
+test-outcome = refl
+
+------------------------------------------------------------------------
+-- VERIFY: the produced board is valid and complete in the REAL env
 ------------------------------------------------------------------------
 
 test-valid : ok-board (board-of solution) ≡ true
@@ -507,11 +499,13 @@ test-complete = refl
 -- SUMMARY
 --
 --   blind candidate → 344 environment counterexamples → 637 features →
---   learned model conflict-forced to the same solution as the
---   environment (CEGAR fixpoint) → Finder tail rollout matches the
---   solution → board valid in the real environment.
+--   CEGAR verify sweep clean (learned == environment on every reachable
+--   probe, no solution used) → survival solver run from the EMPTY board
+--   through the learned model produces the unique solution → board valid
+--   in the real environment.
 --
 -- Cost of arriving at the dynamics: 43 x 9 = 387 environment probes,
 -- linear in horizon x actions, against a 9^43 raw board space.  Nothing
--- brute-forced, nothing written by hand.  All --safe, no postulates.
+-- brute-forced, nothing written by hand, and the solve receives no part
+-- of the answer.  All --safe, no postulates.
 ------------------------------------------------------------------------

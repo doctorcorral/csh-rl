@@ -80,6 +80,11 @@ jobs:
         restore-keys: |
           agdai-${{ runner.os }}-
 
+    - name: Compile synthesis demos (4x4 dynamics + concept discovery)
+      run: |
+        agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda
+        agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda
+
     - name: Compile Sudoku9Synth (9x9 automatic environment synthesis)
       run: agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda
 

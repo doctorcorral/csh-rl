@@ -47,11 +47,11 @@ import CSHRL.Tasks.Verified.Queens1
 --   agda src/CSHRL/Tasks/Verified/Queens8Learning.agda
 --
 -- Synthesized tasks (Tasks/Synthesized/*) are demo/paper artifacts and are
--- checked outside this aggregate.  Sudoku9Synth in particular is heavy
--- (online CEGIS over the full 9x9 puzzle, ~25 min of normalization); it
--- runs in a separate parallel CI job.  Run locally with:
---   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda      (4x4, ~1 min)
---   agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda     (9x9, heavy)
+-- checked outside this aggregate, in a separate parallel CI job.
+-- Run locally with:
+--   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda         (4x4 dynamics learned)
+--   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered)
+--   agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda        (9x9 dynamics learned, verified, solved; ~40 s)
 
 -- Stochastic Task Implementations
 import CSHRL.Tasks.Stochastic.CoinFlip
