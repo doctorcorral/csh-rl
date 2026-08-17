@@ -90,3 +90,6 @@ jobs:
     - name: Compile Sudoku9Synth (9x9 automatic environment synthesis)
       run: agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda
 
+    - name: Compile Sudoku9NonForced (non-forced 9x9, survival fails, Finder solves)
+      run: agda src/CSHRL/Tasks/Synthesized/Sudoku9NonForced.agda
+
