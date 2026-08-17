@@ -52,6 +52,7 @@ import CSHRL.Tasks.Verified.Queens1
 --   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda         (4x4 dynamics learned)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered, curated space)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuConceptEnum.agda   (concept identified from ALL 2^16 hypotheses; ~5 min)
+--   agda src/CSHRL/Tasks/Synthesized/SudokuNonForced.agda     (non-forced: survival fails, Finder needed; seconds)
 --   agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda        (9x9 learned, verified, solved by survival AND optimal Finder; ~9 min)
 
 -- Stochastic Task Implementations
