@@ -49,10 +49,10 @@
 -- the solver: on a non-forced instance the tree is genuinely
 -- exponential and no evaluator (Agda's or Rocq's vm_compute) escapes
 -- that; the Finder's definition and certificates cover the general MDP.
--- (An earlier revision claimed the depth-43 rollout was beyond Agda's
--- normalizer; that was an artifact of lost sharing in how the
--- certificate was phrased — see NOTE ON SHARING below — not a real
--- limit.  With sharing intact the rollout checks in minutes.)
+-- (Deep note: the rollout normalizes only under the sharing discipline
+-- of NOTE ON SHARING below — the learned list threaded as a parameter,
+-- one boolean certificate.  Without it the evaluator recomputes the
+-- walk inside the rollout and the check does not finish.)
 --
 -- All --safe, no postulates.  Learn + verify + survival solve check in
 -- ~40 seconds; the optimal-Finder rollout brings the module to ~9 min.
