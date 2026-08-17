@@ -50,8 +50,9 @@ import CSHRL.Tasks.Verified.Queens1
 -- checked outside this aggregate, in a separate parallel CI job.
 -- Run locally with:
 --   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda         (4x4 dynamics learned)
---   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered)
---   agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda        (9x9 dynamics learned, verified, solved; ~40 s)
+--   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered, curated space)
+--   agda src/CSHRL/Tasks/Synthesized/SudokuConceptEnum.agda   (concept identified from ALL 2^16 hypotheses; ~5 min)
+--   agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda        (9x9 learned, verified, solved by survival AND optimal Finder; ~9 min)
 
 -- Stochastic Task Implementations
 import CSHRL.Tasks.Stochastic.CoinFlip

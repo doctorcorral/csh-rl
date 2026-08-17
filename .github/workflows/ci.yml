@@ -84,6 +84,7 @@ jobs:
       run: |
         agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda
         agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda
+        agda src/CSHRL/Tasks/Synthesized/SudokuConceptEnum.agda
 
     - name: Compile Sudoku9Synth (9x9 automatic environment synthesis)
       run: agda src/CSHRL/Tasks/Synthesized/Sudoku9Synth.agda

@@ -35,24 +35,27 @@
 --   * 637 of the 810 vocabulary features are learned (the other 173
 --     never fire on a reachable counterexample),
 --   * the CEGAR sweep is clean (learned == environment everywhere
---     reachable), and
+--     reachable),
 --   * the survival solver, run from the empty board through the learned
---     model, reproduces the unique solution.
+--     model, reproduces the unique solution, and
+--   * the EC's OPTIMAL FINDER — full depth-43 lookahead at every step —
+--     instantiated with the learned is-dead, also solves from the empty
+--     board (test-finder), exactly the 4x4 pattern of SudokuSynth.
 --
--- SCOPE, HONESTLY.  The solve is genuine and from scratch, but it is a
--- one-step-survival policy, not the EC's depth-lookahead optimal Finder.
--- Survival suffices here *because this instance is conflict-forced*
--- (exactly one digit survives per cell).  A non-forced instance needs
--- the Finder's search; that Finder solves 4x4 from the empty board by
--- refl in SudokuSynth (run-policy (Ongoing []) 8 8 ≡ solution), but a
--- depth-43 rollout is beyond Agda's call-by-name normalizer (no sharing
--- of repeated subterms; unary naturals), so it cannot be normalized at
--- 9x9.  (The Rocq port runs the full 43-step optimal rollout of the
--- hand-written 9x9 instance by vm_compute, which is call-by-value with
--- sharing; here the point is that the *learned* model solves it.)
+-- SCOPE, HONESTLY.  What keeps the Finder's search tree small enough to
+-- normalize is that *this instance is conflict-forced* (exactly one
+-- digit survives per cell), so lookahead explores a linear, not
+-- exponential, tree.  That is a property of the chosen puzzle, not of
+-- the solver: on a non-forced instance the tree is genuinely
+-- exponential and no evaluator (Agda's or Rocq's vm_compute) escapes
+-- that; the Finder's definition and certificates cover the general MDP.
+-- (An earlier revision claimed the depth-43 rollout was beyond Agda's
+-- normalizer; that was an artifact of lost sharing in how the
+-- certificate was phrased — see NOTE ON SHARING below — not a real
+-- limit.  With sharing intact the rollout checks in minutes.)
 --
--- All --safe, no postulates.  With the single-boolean certificate the
--- whole module — learn, verify, solve — checks in ~40 seconds.
+-- All --safe, no postulates.  Learn + verify + survival solve check in
+-- ~40 seconds; the optimal-Finder rollout brings the module to ~9 min.
 ------------------------------------------------------------------------
 
 module CSHRL.Tasks.Synthesized.Sudoku9Synth where
@@ -425,12 +428,10 @@ verify vs c (suc n) = agree-all vs c ∧ verify vs (advance c) n
 -- produces all 43 digits from the empty board, and we then check the
 -- result equals the puzzle's unique solution.
 --
--- Honest scope: one-step survival suffices here *because this instance
--- is conflict-forced* (exactly one digit survives at each cell, so no
--- search or backtracking is needed).  A non-forced instance would need
--- the EC's depth-lookahead Finder; that Finder solves 4x4 from the empty
--- board by refl in SudokuSynth, but a depth-43 rollout is beyond Agda's
--- call-by-name normalizer, which is why 9x9 uses the survival solver.
+-- One-step survival suffices here *because this instance is
+-- conflict-forced* (exactly one digit survives at each cell, so no
+-- search or backtracking is needed).  The EC's depth-lookahead optimal
+-- Finder is run as well — see THE OPTIMAL FINDER below.
 ------------------------------------------------------------------------
 
 -- First action the LEARNED model deems alive (survival, no lookahead).
@@ -484,6 +485,39 @@ outcome-ok (vs , n) =
 
 test-outcome : outcome-ok learned ≡ true
 test-outcome = refl
+
+------------------------------------------------------------------------
+-- THE OPTIMAL FINDER through the LEARNED model
+--
+-- The EC's depth-lookahead Finder — not the one-step survival policy —
+-- instantiated with the LEARNED is-dead, run from the EMPTY board at
+-- full horizon 43, exactly as SudokuSynth does at 4x4.  The EC is
+-- opened inside a module parameterized by the learned feature list so
+-- that the walk's output stays one shared thunk (see NOTE ON SHARING).
+------------------------------------------------------------------------
+
+open import CSHRL.EnvironmentClass.CombinatorialPlacementMDP
+
+module FinderThrough (vs : List SFeature) where
+  open CombinatorialPlacementMDP
+    Config Action
+    (cand-is-dead vs) synth-is-solved
+    place solved-reward
+    all-actions A1 num-empty
+
+  run-policy : State → ℕ → ℕ → List Action
+  run-policy _ _ zero = []
+  run-policy s depth (suc n) =
+    let a = find-policy s depth
+    in a ∷ run-policy (proj₁ (step s a)) depth n
+
+  finder-digits : List ℕ
+  finder-digits = map digit (run-policy (Ongoing []) num-empty num-empty)
+
+-- The optimal Finder, planning to horizon 43 inside the learned model,
+-- produces the puzzle's unique solution from the empty board.
+test-finder : eq-config (FinderThrough.finder-digits synthesized) solution ≡ true
+test-finder = refl
 
 ------------------------------------------------------------------------
 -- VERIFY: the produced board is valid and complete in the REAL env
