@@ -7,7 +7,7 @@
 The main paper presents four core demos (1D Maze, 4-Queens, Biased Bandit, GamblersRuin FOSD) illustrating the three synthesis patterns (FDMDP, CPMDP, SFMDP) and FOSD.
 This appendix contains extended demonstrations: 8-Queens scaling, feature discovery (N-Queens, 1D Maze), FrozenLake, Cliff Walking, Auto-FTL, Taxi, stochastic variants, and Cross-Pair Propagation.
 
-\subsection{Demo 3: 8-Queens (Scaling)}
+\subsection{Demo 5: 8-Queens (Scaling)}
 
 The 8-Queens demo (\texttt{Queens8E2E.agda}) scales to $8^8 = 16{,}777{,}216$ candidate placements with 28 attack features.
 
@@ -47,7 +47,7 @@ test-from-7 : run-policy (Ongoing (0 ∷ 4 ∷ 7 ∷ 5 ∷ 2 ∷ 6 ∷ 1 ∷ [])
 \end{spec}
 
 
-\subsection{Demo 5: N-Queens with Feature Discovery (CPMDP)}
+\subsection{Demo 6: N-Queens with Feature Discovery (CPMDP)}
 \label{sec:e2e-auto}
 
 The previous 4-Queens demo (\S\ref{sec:e2e-queens}) relies on hand-crafted features: the human defines \texttt{QFeature} with an explicit \texttt{attacks~i~j} constructor, encoding domain knowledge about column and diagonal conflicts.
@@ -334,10 +334,10 @@ test-from-4 : run-policy (Ongoing (0 ∷ 4 ∷ 7 ∷ 5 ∷ [])) 8 4
 \noindent Compilation time: approximately 11~minutes (vs.\ 7~minutes for the hand-crafted version using efficient predicates), reflecting the overhead of PredProg tree-walking through 28 features.  Memory usage remains stable at ${\sim}450$\,MB.  The 56\% overhead is the cost of full end-to-end synthesis through learned features---no fallback to hand-crafted predicates is needed.
 
 
-\subsection{Demo 6: 1D Maze with Feature Discovery (FDMDP)}
+\subsection{Demo 7: 1D Maze with Feature Discovery (FDMDP)}
 \label{sec:e2e-maze-auto}
 
-The FTL for placement problems (Demo~5) derives features from \emph{state structure}: pairwise comparisons on \texttt{List~ℕ}.  Finite-state MDPs have \emph{atomic} states---no internal structure to compare.  But features can be derived from the \emph{dynamics}: the step function gives states their meaning.
+The FTL for placement problems (Demo~6) derives features from \emph{state structure}: pairwise comparisons on \texttt{List~ℕ}.  Finite-state MDPs have \emph{atomic} states---no internal structure to compare.  But features can be derived from the \emph{dynamics}: the step function gives states their meaning.
 
 \paragraph{Dynamics-Based Feature Templates.}
 We introduce a second FTL for finite-state MDPs with two template families:
@@ -393,14 +393,14 @@ finder-agrees P0 = refl;  finder-agrees P1 = refl;  finder-agrees P2 = refl
 \begin{remark}[Two FTL Families]
 The framework now has two domain-agnostic Feature Template Languages:
 \begin{enumerate}
-\item \textbf{Structural FTL} (Demo~5): pairwise comparisons on indexed data (\texttt{List~ℕ} states), for placement and assignment problems.
-\item \textbf{Dynamics FTL} (Demos~6--7): dynamics-derived properties (reward, self-loops, terminal reachability) for finite-state MDPs.
+\item \textbf{Structural FTL} (Demo~6): pairwise comparisons on indexed data (\texttt{List~ℕ} states), for placement and assignment problems.
+\item \textbf{Dynamics FTL} (Demos~7--8): dynamics-derived properties (reward, self-loops, terminal reachability) for finite-state MDPs.
 \end{enumerate}
 Both plug into \texttt{PredicateDSL} via the same interface (\texttt{Feature}, \texttt{eval-feature}), and all synthesis theory (CEGIS, propagation, tight bounds) applies unchanged.  The two templates together cover all three Environment Classes.
 \end{remark}
 
 
-\subsection{Demo 7: FrozenLake \texorpdfstring{$4 \times 4$}{4x4} (FDMDP)}
+\subsection{Demo 8: FrozenLake \texorpdfstring{$4 \times 4$}{4x4} (FDMDP)}
 \label{sec:e2e-frozenlake}
 
 FrozenLake is a well-known benchmark from OpenAI Gym: a $4 \times 4$ grid where an agent navigates from Start~(0,0) to Goal~(3,3), avoiding Holes that end the episode with reward~0.  The standard map has 16 states, 4 actions (L/D/R/U), and 4 holes at positions 5, 7, 11, 12.  We model the deterministic (non-slippery) variant as an FDMDP.
@@ -523,7 +523,7 @@ test-replay : length (refine (refine vs3 (3 , true)) (0 , false))
 
 \noindent For the depth-1 ``is~R~optimal?'' predicate (1012~initial candidates), 4~observations achieve a 99\%~reduction to 10~candidates: $1012 \to 286 \to 189 \to 155 \to 10$.  This instantiates the theoretical guarantees of~\S\ref{sec:online} (commutativity, replay redundancy, monotonic convergence) on a concrete RL benchmark, confirming that the CEGIS framework is suitable for online, incremental policy learning.
 
-\subsection{Demo 8: Cliff Walking \texorpdfstring{$4 \times 6$}{4x6} (FDMDP)}
+\subsection{Demo 9: Cliff Walking \texorpdfstring{$4 \times 6$}{4x6} (FDMDP)}
 \label{sec:e2e-cliffwalk}
 
 Cliff Walking is another classic RL benchmark, featured prominently in Sutton \& Barto~\cite{Sutton2018} (Chapter~6) for comparing SARSA and Q-learning.  We model a compact $4 \times 6$ variant as an FDMDP with 24~states and 4~actions (L/D/R/U).
@@ -639,10 +639,10 @@ While both are grid-based FDMDPs, they exercise the framework differently.  Froz
 \end{remark}
 
 
-\subsection{Demo 9: Auto-FTL --- Zero Human Feature Engineering}
+\subsection{Demo 10: Auto-FTL --- Zero Human Feature Engineering}
 \label{sec:e2e-autoftl}
 
-Demos~7 and~8 demonstrated fully automated policy synthesis, but both relied on \emph{human-defined} feature templates: \texttt{row-is}, \texttt{col-is}, and dynamics features specific to the grid interpretation.  A natural question is: can the features themselves be generated automatically?
+Demos~8 and~9 demonstrated fully automated policy synthesis, but both relied on \emph{human-defined} feature templates: \texttt{row-is}, \texttt{col-is}, and dynamics features specific to the grid interpretation.  A natural question is: can the features themselves be generated automatically?
 
 We introduce the \emph{Automatic Feature Template Language} (Auto-FTL), a reusable module (\texttt{CSHRL.Synthesis.AutoFeatureNat}) that derives a complete feature set from only two inputs: the state count~$n$ and the step function.  No grid interpretation, no coordinate system, no domain knowledge.
 
@@ -683,7 +683,7 @@ test-discovered-count : length discovered   ≡ 56            = refl   -- all no
 \noindent All 56 features survive non-trivial filtering (none is constant across all 16 states).  This is $2.8\times$ the hand-crafted count of 20 features, but the version space remains tractable: 58 candidates at depth~0, approximately 6{,}800 at depth~1.
 
 \paragraph{Fully automated pipeline with auto-features.}
-The cascading CEGIS pipeline from Demo~7 works \emph{unchanged} with the auto-generated features:
+The cascading CEGIS pipeline from Demo~8 works \emph{unchanged} with the auto-generated features:
 
 \begin{spec}
 pl = extract (synth-rank-pred 0 obs-is-L)          -- L-optimal predicate (depth 0)
@@ -708,17 +708,17 @@ test-auto-safe       : all-safe auto-traj-states ≡ true                   = re
 test-auto-all-match  : check-all finder-map ≡ true                        = refl
 \end{spec}
 
-\noindent The trajectory, rewards, hole avoidance, and global Finder agreement are identical to the hand-crafted Demo~7.  The entire pipeline compiles in approximately 5 minutes.
+\noindent The trajectory, rewards, hole avoidance, and global Finder agreement are identical to the hand-crafted Demo~8.  The entire pipeline compiles in approximately 5 minutes.
 
 \begin{remark}[From Hand-Crafted to Fully Automatic]
-Demo~9 eliminates the last human input in the synthesis pipeline.  Demos~1--8 required human-defined feature templates---\texttt{row-is}/\texttt{col-is} for grids, \texttt{vals-eq}/\texttt{spread-eq} for placement problems.  The Auto-FTL replaces these with features derived from the state count's number-theoretic structure (divisors, modular arithmetic) and the step function's behavioral properties (reward, self-loops, terminal transitions).  The result is a synthesis pipeline where the human provides \emph{only} the environment definition ($n$, actions, step function), and every subsequent step---feature generation, feature filtering, observation generation, predicate synthesis, policy reconstruction, and correctness verification---is fully automatic and machine-verified.
+Demo~10 eliminates the last human input in the synthesis pipeline.  The preceding demos (1--2, 4--9) required human-defined feature templates---\texttt{row-is}/\texttt{col-is} for grids, \texttt{vals-eq}/\texttt{spread-eq} for placement problems.  The Auto-FTL replaces these with features derived from the state count's number-theoretic structure (divisors, modular arithmetic) and the step function's behavioral properties (reward, self-loops, terminal transitions).  The result is a synthesis pipeline where the human provides \emph{only} the environment definition ($n$, actions, step function), and every subsequent step---feature generation, feature filtering, observation generation, predicate synthesis, policy reconstruction, and correctness verification---is fully automatic and machine-verified.
 \end{remark}
 
 
-\subsection{Demo 10: Auto-FTL Cliff Walking --- Scaling to Richer Structure}
+\subsection{Demo 11: Auto-FTL Cliff Walking --- Scaling to Richer Structure}
 \label{sec:e2e-autoftl-cliffwalk}
 
-Demo~9 applied the Auto-FTL to FrozenLake ($n = 16$, 3~divisors, 56~features).  We now apply it to Cliff Walking ($n = 24$, 6~divisors, 106~features)---a larger state space with richer factorization structure, a contiguous cliff, and a more complex optimal policy requiring three cascading CEGIS stages.  Again: zero human feature engineering, zero human observations.
+Demo~10 applied the Auto-FTL to FrozenLake ($n = 16$, 3~divisors, 56~features).  We now apply it to Cliff Walking ($n = 24$, 6~divisors, 106~features)---a larger state space with richer factorization structure, a contiguous cliff, and a more complex optimal policy requiring three cascading CEGIS stages.  Again: zero human feature engineering, zero human observations.
 
 \paragraph{Richer factorization from a highly composite number.}
 The state count $n = 24$ has six non-trivial divisors, compared to three for $n = 16$:
@@ -773,10 +773,10 @@ This demo validates the Auto-FTL on a second, larger environment.  The key diffe
 \end{remark}
 
 
-\subsection{Demo 11: FrozenLake \texorpdfstring{$8 \times 8$}{8x8} --- Scaling to 64 States}
+\subsection{Demo 12: FrozenLake \texorpdfstring{$8 \times 8$}{8x8} --- Scaling to 64 States}
 \label{sec:e2e-frozenlake8x8}
 
-Demo~10 applied the Auto-FTL to Cliff Walking ($n = 24$, 19~non-terminal states).  We now scale to FrozenLake~$8{\times}8$ ($n = 64$, 53~non-terminal states, 10~holes)---a $4\times$ increase in state space over the $4{\times}4$ variant.  This demo introduces two infrastructure improvements required for scalable synthesis: a \emph{memoized Finder} that computes optimal policies in $O(d \cdot n^2)$ time via dynamic programming, and a \emph{greedy cascading CEGIS} (\texttt{synth-greedy-or}) that handles scattered state sets unreachable by bounded-depth predicate enumeration.
+Demo~11 applied the Auto-FTL to Cliff Walking ($n = 24$, 19~non-terminal states).  We now scale to FrozenLake~$8{\times}8$ ($n = 64$, 53~non-terminal states, 10~holes)---a $4\times$ increase in state space over the $4{\times}4$ variant.  This demo introduces two infrastructure improvements required for scalable synthesis: a \emph{memoized Finder} that computes optimal policies in $O(d \cdot n^2)$ time via dynamic programming, and a \emph{greedy cascading CEGIS} (\texttt{synth-greedy-or}) that handles scattered state sets unreachable by bounded-depth predicate enumeration.
 
 \paragraph{The environment.}
 The standard OpenAI Gym $8{\times}8$ FrozenLake map has 64 states: Start at~0, Goal at~63, and 10 holes at positions $\{19, 29, 35, 41, 42, 46, 49, 52, 54, 59\}$.  Movement is defined arithmetically using \texttt{divℕ}/\texttt{modℕ} for row/column extraction---no 64-case pattern match:
@@ -840,10 +840,10 @@ This demo exposed two scalability bottlenecks and their solutions.  First, Agda'
 \end{remark}
 
 
-\subsection{Demo 12: Taxi \texorpdfstring{$5 \times 5$}{5x5} --- Relational Navigation at Scale}
+\subsection{Demo 13: Taxi \texorpdfstring{$5 \times 5$}{5x5} --- Relational Navigation at Scale}
 \label{sec:e2e-taxi}
 
-Demos~9--11 operated on environments with at most 64~states and a single reward structure (hole avoidance or cliff avoidance).  We now tackle Taxi~$5{\times}5$---the classic OpenAI Gym benchmark~\cite{dietterich2000hierarchical}---with \textbf{501~states}, \textbf{6~actions}, \textbf{internal walls}, and a multi-phase task (navigate to passenger, pick up, navigate to destination, drop off).  This represents a ${\sim}10\times$ scale-up over FrozenLake~$8{\times}8$ and the first demo requiring \emph{relational} reasoning about target-relative position.
+Demos~10--12 operated on environments with at most 64~states and a single reward structure (hole avoidance or cliff avoidance).  We now tackle Taxi~$5{\times}5$---the classic OpenAI Gym benchmark~\cite{dietterich2000hierarchical}---with \textbf{501~states}, \textbf{6~actions}, \textbf{internal walls}, and a multi-phase task (navigate to passenger, pick up, navigate to destination, drop off).  This represents a ${\sim}10\times$ scale-up over FrozenLake~$8{\times}8$ and the first demo requiring \emph{relational} reasoning about target-relative position.
 
 \paragraph{Environment.}
 The Taxi environment is a $5 \times 5$ grid with four designated locations: R$(0{,}0)$, G$(0{,}4)$, Y$(4{,}0)$, B$(4{,}3)$.  Internal walls block East/West movement: between columns~1--2 at rows~0--1, and between columns~0--1 and~2--3 at rows~3--4.  A state encodes $(\text{row}, \text{col}, \text{passenger}, \text{dest})$ as a single natural number: $\text{row} \times 100 + \text{col} \times 20 + \text{pass} \times 4 + \text{dest}$, yielding 500~regular states plus a terminal state~500.  There are 6~actions: South, North, East, West, Pickup, and Dropoff.  Reward is~1 at successful dropoff, 0~otherwise.
@@ -1134,7 +1134,7 @@ Counterexamples & Impossible & Discovered post-hoc & Unknown \\
 \paragraph{Why the gap?  Kolmogorov complexity.}
 The optimal Cliff Walking policy has very low Kolmogorov complexity: the environment's regular spatial structure (grid, contiguous cliff, single goal) induces a policy describable by a few spatial predicates.  The Auto-FTL \emph{discovers} this regularity---grid coordinates emerge from modular arithmetic---and \texttt{PredProg} \emph{compresses} it into a near-minimal Boolean program.  A DQN, by contrast, is a generic function approximator: it must represent this inherently simple mapping using thousands of floating-point parameters, ``wasting'' capacity on a structure that admits a 38-bit description.
 
-VIPER's decision trees sit between these extremes: they are more structured than DNNs (axis-aligned splits) but less compact than Boolean predicate programs (each node repeats a state-space partition).  A VIPER tree for a similar grid world would typically require 31--100+~nodes, each encoding a threshold comparison---roughly 10--50$\times$ larger than our \texttt{PredProg}.  Note that our \texttt{synth-decision-tree} (Demo~12) also builds decision trees, but within the \texttt{PredProg} framework: each tree node is a relational feature, and the result is a verified \texttt{PredProg} term.  Unlike VIPER, which distills an unverified DNN, our decision trees are synthesized directly from the Finder's proven-optimal policy and verified at every state.
+VIPER's decision trees sit between these extremes: they are more structured than DNNs (axis-aligned splits) but less compact than Boolean predicate programs (each node repeats a state-space partition).  A VIPER tree for a similar grid world would typically require 31--100+~nodes, each encoding a threshold comparison---roughly 10--50$\times$ larger than our \texttt{PredProg}.  Note that our \texttt{synth-decision-tree} (Demo~13) also builds decision trees, but within the \texttt{PredProg} framework: each tree node is a relational feature, and the result is a verified \texttt{PredProg} term.  Unlike VIPER, which distills an unverified DNN, our decision trees are synthesized directly from the Finder's proven-optimal policy and verified at every state.
 
 This compression is not an artefact of small environments.  For \emph{any} environment whose optimal policy has low K-complexity (regular structure, spatial patterns, symmetries), the CSH pipeline will produce a proportionally compact \texttt{PredProg}---while a DQN's parameter count is determined by architecture, not by the policy's intrinsic complexity.  The FTL controls this: by providing features aligned with the environment's structure, it ensures the optimal predicate lies at low \texttt{PredProg} depth, where the encoding is minimal.
 
@@ -1431,12 +1431,12 @@ A${>}$C and B${>}$D are governed by $\mathsf{feat}\;f_1$~(cross-pair group);
 A${>}$D and B${>}$C require depth-1 programs (unresolvable at depth~0).
 The version space at depth~1 contains \textbf{22~programs} (literals, negations, conjunctions, disjunctions).
 
-\subsection{Demo 13: FrozenLake \texorpdfstring{$4 \times 4$}{4x4} (Slippery) --- Stochastic Synthesis}
+\subsection{Demo 14: FrozenLake \texorpdfstring{$4 \times 4$}{4x4} (Slippery) --- Stochastic Synthesis}
 \label{sec:e2e-frozenlake-slippery}
 
-Demos~7--12 operated in the \emph{deterministic} setting: actions have a single, predictable outcome.
+Demos~8--13 operated in the \emph{deterministic} setting: actions have a single, predictable outcome.
 We now cross the deterministic/stochastic boundary by implementing the \textbf{slippery FrozenLake}, a stochastic variant of the standard OpenAI Gym benchmark (\texttt{is\_slippery=True}).
-The grid and map topology are identical to Demo~7 (same 16~states, same 4~holes and 1~goal), but each chosen action has only $\tfrac{1}{3}$ probability of executing in the intended direction, with $\tfrac{1}{3}$ each for the two perpendicular directions (e.g., choosing Right yields \{Right, Down, Up\}, each with weight~1 out of~3).
+The grid and map topology are identical to Demo~8 (same 16~states, same 4~holes and 1~goal), but each chosen action has only $\tfrac{1}{3}$ probability of executing in the intended direction, with $\tfrac{1}{3}$ each for the two perpendicular directions (e.g., choosing Right yields \{Right, Down, Up\}, each with weight~1 out of~3).
 
 This demo achieves five firsts:
 \begin{enumerate}
@@ -1446,7 +1446,7 @@ This demo achieves five firsts:
   \item \textbf{Decision-tree CEGIS} synthesizes \texttt{PredProg} policies for the stochastic environment from row/col features.
   \item The synthesized policy is \textbf{verified} to match the Finder at all 11~non-terminal states.
 \end{enumerate}
-The pipeline scales to the 8×8 grid (Demo~14, \S\ref{sec:e2e-frozenlake-8x8-slippery}).
+The pipeline scales to the 8×8 grid (Demo~15, \S\ref{sec:e2e-frozenlake-8x8-slippery}).
 
 \paragraph{Slippery step function.}
 The step function uses the \texttt{Dist} type from \texttt{Probability.Finite}: for non-terminal states, it returns three equally-weighted outcomes (intended direction plus two perpendicular directions).
@@ -1500,7 +1500,7 @@ When terminal states self-loop via \texttt{pure} (branching factor~1) while non-
 The uniform branching design---where terminal states emit 3~copies of the self-loop---eliminates this issue structurally, without requiring rational arithmetic or explicit normalization.
 \end{remark}
 
-\subsection{Demo 14: FrozenLake \texorpdfstring{$8 \times 8$}{8x8} (Slippery) --- Scaling the Stochastic Pipeline}
+\subsection{Demo 15: FrozenLake \texorpdfstring{$8 \times 8$}{8x8} (Slippery) --- Scaling the Stochastic Pipeline}
 \label{sec:e2e-frozenlake-8x8-slippery}
 
 We scale the slippery FrozenLake to the 8×8 grid (64~states, 53~non-terminal, 10~holes, 1~goal), using the same memoized stochastic Finder at depth~10.
@@ -1528,7 +1528,7 @@ Compile time: ${\sim}2.9$~hours (memoized Finder + decision-tree synthesis over 
 
 \begin{center}
 \begin{tabular}{@{}lcc@{}}
-& \textbf{Demo 13 (4×4)} & \textbf{Demo 14 (8×8)} \\
+& \textbf{Demo 14 (4×4)} & \textbf{Demo 15 (8×8)} \\
 \hline
 States (non-terminal) & 16 (11) & 64 (53) \\
 Features & 8 (row/col 0--3) & 16 (row/col 0--7) \\
