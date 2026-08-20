@@ -50,6 +50,7 @@ import CSHRL.Tasks.Verified.Queens1
 -- checked outside this aggregate, in a separate parallel CI job.
 -- Run locally with:
 --   agda src/CSHRL/Tasks/Synthesized/SacrificeSynth.agda      (CoindHomo vs CoinductiveHomomorphism oracles; seconds)
+--   agda src/CSHRL/Tasks/Synthesized/MountainCarSuccessor.agda (MountainCar, honest altitude reward, successor synthesis; ~4 min)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda         (4x4 dynamics learned)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered, curated space)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuConceptEnum.agda   (concept identified from ALL 2^16 hypotheses; ~5 min)
