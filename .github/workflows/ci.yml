@@ -83,6 +83,9 @@ jobs:
     - name: Compile synthesis demos (4x4 dynamics + concept discovery)
       run: |
         agda src/CSHRL/Tasks/Synthesized/SacrificeSynth.agda
+        agda src/CSHRL/Core/ShiftedHomomorphism.agda
+        agda src/CSHRL/Tasks/Verified/SacrificeChain.agda
+        agda src/CSHRL/Tasks/Synthesized/SacrificeDepthSynth.agda
         agda src/CSHRL/Tasks/Synthesized/MountainCarSuccessor.agda
         agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda
         agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda

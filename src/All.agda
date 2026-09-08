@@ -50,6 +50,9 @@ import CSHRL.Tasks.Verified.Queens1
 -- checked outside this aggregate, in a separate parallel CI job.
 -- Run locally with:
 --   agda src/CSHRL/Tasks/Synthesized/SacrificeSynth.agda      (CoindHomo vs CoinductiveHomomorphism oracles; seconds)
+--   agda src/CSHRL/Core/ShiftedHomomorphism.agda              (sacrifice hierarchy: k-shifted conditions; seconds)
+--   agda src/CSHRL/Tasks/Verified/SacrificeChain.agda         (strictness family Chain n, parametric in n; seconds)
+--   agda src/CSHRL/Tasks/Synthesized/SacrificeDepthSynth.agda (one CEGIS loop at rungs 0/1/2 on Chain 1; seconds)
 --   agda src/CSHRL/Tasks/Synthesized/MountainCarSuccessor.agda (MountainCar, honest altitude reward, successor synthesis; ~4 min)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuSynth.agda         (4x4 dynamics learned)
 --   agda src/CSHRL/Tasks/Synthesized/SudokuConceptSynth.agda  (4x4 conflict CONCEPT discovered, curated space)
