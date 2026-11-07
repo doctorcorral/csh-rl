@@ -1,0 +1,73 @@
+cff-version: 1.2.0
+message: If you use this software, please cite the published chapter in preferred-citation.
+title: Coinductive Symmetric Homomorphism Reinforcement Learning
+authors:
+  - family-names: Corral-Corral
+    given-names: Ricardo
+    affiliation: Independent Researcher
+    city: Chihuahua
+    country: MX
+    email: ricardo@gyx.ai
+repository-code: https://github.com/doctorcorral/csh-rl
+url: https://github.com/doctorcorral/csh-rl
+preferred-citation:
+  type: conference-paper
+  title: "Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation"
+  authors:
+    - family-names: Corral-Corral
+      given-names: Ricardo
+      affiliation: Independent Researcher
+      city: Chihuahua
+      country: MX
+      email: ricardo@gyx.ai
+  editors:
+    - family-names: Ponce
+      given-names: Hiram
+      affiliation: Universidad Panamericana
+      orcid: https://orcid.org/0000-0002-6559-7501
+    - family-names: Ochoa-Ruiz
+      given-names: Gilberto
+      affiliation: Tecnológico de Monterrey
+      orcid: https://orcid.org/0000-0002-9896-8727
+    - family-names: Méndez-Gurrola
+      given-names: Iris Iddaly
+      affiliation: Universidad Autónoma de Ciudad Juárez
+      orcid: https://orcid.org/0000-0002-9063-0481
+  collection-title: Lecture Notes in Computer Science
+  collection-type: series
+  collection-doi: 10.1007/978-3-032-44179-9
+  volume: 17150
+  volume-title: "Advances in Soft Computing: 25th Mexican International Conference on Artificial Intelligence, MICAI 2026, Chihuahua, Mexico, November 2–6, 2026, Proceedings, Part II"
+  conference:
+    name: Mexican International Conference on Artificial Intelligence
+    alias: MICAI
+    city: Chihuahua
+    country: MX
+    date-start: 2026-11-02
+    date-end: 2026-11-06
+  publisher:
+    name: Springer Nature Switzerland
+    city: Cham
+  start: 3
+  end: 28
+  pages: 3-28
+  year: 2026
+  month: 11
+  date-published: 2026-11-04
+  doi: 10.1007/978-3-032-44179-9_1
+  url: https://doi.org/10.1007/978-3-032-44179-9_1
+  isbn: "978-3-032-44179-9"
+  issn: "1611-3349"
+  languages:
+    - en
+  identifiers:
+    - type: url
+      value: https://link.springer.com/chapter/10.1007/978-3-032-44179-9_1
+      description: Springer Nature Link chapter page.
+    - type: other
+      value: "978-3-032-44178-2"
+      description: Print ISBN of the proceedings volume.
+    - type: other
+      value: "0302-9743"
+      description: Print ISSN of Lecture Notes in Computer Science.
+  notes: "Published online 4 November 2026. The chapter DOI record's issued date and Crossref BibTeX year are 2026. The book DOI 10.1007/978-3-032-44179-9 is issued 2027, and the Springer copyright line is Springer Nature Switzerland AG 2027. Volume 17150 is shown on Springer Nature Link for Lecture Notes in Computer Science and its Lecture Notes in Artificial Intelligence subseries; the Crossref chapter BibTeX export does not include a volume."
