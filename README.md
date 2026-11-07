@@ -6,7 +6,7 @@ A novel foundational framework for reinforcement learning that redefines optimal
 
 ## The Paper
 
-The published version is the MICAI 2026 chapter [Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation](https://doi.org/10.1007/978-3-032-44179-9_1). Cite that chapter, not the manuscript title below. The bibliographic record is in [Citation](#citation).
+The published version is [Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation](https://doi.org/10.1007/978-3-032-44179-9_1), in Lecture Notes in Artificial Intelligence, volume 17150 (2027), from the MICAI 2026 proceedings. Cite that chapter, not the manuscript title below. The bibliographic record is in [Citation](#citation).
 
 The development manuscript in this repository is a **literate Agda document**. Compiling it type-checks all embedded code while producing the PDF:
 
@@ -160,7 +160,9 @@ All learning modules provide:
 
 Cite the published chapter. The same BibTeX entry is in [`CITATION.bib`](CITATION.bib). GitHub's cite button reads [`CITATION.cff`](CITATION.cff).
 
-Corral-Corral, Ricardo (2026). Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation. In: Hiram Ponce, Gilberto Ochoa-Ruiz, and Iris Iddaly Méndez-Gurrola (eds.), *Advances in Soft Computing: 25th Mexican International Conference on Artificial Intelligence, MICAI 2026, Chihuahua, Mexico, November 2–6, 2026, Proceedings, Part II*. Lecture Notes in Computer Science, vol. 17150, subseries Lecture Notes in Artificial Intelligence. Springer Nature Switzerland, Cham, pp. 3–28. https://doi.org/10.1007/978-3-032-44179-9_1
+Corral-Corral, Ricardo (2027). Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation. In: Hiram Ponce, Gilberto Ochoa-Ruiz, and Iris Iddaly Méndez-Gurrola (eds.), *Advances in Soft Computing: 25th Mexican International Conference on Artificial Intelligence, MICAI 2026, Chihuahua, Mexico, November 2–6, 2026, Proceedings, Part II*. Lecture Notes in Artificial Intelligence, vol. 17150. Springer Nature Switzerland, Cham, pp. 3–28. https://doi.org/10.1007/978-3-032-44179-9_1
+
+The printed chapter footer is “H. Ponce et al. (Eds.): MICAI 2026, LNAI 17150, pp. 3–28, 2027.” MICAI 2026 is the conference, held 2–6 November 2026. The printed volume year is 2027. The chapter was published online on 4 November 2026.
 
 ```bibtex
 @incollection{corral2026cshrl,
@@ -168,22 +170,21 @@ Corral-Corral, Ricardo (2026). Coinductive Symmetric Homomorphism Reinforcement 
   title        = {Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation},
   booktitle    = {Advances in Soft Computing: 25th Mexican International Conference on Artificial Intelligence, MICAI 2026, Chihuahua, Mexico, November 2--6, 2026, Proceedings, Part II},
   editor       = {Ponce, Hiram and Ochoa-Ruiz, Gilberto and M{\'e}ndez-Gurrola, Iris Iddaly},
-  series       = {Lecture Notes in Computer Science},
+  series       = {Lecture Notes in Artificial Intelligence},
   volume       = {17150},
   pages        = {3--28},
-  year         = {2026},
-  month        = nov,
+  year         = {2027},
   publisher    = {Springer Nature Switzerland},
   address      = {Cham},
   doi          = {10.1007/978-3-032-44179-9_1},
   url          = {https://doi.org/10.1007/978-3-032-44179-9_1},
   isbn         = {978-3-032-44179-9},
   issn         = {1611-3349},
-  note         = {Subseries: Lecture Notes in Artificial Intelligence (LNAI). Print ISBN 978-3-032-44178-2. Series ISSN 0302-9743.}
+  note         = {Printed volume: LNAI 17150, pp. 3--28, 2027. Subseries of Lecture Notes in Computer Science. Published online 4 November 2026. Copyright: The Author(s), under exclusive license to Springer Nature Switzerland AG 2027. Print ISBN 978-3-032-44178-2. Series ISSN 0302-9743.}
 }
 ```
 
-`literate/CSHRL.lagda.tex` still uses the working title "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure". That title is not the published title. Crossref's BibTeX transform for the chapter is `@inbook` with year 2026. The entry above is `@incollection` so classic BibTeX keeps the editors and the book title. The proceedings volume, DOI `10.1007/978-3-032-44179-9`, is issued 2027, and the Springer copyright line reads Springer Nature Switzerland AG 2027. Volume 17150 is the Lecture Notes in Computer Science / Lecture Notes in Artificial Intelligence volume shown on Springer Nature Link; the Crossref chapter BibTeX export does not include a volume number. Electronic ISBN `978-3-032-44179-9`, print ISBN `978-3-032-44178-2`, series ISSN `0302-9743`, electronic ISSN `1611-3349`.
+`literate/CSHRL.lagda.tex` still uses the working title "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure". That title is not the published title. The citation key remains `corral2026cshrl`. The entry above is `@incollection` so classic BibTeX keeps the editors and the book title. The printed copyright line is “© The Author(s), under exclusive license to Springer Nature Switzerland AG 2027.” Crossref’s chapter BibTeX transform is `@inbook` with year 2026 and no volume; this record uses printed volume year 2027 and volume 17150. LNAI is the subseries of Lecture Notes in Computer Science. Electronic ISBN `978-3-032-44179-9`, print ISBN `978-3-032-44178-2`, series ISSN `0302-9743`, electronic ISSN `1611-3349`.
 
 ## Future Work
 

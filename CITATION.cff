@@ -33,7 +33,7 @@ preferred-citation:
       given-names: Iris Iddaly
       affiliation: Universidad Autónoma de Ciudad Juárez
       orcid: https://orcid.org/0000-0002-9063-0481
-  collection-title: Lecture Notes in Computer Science
+  collection-title: Lecture Notes in Artificial Intelligence
   collection-type: series
   collection-doi: 10.1007/978-3-032-44179-9
   volume: 17150
@@ -50,10 +50,7 @@ preferred-citation:
     city: Cham
   start: 3
   end: 28
-  pages: 3-28
-  year: 2026
-  month: 11
-  date-published: 2026-11-04
+  year: 2027
   doi: 10.1007/978-3-032-44179-9_1
   url: https://doi.org/10.1007/978-3-032-44179-9_1
   isbn: "978-3-032-44179-9"
@@ -69,5 +66,5 @@ preferred-citation:
       description: Print ISBN of the proceedings volume.
     - type: other
       value: "0302-9743"
-      description: Print ISSN of Lecture Notes in Computer Science.
-  notes: "Published online 4 November 2026. The chapter DOI record's issued date and Crossref BibTeX year are 2026. The book DOI 10.1007/978-3-032-44179-9 is issued 2027, and the Springer copyright line is Springer Nature Switzerland AG 2027. Volume 17150 is shown on Springer Nature Link for Lecture Notes in Computer Science and its Lecture Notes in Artificial Intelligence subseries; the Crossref chapter BibTeX export does not include a volume."
+      description: Print ISSN of Lecture Notes in Computer Science, the parent series of LNAI.
+  notes: "Printed chapter footer: H. Ponce et al. (Eds.): MICAI 2026, LNAI 17150, pp. 3–28, 2027. Copyright: The Author(s), under exclusive license to Springer Nature Switzerland AG 2027. Published online 4 November 2026. MICAI 2026 is the conference; 2027 is the printed volume year. LNAI is the subseries of Lecture Notes in Computer Science. Crossref chapter BibTeX uses year 2026 and omits the volume; this file follows the printed volume."
