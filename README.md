@@ -6,7 +6,7 @@ A novel foundational framework for reinforcement learning that redefines optimal
 
 ## The Paper
 
-The published version is [Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation](https://doi.org/10.1007/978-3-032-44179-9_1), in Lecture Notes in Artificial Intelligence, volume 17150 (2027), from the MICAI 2026 proceedings. Cite that chapter, not the manuscript title below. The bibliographic record is in [Citation](#citation).
+The published version is [Coinductive Symmetric Homomorphism Reinforcement Learning: Optimality as Structure Preservation](https://doi.org/10.1007/978-3-032-44179-9_1), in Lecture Notes in Artificial Intelligence, volume 17150 (2027), from the MICAI 2026 proceedings. The bibliographic record is in [Citation](#citation).
 
 The development manuscript in this repository is a **literate Agda document**. Compiling it type-checks all embedded code while producing the PDF:
 
@@ -184,7 +184,7 @@ The printed chapter footer is “H. Ponce et al. (Eds.): MICAI 2026, LNAI 17150,
 }
 ```
 
-`literate/CSHRL.lagda.tex` still uses the working title "Coinductive Symmetric Homomorphism Reinforcement Learning: A New Foundation Where Optimality Is Pure Structure". That title is not the published title. The citation key remains `corral2026cshrl`. The entry above is `@incollection` so classic BibTeX keeps the editors and the book title. The printed copyright line is “© The Author(s), under exclusive license to Springer Nature Switzerland AG 2027.” Crossref’s chapter BibTeX transform is `@inbook` with year 2026 and no volume; this record uses printed volume year 2027 and volume 17150. LNAI is the subseries of Lecture Notes in Computer Science. Electronic ISBN `978-3-032-44179-9`, print ISBN `978-3-032-44178-2`, series ISSN `0302-9743`, electronic ISSN `1611-3349`.
+The citation key remains `corral2026cshrl`. The entry above is `@incollection` so classic BibTeX keeps the editors and the book title. The printed copyright line is “© The Author(s), under exclusive license to Springer Nature Switzerland AG 2027.” Crossref’s chapter BibTeX transform is `@inbook` with year 2026 and no volume; this record uses printed volume year 2027 and volume 17150. LNAI is the subseries of Lecture Notes in Computer Science. Electronic ISBN `978-3-032-44179-9`, print ISBN `978-3-032-44178-2`, series ISSN `0302-9743`, electronic ISSN `1611-3349`.
 
 ## Future Work
 
