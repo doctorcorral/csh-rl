@@ -521,7 +521,7 @@ test-replay : length (refine (refine vs3 (3 , true)) (0 , false))
             ≡ length vs3   = refl
 \end{spec}
 
-\noindent For the depth-1 ``is~R~optimal?'' predicate (1012~initial candidates), 4~observations achieve a 99\%~reduction to 10~candidates: $1012 \to 286 \to 189 \to 155 \to 10$.  This instantiates the theoretical guarantees of~\S\ref{sec:online} (commutativity, replay redundancy, monotonic convergence) on a concrete RL benchmark, confirming that the CEGIS framework is suitable for online, incremental policy learning.
+\noindent For the depth-1 ``is~R~optimal?'' predicate (1980~initial candidates), 4~observations achieve a 99\%~reduction to 10~candidates: $1980 \to 770 \to 346 \to 240 \to 10$.  This instantiates the theoretical guarantees of~\S\ref{sec:online} (commutativity, replay redundancy, monotonic convergence) on a concrete RL benchmark, confirming that the CEGIS framework is suitable for online, incremental policy learning.
 
 \subsection{Demo 9: Cliff Walking \texorpdfstring{$4 \times 6$}{4x6} (FDMDP)}
 \label{sec:e2e-cliffwalk}

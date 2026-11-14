@@ -113,28 +113,28 @@ test-replay = refl
 vs0-R : VersionSpace
 vs0-R = initial-vs 1
 
-test-vs0-R : length vs0-R ≡ 1012
+test-vs0-R : length vs0-R ≡ 1980
 test-vs0-R = refl
 
 -- Observation 1: at state 14, R IS optimal
 vs-R1 : VersionSpace
 vs-R1 = refine vs0-R (14 , true)
 
-test-vs-R1 : length vs-R1 ≡ 286
+test-vs-R1 : length vs-R1 ≡ 770
 test-vs-R1 = refl
 
 -- Observation 2: at state 0, R is NOT optimal
 vs-R2 : VersionSpace
 vs-R2 = refine vs-R1 (0 , false)
 
-test-vs-R2 : length vs-R2 ≡ 189
+test-vs-R2 : length vs-R2 ≡ 346
 test-vs-R2 = refl
 
 -- Observation 3: at state 9, R is NOT optimal
 vs-R3 : VersionSpace
 vs-R3 = refine vs-R2 (9 , false)
 
-test-vs-R3 : length vs-R3 ≡ 155
+test-vs-R3 : length vs-R3 ≡ 240
 test-vs-R3 = refl
 
 -- Observation 4: at state 8, R IS optimal
@@ -151,9 +151,9 @@ test-vs-R4 = refl
 --   3 observations: 22 → 6 → 3 → 2
 --   The 2 survivors are equivalent on all non-terminal states.
 --
--- "is R optimal?" (depth 1, 1012 candidates):
---   4 observations: 1012 → 286 → 189 → 155 → 10
---   From 1012 to 10 in 4 steps — 99% reduction.
+-- "is R optimal?" (depth 1, 1980 candidates):
+--   4 observations: 1980 → 770 → 346 → 240 → 10
+--   From 1980 to 10 in 4 steps — 99% reduction.
 --
 -- Properties: replay-redundant, commutative, monotonically converging.
 -- Compile time: ~8 seconds (FrozenLakeE2E cached).
