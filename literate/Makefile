@@ -3,13 +3,14 @@
 
 MAIN = CSHRL
 APPENDIX = CSHRL-Appendix
+SYNTHESIS = CSHRLSynthesis
 AGDA = agda
 LATEX = lualatex
 LATEX_FLAGS = -interaction=nonstopmode
 
-.PHONY: all clean agda pdf appendix
+.PHONY: all clean agda pdf appendix synthesis agda-synthesis
 
-all: pdf appendix
+all: pdf appendix synthesis
 
 # Main document
 agda: $(MAIN).lagda.tex
@@ -30,10 +31,21 @@ appendix: agda-appendix
 	cd latex && $(LATEX) $(LATEX_FLAGS) $(APPENDIX).tex
 	cp latex/$(APPENDIX).pdf .
 
+# Synthesis paper (main text + demos appendix, which it \input{}s)
+agda-synthesis: $(SYNTHESIS).lagda.tex $(SYNTHESIS)-Demos.lagda.tex
+	$(AGDA) --latex $(SYNTHESIS).lagda.tex
+	$(AGDA) --latex $(SYNTHESIS)-Demos.lagda.tex
+	cp agda-spec.sty latex/
+
+synthesis: agda-synthesis
+	cd latex && $(LATEX) $(LATEX_FLAGS) $(SYNTHESIS).tex
+	cd latex && $(LATEX) $(LATEX_FLAGS) $(SYNTHESIS).tex
+	cp latex/$(SYNTHESIS).pdf .
+
 # Clean build artifacts
 clean:
 	rm -rf latex/
-	rm -f $(MAIN).pdf $(APPENDIX).pdf
+	rm -f $(MAIN).pdf $(APPENDIX).pdf $(SYNTHESIS).pdf
 	rm -f *.agdai
 	rm -rf _build/
 
